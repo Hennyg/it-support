@@ -13,7 +13,7 @@
     { "route": "/index.html","allowedRoles": ["portal_admin", "portal_it_support"] }
   ],
   "responseOverrides": {
-    "401": { "rewrite": "/unauthorized.html" },
+    "401": { "redirect": "/.auth/login/aad?post_login_redirect_uri=%2F", "statusCode": 302 },
     "403": { "rewrite": "/unauthorized.html" }
   }
 }
