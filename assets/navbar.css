@@ -1,0 +1,82 @@
+:root{
+  --nav-bg:#850c18;
+  --nav-accent:#1f6c7a;
+  --text-on-dark:#fff;
+  --maxw:1200px;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif;
+}
+
+.navbar{background:var(--nav-bg);color:var(--text-on-dark);font-family:var(--font)}
+.navbar-inner{
+  max-width:var(--maxw);
+  margin:0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:.85rem 1rem;
+  gap:1rem;
+}
+.brand{display:flex;align-items:center;gap:12px;white-space:nowrap}
+.brand .logo{
+  width:44px;height:44px;border-radius:999px;
+  background:url("/icons/logo_kontakter192.png") center/cover no-repeat;
+  box-shadow:0 1px 6px rgba(0,0,0,.18);
+  flex:0 0 auto;
+}
+.brand .title{font-size:1.2rem;font-weight:700;letter-spacing:.2px;line-height:1.1}
+.brand .sub{font-size:.85rem;opacity:.85;margin-top:.2rem}
+
+.nav{
+  display:flex;
+  gap:1rem;
+  align-items:center;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  font-size:1rem;
+}
+.nav a{color:var(--text-on-dark);text-decoration:none;opacity:.95}
+.nav a:hover{opacity:1;text-decoration:underline}
+.sep{opacity:.45;user-select:none}
+.userLine{opacity:.9;font-size:.95rem}
+
+.nav-accent{height:10px;background:var(--nav-accent)}
+
+.appMenu{position:relative;display:inline-block}
+.appBtn{
+  appearance:none;border:0;background:transparent;color:var(--text-on-dark);
+  font:inherit;cursor:pointer;opacity:.95;padding:.2rem .35rem;border-radius:8px;
+}
+.appBtn:hover{opacity:1;text-decoration:underline}
+.appPanel{
+  position:absolute;right:0;top:calc(100% + 10px);
+  min-width:260px;
+  background:#fff;color:#111;
+  border:1px solid rgba(0,0,0,.12);
+  border-radius:12px;
+  box-shadow:0 10px 30px rgba(0,0,0,.18);
+  padding:.5rem;
+  z-index:2000;
+  display:none;
+}
+.appPanel.open{display:block}
+.appItem{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:.55rem .6rem;border-radius:10px;
+  text-decoration:none;color:inherit;
+}
+.appItem:hover{background:rgba(0,0,0,.05)}
+.appItem .l{display:flex;flex-direction:column;gap:2px}
+.appItem .n{font-weight:700}
+.appItem .d{font-size:.85rem;opacity:.75}
+.appItem .tag{font-size:.75rem;opacity:.65}
+.appItem.active{background:rgba(0,0,0,.06)}
+.hidden{display:none !important}
+
+@media (max-width: 720px){
+  .brand .title{font-size:1.05rem}
+  .nav{gap:.75rem}
+  .userLine{font-size:.9rem}
+}
+.navbar{position:sticky;top:0;z-index:100}
+.navbar .brand{font-size:1.2rem}
+.navbar .logo{width:42px;height:42px}
