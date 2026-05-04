@@ -1,4 +1,7 @@
 {
+  "auth": {
+    "rolesSource": "/api/getRoles"
+  },
   "routes": [
     { "route": "/favicon.ico",       "allowedRoles": ["anonymous", "authenticated"] },
     { "route": "/manifest.json",     "allowedRoles": ["anonymous", "authenticated"] },
@@ -9,8 +12,8 @@
     { "route": "/api/getRoles",      "allowedRoles": ["authenticated"] },
     { "route": "/api/*",             "allowedRoles": ["portal_admin", "portal_it_support"] },
 
-    { "route": "/",          "allowedRoles": ["portal_admin", "portal_it_support"] },
-    { "route": "/index.html","allowedRoles": ["portal_admin", "portal_it_support"] }
+    { "route": "/",                  "allowedRoles": ["portal_admin", "portal_it_support"] },
+    { "route": "/index.html",        "allowedRoles": ["portal_admin", "portal_it_support"] }
   ],
   "responseOverrides": {
     "401": { "redirect": "/.auth/login/aad?post_login_redirect_uri=%2F", "statusCode": 302 },
