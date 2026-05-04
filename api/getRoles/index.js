@@ -1,3 +1,4 @@
+
 // api/getRoles/index.js
 // Gruppe-ID'er læses fra environment variables i SWA Configuration.
 // Sæt PORTAL_ADMIN_ID og PORTAL_IT_SUPPORT_ID i Application settings.
