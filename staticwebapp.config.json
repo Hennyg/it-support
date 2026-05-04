@@ -1,0 +1,19 @@
+{
+  "routes": [
+    { "route": "/favicon.ico",       "allowedRoles": ["anonymous", "authenticated"] },
+    { "route": "/manifest.json",     "allowedRoles": ["anonymous", "authenticated"] },
+    { "route": "/assets/*",          "allowedRoles": ["anonymous", "authenticated"] },
+    { "route": "/.auth/*",           "allowedRoles": ["anonymous", "authenticated"] },
+    { "route": "/unauthorized.html", "allowedRoles": ["anonymous", "authenticated"] },
+
+    { "route": "/api/getRoles",      "allowedRoles": ["authenticated"] },
+    { "route": "/api/*",             "allowedRoles": ["portal_admin", "portal_it_support"] },
+
+    { "route": "/",          "allowedRoles": ["portal_admin", "portal_it_support"] },
+    { "route": "/index.html","allowedRoles": ["portal_admin", "portal_it_support"] }
+  ],
+  "responseOverrides": {
+    "401": { "rewrite": "/unauthorized.html" },
+    "403": { "rewrite": "/unauthorized.html" }
+  }
+}
