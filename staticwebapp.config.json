@@ -1,4 +1,7 @@
 {
+  "auth": {
+    "rolesSource": "/api/getRoles"
+  },
   "routes": [
     { "route": "/favicon.ico",       "allowedRoles": ["anonymous", "authenticated"] },
     { "route": "/manifest.json",     "allowedRoles": ["anonymous", "authenticated"] },
