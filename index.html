@@ -110,9 +110,11 @@
         });
       }
 
-    } catch {
-      location.href = "/unauthorized.html";
-    }
+      } catch (err) {
+            console.error("Auth fejl:", err);
+            document.getElementById("appContent").style.display = "";
+            document.getElementById("greetingUser").textContent = "Fejl ved adgangstjek";
+          }
   })();
   </script>
 
