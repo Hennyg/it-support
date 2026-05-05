@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ingen adgang – IT Support</title>
+  <title>IT Support Portal</title>
   <link rel="stylesheet" href="/assets/navbar.css" />
   <meta name="herrup-app" content="it-support">
   <meta name="herrup-title" content="IT Support">
-  <meta name="herrup-subtitle" content="Adgang mangler">
+  <meta name="herrup-subtitle" content="">
   <script src="/assets/navbar.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
@@ -33,9 +33,9 @@
     .icon { font-size: 3rem; margin-bottom: 16px; }
     h1 { margin: 0 0 10px; font-size: 1.8rem; color: #111827; }
     p { color: #6b7280; margin: 8px 0; line-height: 1.6; }
+    .buttons { display: flex; gap: 12px; justify-content: center; margin-top: 28px; flex-wrap: wrap; }
     .btn {
       display: inline-block;
-      margin-top: 28px;
       padding: 12px 28px;
       background: #850c18;
       color: #fff;
@@ -45,17 +45,24 @@
       font-size: 1rem;
     }
     .btn:hover { background: #6b0913; }
+    .btn.secondary {
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #e5e7eb;
+    }
+    .btn.secondary:hover { background: #e5e7eb; }
     #userLine { margin-top: 18px; font-size: .9rem; color: #9ca3af; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="box">
-      <div class="icon">🔒</div>
-      <h1>Ingen adgang</h1>
-      <p>Din bruger har ikke adgang til <strong>IT Support Portalen</strong>.</p>
-      <p>Kontakt din administrator for at få tildelt de nødvendige rettigheder.</p>
-      <a class="btn" href="/.auth/logout?post_logout_redirect_uri=/">Log ud og prøv igen</a>
+      <div class="icon" id="icon">🔒</div>
+      <h1 id="heading">Log ind</h1>
+      <p id="message">Log ind med din organisationskonto for at få adgang til IT Support Portalen.</p>
+      <div class="buttons" id="buttons">
+        <a class="btn" href="/.auth/login/aad?post_login_redirect_uri=/">Log ind</a>
+      </div>
       <div id="userLine"></div>
     </div>
   </div>
@@ -66,6 +73,13 @@
       const me = await r.json();
       const user = me?.clientPrincipal?.userDetails;
       if (user) {
+        // Logget ind men ingen adgang
+        document.getElementById("icon").textContent = "⛔";
+        document.getElementById("heading").textContent = "Ingen adgang";
+        document.getElementById("message").textContent = "Din bruger har ikke adgang til IT Support Portalen. Kontakt din administrator for at få tildelt de nødvendige rettigheder.";
+        document.getElementById("buttons").innerHTML = `
+          <a class="btn secondary" href="/.auth/logout?post_logout_redirect_uri=/">Log ud</a>
+        `;
         document.getElementById("userLine").textContent = "Logget ind som: " + user;
       }
     } catch {}
