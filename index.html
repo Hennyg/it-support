@@ -4,18 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>IT Support Portal</title>
-
   <link rel="stylesheet" href="/assets/navbar.css" />
-
   <meta name="herrup-app" content="it-support">
   <meta name="herrup-title" content="IT Support">
   <meta name="herrup-subtitle" content="Intern IT Support Portal">
-
   <script src="/assets/navbar.js"></script>
-
   <style>
     *, *::before, *::after { box-sizing: border-box; }
-
     body {
       margin: 0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -23,13 +18,8 @@
       color: #111827;
       min-height: 100vh;
     }
-
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 40px 20px;
-    }
-
+    #appContent { display: none; }
+    .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
     .welcome-hero {
       background: linear-gradient(135deg, #850c18 0%, #5a0810 100%);
       color: #fff;
@@ -38,202 +28,91 @@
       margin-bottom: 32px;
       box-shadow: 0 10px 30px rgba(0,0,0,.15);
     }
-
-    .welcome-hero h1 {
-      margin: 0 0 12px;
-      font-size: 2.2rem;
-      line-height: 1.15;
-    }
-
-    .welcome-hero p {
-      margin: 0;
-      font-size: 1.05rem;
-      line-height: 1.6;
-      color: rgba(255,255,255,.9);
-      max-width: 620px;
-    }
-
+    .welcome-hero h1 { margin: 0 0 12px; font-size: 2.2rem; line-height: 1.15; }
+    .welcome-hero p { margin: 0; font-size: 1.05rem; line-height: 1.6; color: rgba(255,255,255,.9); max-width: 620px; }
     .welcome-hero .user-greeting {
-      display: inline-block;
-      margin-top: 18px;
-      background: rgba(255,255,255,.15);
-      border: 1px solid rgba(255,255,255,.25);
-      border-radius: 999px;
-      padding: 6px 16px;
-      font-size: .95rem;
-      font-weight: 600;
+      display: inline-block; margin-top: 18px;
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25);
+      border-radius: 999px; padding: 6px 16px; font-size: .95rem; font-weight: 600;
     }
-
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 18px;
-      margin-bottom: 32px;
-    }
-
-    .card {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.05);
-    }
-
-    .card-icon {
-      font-size: 2rem;
-      margin-bottom: 12px;
-    }
-
-    .card h2 {
-      margin: 0 0 8px;
-      font-size: 1.1rem;
-      color: #111827;
-    }
-
-    .card p {
-      margin: 0;
-      font-size: .95rem;
-      color: #6b7280;
-      line-height: 1.55;
-    }
-
-    .role-info {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 16px;
-      padding: 20px 24px;
-      margin-bottom: 24px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.05);
-    }
-
-    .role-info h3 {
-      margin: 0 0 10px;
-      font-size: 1rem;
-      color: #374151;
-    }
-
-    .role-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .role-badge {
-      background: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      color: #166534;
-      border-radius: 999px;
-      padding: 4px 14px;
-      font-size: .85rem;
-      font-weight: 600;
-    }
-
-    .role-badge.admin {
-      background: #fef3c7;
-      border-color: #fcd34d;
-      color: #92400e;
-    }
-
-    .role-badge.muted {
-      background: #f3f4f6;
-      border-color: #e5e7eb;
-      color: #6b7280;
-    }
-
-    @media (max-width: 600px) {
-      .welcome-hero {
-        padding: 24px;
-      }
-
-      .welcome-hero h1 {
-        font-size: 1.7rem;
-      }
-    }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-bottom: 32px; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .card-icon { font-size: 2rem; margin-bottom: 12px; }
+    .card h2 { margin: 0 0 8px; font-size: 1.1rem; }
+    .card p { margin: 0; font-size: .95rem; color: #6b7280; line-height: 1.55; }
+    .role-info { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; }
+    .role-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .role-badge { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 999px; padding: 4px 14px; font-size: .85rem; font-weight: 600; }
+    .role-badge.admin { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
   </style>
 </head>
 <body>
-  <div class="container">
 
-    <section class="welcome-hero">
-      <h1>Velkommen til IT Support</h1>
-      <p>
-        Dette er den interne IT Support Portal. Her kan du finde værktøjer og ressourcer
-        til daglig IT-understøttelse.
-      </p>
-      <div class="user-greeting" id="greetingUser">Henter bruger...</div>
-    </section>
-
-    <div class="role-info" id="roleInfo" style="display:none;">
-      <h3>Din adgang</h3>
-      <div class="role-badges" id="roleBadges"></div>
-    </div>
-
-    <div class="cards">
-      <div class="card">
-        <div class="card-icon">🖥️</div>
-        <h2>Support</h2>
-        <p>Adgang til support-værktøjer og brugeradministration.</p>
+  <div id="appContent">
+    <div class="container">
+      <section class="welcome-hero">
+        <h1>Velkommen til IT Support</h1>
+        <p>Dette er den interne IT Support Portal. Her kan du finde værktøjer og ressourcer til daglig IT-understøttelse.</p>
+        <div class="user-greeting" id="greetingUser"></div>
+      </section>
+      <div class="role-info" id="roleInfo" style="display:none;">
+        <strong>Din adgang</strong>
+        <div class="role-badges" id="roleBadges"></div>
       </div>
-
-      <div class="card">
-        <div class="card-icon">🔐</div>
-        <h2>Adgangsstyring</h2>
-        <p>Administrér brugeradgang og rettigheder i systemerne.</p>
-      </div>
-
-      <div class="card">
-        <div class="card-icon">📋</div>
-        <h2>Dokumentation</h2>
-        <p>Interne guides og teknisk dokumentation.</p>
+      <div class="cards">
+        <div class="card"><div class="card-icon">🖥️</div><h2>Support</h2><p>Adgang til support-værktøjer og brugeradministration.</p></div>
+        <div class="card"><div class="card-icon">🔐</div><h2>Adgangsstyring</h2><p>Administrér brugeradgang og rettigheder i systemerne.</p></div>
+        <div class="card"><div class="card-icon">📋</div><h2>Dokumentation</h2><p>Interne guides og teknisk dokumentation.</p></div>
       </div>
     </div>
-
   </div>
 
   <script>
+  const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
+
   (async () => {
-    // Vis brugerens navn i velkomsthilsen
     try {
-      const r = await fetch("/.auth/me", { headers: { Accept: "application/json" } });
-      if (r.ok) {
-        const me = await r.json();
-        const user = me?.clientPrincipal?.userDetails;
-        const el = document.getElementById("greetingUser");
-        if (user) {
-          el.textContent = "Logget ind som: " + user;
-        } else {
-          el.textContent = "Ikke logget ind";
-        }
+      // Tjek om bruger er logget ind
+      const meRes = await fetch("/.auth/me");
+      const me = await meRes.json();
+      const user = me?.clientPrincipal?.userDetails;
+
+      if (!user) {
+        location.href = "/unauthorized.html";
+        return;
       }
-    } catch {}
 
-    // Hent roller via getRoles API (samme mønster som navbar.js)
-    try {
-      const r = await fetch("/api/getRoles", { headers: { Accept: "application/json" } });
-      if (r.ok) {
-        const data = await r.json();
-        const roles = Array.isArray(data?.roles) ? data.roles : [];
+      // Hent roller fra getRoles
+      const rolesRes = await fetch("/api/getRoles");
+      const rolesData = await rolesRes.json();
+      const roles = Array.isArray(rolesData?.roles) ? rolesData.roles : [];
 
-        // Filtrer system-roller væk – vis kun applikationsroller
-        const appRoles = roles.filter(role =>
-          !["anonymous", "authenticated"].includes(role)
-        );
-
-        const roleInfo = document.getElementById("roleInfo");
-        const roleBadges = document.getElementById("roleBadges");
-
-        if (appRoles.length > 0) {
-          roleInfo.style.display = "";
-          appRoles.forEach(role => {
-            const span = document.createElement("span");
-            span.className = "role-badge" +
-              (role === "portal_admin" ? " admin" : "");
-            span.textContent = role;
-            roleBadges.appendChild(span);
-          });
-        }
+      // Tjek om brugeren har adgang
+      const hasAccess = roles.some(r => ALLOWED_ROLES.includes(r));
+      if (!hasAccess) {
+        location.href = "/unauthorized.html";
+        return;
       }
-    } catch {}
+
+      // Vis indhold
+      document.getElementById("appContent").style.display = "";
+      document.getElementById("greetingUser").textContent = "Logget ind som: " + user;
+
+      // Vis roller
+      const appRoles = roles.filter(r => !["anonymous", "authenticated"].includes(r));
+      if (appRoles.length > 0) {
+        document.getElementById("roleInfo").style.display = "";
+        appRoles.forEach(role => {
+          const span = document.createElement("span");
+          span.className = "role-badge" + (role === "portal_admin" ? " admin" : "");
+          span.textContent = role;
+          document.getElementById("roleBadges").appendChild(span);
+        });
+      }
+
+    } catch {
+      location.href = "/unauthorized.html";
+    }
   })();
   </script>
 
