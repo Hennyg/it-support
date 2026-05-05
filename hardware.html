@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hardware — IT Support</title>
+  <link rel="stylesheet" href="/assets/navbar.css" />
+  <meta name="herrup-app" content="it-support">
+  <meta name="herrup-title" content="IT Support">
+  <meta name="herrup-subtitle" content="Hardware & System">
+  <script src="/assets/navbar.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; color: #111827; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
+
+    /* Status banner */
+    .agent-status { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: 12px; margin-bottom: 24px; font-size: .95rem; font-weight: 600; }
+    .agent-status.ok      { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .agent-status.error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .agent-status.loading { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot.green  { background: #22c55e; }
+    .dot.red    { background: #ef4444; }
+    .dot.gray   { background: #94a3b8; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+
+    /* Grid layout */
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+    .grid.wide { grid-template-columns: 1fr; }
+
+    /* Kort */
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .card-header { display: flex; align-items: center; gap: 10px; padding: 16px 20px; border-bottom: 1px solid #f3f4f6; }
+    .card-icon { font-size: 1.4rem; }
+    .card-title { font-size: 1rem; font-weight: 700; color: #111827; }
+    .card-body { padding: 16px 20px; }
+
+    /* Rækker i kort */
+    .row { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid #f9fafb; gap: 12px; }
+    .row:last-child { border-bottom: none; }
+    .row-label { font-size: .85rem; color: #6b7280; flex-shrink: 0; }
+    .row-value { font-size: .9rem; color: #111827; font-weight: 500; text-align: right; word-break: break-word; }
+
+    /* Driver-knap */
+    .driver-btn { display: inline-block; margin-top: 8px; padding: 6px 14px; background: #850c18; color: #fff; border-radius: 8px; font-size: .82rem; font-weight: 600; text-decoration: none; }
+    .driver-btn:hover { background: #6b0913; }
+
+    /* Drev progress */
+    .drive-bar { height: 8px; background: #f3f4f6; border-radius: 4px; margin: 6px 0 2px; overflow: hidden; }
+    .drive-bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+    .drive-bar-fill.ok   { background: #22c55e; }
+    .drive-bar-fill.warn { background: #f59e0b; }
+    .drive-bar-fill.crit { background: #ef4444; }
+
+    /* Event log tabel */
+    .event-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+    .event-table th { background: #f8fafc; padding: 8px 12px; text-align: left; font-weight: 600; color: #374151; border-bottom: 2px solid #e5e7eb; }
+    .event-table td { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+    .event-table tr:hover td { background: #fafafa; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+    .badge.error   { background: #fef2f2; color: #991b1b; }
+    .badge.warning { background: #fffbeb; color: #92400e; }
+
+    /* Software søgning */
+    .search-box { width: 100%; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: .9rem; margin-bottom: 12px; outline: none; }
+    .search-box:focus { border-color: #850c18; box-shadow: 0 0 0 3px rgba(133,12,24,.1); }
+    .software-list { max-height: 400px; overflow-y: auto; }
+    .software-item { display: flex; justify-content: space-between; padding: 6px 4px; border-bottom: 1px solid #f3f4f6; font-size: .85rem; gap: 8px; }
+    .software-item:last-child { border-bottom: none; }
+    .sw-name { color: #111827; }
+    .sw-version { color: #6b7280; flex-shrink: 0; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; }
+    .tab { padding: 8px 16px; cursor: pointer; font-size: .9rem; font-weight: 500; color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+    .tab.active { color: #850c18; border-bottom-color: #850c18; }
+
+    /* Ikke tilgængelig */
+    #noAgent { display: none; }
+    .no-agent-box { background: #fff; border: 1px solid #fecaca; border-radius: 16px; padding: 32px; text-align: center; }
+    .no-agent-box h2 { color: #991b1b; margin: 0 0 12px; }
+    .no-agent-box p { color: #6b7280; margin: 0 0 20px; line-height: 1.6; }
+    .copy-btn { padding: 10px 20px; background: #850c18; color: #fff; border: none; border-radius: 10px; font-size: .9rem; font-weight: 600; cursor: pointer; }
+    .copy-btn:hover { background: #6b0913; }
+    code.install-cmd { display: block; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; font-size: .85rem; text-align: left; margin: 12px 0; color: #1e293b; }
+  </style>
+</head>
+<body>
+
+<div id="appContent" style="display:none;">
+  <div class="container">
+
+    <div class="agent-status loading" id="agentStatus">
+      <div class="dot gray" id="agentDot"></div>
+      <span id="agentStatusText">Forbinder til IT Support Agent...</span>
+    </div>
+
+    <!-- Vises kun hvis agent ikke er installeret -->
+    <div id="noAgent">
+      <div class="no-agent-box">
+        <h2>🔌 IT Support Agent ikke fundet</h2>
+        <p>IT Support Agent er ikke installeret på denne PC. Agenten skal installeres for at kunne vise hardware-info, køre scripts og se event logs.</p>
+        <p>Kontakt din IT-administrator for at få agenten installeret via Intune.</p>
+        <p style="font-size:.85rem;color:#9ca3af;">Forventer agent på <code>http://localhost:5199</code></p>
+      </div>
+    </div>
+
+    <!-- Vises når agent er klar -->
+    <div id="agentContent" style="display:none;">
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab active" onclick="showTab('hardware')">🖥️ Hardware</div>
+        <div class="tab" onclick="showTab('software')">📦 Software</div>
+        <div class="tab" onclick="showTab('eventlog')">⚠️ Event Log</div>
+      </div>
+
+      <!-- ── HARDWARE TAB ── -->
+      <div id="tab-hardware">
+        <div class="grid" id="hwGrid">
+          <!-- Udfyldes af JS -->
+        </div>
+      </div>
+
+      <!-- ── SOFTWARE TAB ── -->
+      <div id="tab-software" style="display:none;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon">📦</div>
+            <div class="card-title">Installerede programmer <span id="swCount" style="font-weight:400;color:#6b7280;"></span></div>
+          </div>
+          <div class="card-body">
+            <input class="search-box" type="search" id="swSearch" placeholder="Søg i programmer..." oninput="filterSoftware()" />
+            <div class="software-list" id="swList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── EVENT LOG TAB ── -->
+      <div id="tab-eventlog" style="display:none;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon">⚠️</div>
+            <div class="card-title">Windows Event Log — fejl og advarsler (seneste 7 dage)</div>
+          </div>
+          <div class="card-body" style="overflow-x:auto;">
+            <table class="event-table">
+              <thead>
+                <tr>
+                  <th>Tidspunkt</th>
+                  <th>Log</th>
+                  <th>Niveau</th>
+                  <th>Kilde</th>
+                  <th>ID</th>
+                  <th>Besked</th>
+                </tr>
+              </thead>
+              <tbody id="eventBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /agentContent -->
+  </div>
+</div>
+
+<script>
+const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
+const AGENT = "http://localhost:5199";
+let allSoftware = [];
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+(async () => {
+  const me = await fetch("/.auth/me").then(r => r.json()).catch(() => null);
+  if (!me?.clientPrincipal?.userDetails) { location.href = "/unauthorized.html"; return; }
+  const roles = (await fetch("/api/getRoles").then(r => r.json()).catch(() => ({roles:[]}))).roles ?? [];
+  if (!roles.some(r => ALLOWED_ROLES.includes(r))) { location.href = "/unauthorized.html"; return; }
+
+  document.getElementById("appContent").style.display = "";
+  initAgent();
+})();
+
+// ── Agent ─────────────────────────────────────────────────────────────────────
+async function initAgent() {
+  try {
+    const ping = await fetch(`${AGENT}/api/ping`, { signal: AbortSignal.timeout(3000) });
+    if (!ping.ok) throw new Error("ping fejlede");
+
+    setStatus("ok", "IT Support Agent forbundet");
+    document.getElementById("agentContent").style.display = "";
+
+    // Hent hardware med det samme
+    loadHardware();
+  } catch {
+    setStatus("error", "IT Support Agent ikke fundet på localhost:5199");
+    document.getElementById("noAgent").style.display = "";
+  }
+}
+
+function setStatus(type, text) {
+  const s = document.getElementById("agentStatus");
+  const d = document.getElementById("agentDot");
+  s.className = `agent-status ${type}`;
+  d.className = `dot ${type === "ok" ? "green" : type === "error" ? "red" : "gray"}`;
+  document.getElementById("agentStatusText").textContent = text;
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function showTab(name) {
+  ["hardware","software","eventlog"].forEach(t => {
+    document.getElementById(`tab-${t}`).style.display = t === name ? "" : "none";
+  });
+  document.querySelectorAll(".tab").forEach((el, i) => {
+    el.classList.toggle("active", ["hardware","software","eventlog"][i] === name);
+  });
+
+  if (name === "software" && allSoftware.length === 0) loadSoftware();
+  if (name === "eventlog" && document.getElementById("eventBody").childElementCount === 0) loadEventLog();
+}
+
+// ── Hardware ─────────────────────────────────────────────────────────────────
+async function loadHardware() {
+  const hw = await fetch(`${AGENT}/api/hardware`).then(r => r.json());
+  const grid = document.getElementById("hwGrid");
+  grid.innerHTML = "";
+
+  // Windows
+  grid.appendChild(makeCard("🪟", "Windows", [
+    ["Version",       hw.windows.caption],
+    ["Build",         hw.windows.build],
+    ["Arkitektur",    hw.windows.architecture],
+    ["Senest startet",hw.windows.lastBoot],
+  ]));
+
+  // CPU
+  grid.appendChild(makeCard("⚙️", "Processor", [
+    ["Model",         hw.cpu.name],
+    ["Kerner",        `${hw.cpu.cores} kerner / ${hw.cpu.logicalCores} logiske`],
+    ["Maks hastighed",`${(hw.cpu.maxClockMhz/1000).toFixed(1)} GHz`],
+  ]));
+
+  // RAM
+  const ramCard = makeCard("🧠", `RAM — ${hw.ram.totalGb} GB i alt`, []);
+  const ramBody = ramCard.querySelector(".card-body");
+  hw.ram.sticks.forEach(s => {
+    const d = document.createElement("div");
+    d.className = "row";
+    d.innerHTML = `<span class="row-label">${s.slot}</span><span class="row-value">${s.capacityGb} GB · ${s.speedMhz} MHz · ${s.manufacturer || "—"}</span>`;
+    ramBody.appendChild(d);
+  });
+  grid.appendChild(ramCard);
+
+  // GPU'er
+  hw.gpus.forEach(gpu => {
+    const driverUrl = getDriverUrl(gpu.name);
+    const el = makeCard("🎮", "Grafikkort", [
+      ["Model",          gpu.name],
+      ["VRAM",           gpu.vramMb > 0 ? `${gpu.vramMb} MB` : "—"],
+      ["Driver version", gpu.driverVersion],
+      ["Driver dato",    gpu.driverDate],
+    ]);
+    if (driverUrl) {
+      const body = el.querySelector(".card-body");
+      const a = document.createElement("a");
+      a.className = "driver-btn";
+      a.href = driverUrl;
+      a.target = "_blank";
+      a.textContent = "Hent nyeste driver →";
+      body.appendChild(a);
+    }
+    grid.appendChild(el);
+  });
+
+  // Drev
+  const driveCard = makeCard("💾", "Drev", []);
+  const driveBody = driveCard.querySelector(".card-body");
+  hw.drives.forEach(d => {
+    const pct = d.usedPct;
+    const cls = pct >= 90 ? "crit" : pct >= 75 ? "warn" : "ok";
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <div class="row">
+        <span class="row-label">${d.letter}</span>
+        <span class="row-value">${d.freeGb} GB fri af ${d.sizeGb} GB (${d.fileSystem})</span>
+      </div>
+      <div class="drive-bar"><div class="drive-bar-fill ${cls}" style="width:${pct}%"></div></div>
+    `;
+    driveBody.appendChild(div);
+  });
+  grid.appendChild(driveCard);
+
+  // Skærme
+  if (hw.monitors.length > 0) {
+    grid.appendChild(makeCard("🖥️", "Skærme", hw.monitors.map((m, i) => [
+      `Skærm ${i+1}`, `${m.resolution} — ${m.name}`
+    ])));
+  }
+}
+
+function makeCard(icon, title, rows) {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <div class="card-header">
+      <div class="card-icon">${icon}</div>
+      <div class="card-title">${title}</div>
+    </div>
+    <div class="card-body"></div>
+  `;
+  const body = card.querySelector(".card-body");
+  rows.forEach(([label, value]) => {
+    const d = document.createElement("div");
+    d.className = "row";
+    d.innerHTML = `<span class="row-label">${label}</span><span class="row-value">${value || "—"}</span>`;
+    body.appendChild(d);
+  });
+  return card;
+}
+
+function getDriverUrl(gpuName) {
+  const n = gpuName.toLowerCase();
+  if (n.includes("nvidia"))  return "https://www.nvidia.com/drivers";
+  if (n.includes("amd") || n.includes("radeon")) return "https://www.amd.com/en/support";
+  if (n.includes("intel"))   return "https://www.intel.com/content/www/us/en/download-center/home.html";
+  return null;
+}
+
+// ── Software ─────────────────────────────────────────────────────────────────
+async function loadSoftware() {
+  const data = await fetch(`${AGENT}/api/software`).then(r => r.json());
+  allSoftware = data.programs ?? [];
+  document.getElementById("swCount").textContent = `(${allSoftware.length})`;
+  renderSoftware(allSoftware);
+}
+
+function filterSoftware() {
+  const q = document.getElementById("swSearch").value.toLowerCase();
+  renderSoftware(allSoftware.filter(p => p.name.toLowerCase().includes(q) || p.publisher.toLowerCase().includes(q)));
+}
+
+function renderSoftware(list) {
+  const el = document.getElementById("swList");
+  el.innerHTML = list.map(p => `
+    <div class="software-item">
+      <span class="sw-name">${esc(p.name)}<br>
+        <span style="font-size:.78rem;color:#9ca3af;">${esc(p.publisher)}</span>
+      </span>
+      <span class="sw-version">${esc(p.version)}</span>
+    </div>
+  `).join("");
+}
+
+// ── Event Log ────────────────────────────────────────────────────────────────
+async function loadEventLog() {
+  const data = await fetch(`${AGENT}/api/eventlog`).then(r => r.json());
+  const tbody = document.getElementById("eventBody");
+  tbody.innerHTML = (data.events ?? []).map(e => `
+    <tr>
+      <td style="white-space:nowrap">${esc(e.time)}</td>
+      <td>${esc(e.log)}</td>
+      <td><span class="badge ${e.level === "Error" ? "error" : "warning"}">${esc(e.level)}</span></td>
+      <td>${esc(e.source)}</td>
+      <td>${e.eventId}</td>
+      <td style="max-width:400px;word-break:break-word">${esc(e.message)}</td>
+    </tr>
+  `).join("");
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+</script>
+
+</body>
+</html>
