@@ -18,7 +18,7 @@
       color: #111827;
       min-height: 100vh;
     }
-    #appContent { display: none !important; }
+    #appContent { display: none; }
     .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
     .welcome-hero {
       background: linear-gradient(135deg, #850c18 0%, #5a0810 100%);
@@ -70,7 +70,7 @@
 <script>
 (async () => {
   // Vis siden med det samme
-  document.getElementById("appContent").style.display = "";
+  document.getElementById("appContent").style.setProperty("display", "block", "important");
   document.getElementById("greetingUser").textContent = "Henter...";
 
   try {
