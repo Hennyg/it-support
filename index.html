@@ -67,56 +67,21 @@
     </div>
   </div>
 
-  <script>
-  const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
+<script>
+(async () => {
+  // Vis siden med det samme
+  document.getElementById("appContent").style.display = "";
+  document.getElementById("greetingUser").textContent = "Henter...";
 
-  (async () => {
-    try {
-      // Tjek om bruger er logget ind
-      const meRes = await fetch("/.auth/me");
-      const me = await meRes.json();
-      const user = me?.clientPrincipal?.userDetails;
-
-      if (!user) {
-        location.href = "/unauthorized.html";
-        return;
-      }
-
-      // Hent roller fra getRoles
-      const rolesRes = await fetch("/api/getRoles");
-      const rolesData = await rolesRes.json();
-      const roles = Array.isArray(rolesData?.roles) ? rolesData.roles : [];
-
-      // Tjek om brugeren har adgang
-      const hasAccess = roles.some(r => ALLOWED_ROLES.includes(r));
-      if (!hasAccess) {
-        location.href = "/unauthorized.html";
-        return;
-      }
-
-      // Vis indhold
-      document.getElementById("appContent").style.display = "";
-      document.getElementById("greetingUser").textContent = "Logget ind som: " + user;
-
-      // Vis roller
-      const appRoles = roles.filter(r => !["anonymous", "authenticated"].includes(r));
-      if (appRoles.length > 0) {
-        document.getElementById("roleInfo").style.display = "";
-        appRoles.forEach(role => {
-          const span = document.createElement("span");
-          span.className = "role-badge" + (role === "portal_admin" ? " admin" : "");
-          span.textContent = role;
-          document.getElementById("roleBadges").appendChild(span);
-        });
-      }
-
-      } catch (err) {
-            console.error("Auth fejl:", err);
-            document.getElementById("appContent").style.display = "";
-            document.getElementById("greetingUser").textContent = "Fejl ved adgangstjek";
-          }
-  })();
-  </script>
+  try {
+    const meRes = await fetch("/.auth/me");
+    const meText = await meRes.text();
+    document.getElementById("greetingUser").textContent = "/.auth/me: " + meText.substring(0, 200);
+  } catch (err) {
+    document.getElementById("greetingUser").textContent = "Fejl: " + err.message;
+  }
+})();
+</script>
 
 </body>
 </html>
