@@ -68,17 +68,42 @@
   </div>
 
 <script>
-(async () => {
-  // Vis siden med det samme
-  document.getElementById("appContent").style.setProperty("display", "block", "important");
-  document.getElementById("greetingUser").textContent = "Henter...";
+const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
 
+(async () => {
   try {
-    const meRes = await fetch("/.auth/me");
-    const meText = await meRes.text();
-    document.getElementById("greetingUser").textContent = "/.auth/me: " + meText.substring(0, 200);
-  } catch (err) {
-    document.getElementById("greetingUser").textContent = "Fejl: " + err.message;
+    const me = await fetch("/.auth/me").then(r => r.json());
+    const user = me?.clientPrincipal?.userDetails;
+
+    if (!user) {
+      location.href = "/unauthorized.html";
+      return;
+    }
+
+    const rolesData = await fetch("/api/getRoles").then(r => r.json());
+    const roles = Array.isArray(rolesData?.roles) ? rolesData.roles : [];
+
+    if (!roles.some(r => ALLOWED_ROLES.includes(r))) {
+      location.href = "/unauthorized.html";
+      return;
+    }
+
+    document.getElementById("appContent").style.setProperty("display", "block", "important");
+    document.getElementById("greetingUser").textContent = "Logget ind som: " + user;
+
+    const appRoles = roles.filter(r => !["anonymous", "authenticated"].includes(r));
+    if (appRoles.length > 0) {
+      document.getElementById("roleInfo").style.setProperty("display", "block", "important");
+      appRoles.forEach(role => {
+        const span = document.createElement("span");
+        span.className = "role-badge" + (role === "portal_admin" ? " admin" : "");
+        span.textContent = role;
+        document.getElementById("roleBadges").appendChild(span);
+      });
+    }
+
+  } catch {
+    location.href = "/unauthorized.html";
   }
 })();
 </script>
