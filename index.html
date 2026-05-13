@@ -36,7 +36,8 @@
       border-radius: 999px; padding: 6px 16px; font-size: .95rem; font-weight: 600;
     }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-bottom: 32px; }
-    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.05); transition: box-shadow .15s, border-color .15s; }
+    .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); border-color: #d1d5db; }
     .card-icon { font-size: 2rem; margin-bottom: 12px; }
     .card h2 { margin: 0 0 8px; font-size: 1.1rem; }
     .card p { margin: 0; font-size: .95rem; color: #6b7280; line-height: 1.55; }
@@ -59,23 +60,28 @@
         <strong>Din adgang</strong>
         <div class="role-badges" id="roleBadges"></div>
       </div>
-        <div class="cards">
-          <a class="card" href="/hardware.html" style="text-decoration:none;color:inherit;">
-            <div class="card-icon">🖥️</div>
-            <h2>Hardware & System</h2>
-            <p>Se hardware-info, installerede programmer og event log på kundens PC.</p>
-          </a>
-          <div class="card">
-            <div class="card-icon">🔐</div>
-            <h2>Adgangsstyring</h2>
-            <p>Administrér brugeradgang og rettigheder i systemerne.</p>
-          </div>
-          <div class="card">
-            <div class="card-icon">📋</div>
-            <h2>Dokumentation</h2>
-            <p>Interne guides og teknisk dokumentation.</p>
-          </div>
+      <div class="cards">
+        <a class="card" href="/hardware.html" style="text-decoration:none;color:inherit;">
+          <div class="card-icon">🖥️</div>
+          <h2>Hardware & System</h2>
+          <p>Se hardware-info, installerede programmer og event log på kundens PC.</p>
+        </a>
+        <a class="card" href="/dock.html" style="text-decoration:none;color:inherit;">
+          <div class="card-icon">🔌</div>
+          <h2>Dock Diagnostik</h2>
+          <p>Diagnosticer i-Tec docking station problemer — skærm blinker, manglende tilkobling, DisplayLink driver og firmware.</p>
+        </a>
+        <div class="card">
+          <div class="card-icon">🔐</div>
+          <h2>Adgangsstyring</h2>
+          <p>Administrér brugeradgang og rettigheder i systemerne.</p>
         </div>
+        <div class="card">
+          <div class="card-icon">📋</div>
+          <h2>Dokumentation</h2>
+          <p>Interne guides og teknisk dokumentation.</p>
+        </div>
+      </div>
     </div>
   </div>
 
