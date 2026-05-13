@@ -1,0 +1,9 @@
+app.MapPost("/api/download", async (DownloadRequest req) => {
+    var path = Path.Combine(Path.GetTempPath(), req.Filename);
+    using var http = new HttpClient();
+    var bytes = await http.GetByteArrayAsync(req.Url);
+    await File.WriteAllBytesAsync(path, bytes);
+    return Results.Json(new { path });
+});
+
+record DownloadRequest(string Url, string Filename);
