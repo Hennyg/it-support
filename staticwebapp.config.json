@@ -10,7 +10,8 @@
     { "route": "/api/*",             "allowedRoles": ["authenticated"] },
 
     { "route": "/",                  "allowedRoles": ["authenticated"] },
-    { "route": "/index.html",        "allowedRoles": ["authenticated"] }
+    { "route": "/index.html",        "allowedRoles": ["authenticated"] },
+    { "route": "/dock.html",        "allowedRoles": ["authenticated"] }
   ],
   "responseOverrides": {
     "401": { "rewrite": "/unauthorized.html" },
