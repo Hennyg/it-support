@@ -128,6 +128,10 @@
 <div id="appContent" style="display:none;">
   <div class="container">
 
+    <a href="/index.html" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:20px;font-size:.9rem;font-weight:600;color:#850c18;text-decoration:none;">
+      ← Tilbage til IT Support
+    </a>
+
     <div class="agent-status loading" id="agentStatus">
       <div class="dot gray" id="agentDot"></div>
       <span id="agentStatusText">Forbinder til IT Support Agent...</span>
@@ -554,10 +558,10 @@ Write-Host "Hardware-scanning fuldført."
 Write-Host "=== i-Tec / Dock relaterede enheder ==="
 Get-PnpDevice | Where-Object { $_.FriendlyName -like "*i-tec*" -or $_.FriendlyName -like "*docking*" -or $_.FriendlyName -like "*dock*" } | Select-Object Status, FriendlyName, InstanceId | Format-Table -AutoSize
 
-Write-Host "`n=== USB Enheder med fejl ==="
+Write-Host "\`n=== USB Enheder med fejl ==="
 Get-PnpDevice | Where-Object { ($_.Class -eq "USB" -or $_.Class -eq "Net") -and $_.Status -ne "OK" } | Select-Object Status, FriendlyName | Format-Table -AutoSize
 
-Write-Host "`n=== DisplayLink relaterede enheder ==="
+Write-Host "\`n=== DisplayLink relaterede enheder ==="
 Get-PnpDevice | Where-Object { $_.FriendlyName -like "*DisplayLink*" -or $_.FriendlyName -like "*DL-*" } | Select-Object Status, FriendlyName | Format-Table -AutoSize
     `.trim()
   },
@@ -568,7 +572,7 @@ Write-Host "=== Netværksadaptere via dock ==="
 Get-NetAdapter | Where-Object { $_.InterfaceDescription -like "*USB*" -or $_.InterfaceDescription -like "*Realtek*" -or $_.InterfaceDescription -like "*ASIX*" -or $_.InterfaceDescription -like "*DisplayLink*" } |
   Select-Object Name, Status, LinkSpeed, InterfaceDescription | Format-Table -AutoSize
 
-Write-Host "`n=== Alle netværksadaptere ==="
+Write-Host "\`n=== Alle netværksadaptere ==="
 Get-NetAdapter | Select-Object Name, Status, LinkSpeed | Format-Table -AutoSize
     `.trim()
   },
@@ -616,10 +620,10 @@ if ($batt) {
 Write-Host "=== Aktiv strømplan ==="
 powercfg /getactivescheme
 
-Write-Host "`n=== Alle strømplaner ==="
+Write-Host "\`n=== Alle strømplaner ==="
 powercfg /list
 
-Write-Host "`n=== USB Selective Suspend indstilling ==="
+Write-Host "\`n=== USB Selective Suspend indstilling ==="
 powercfg /query scheme_current sub_usb 48e6b7a6-50f5-4782-a5d4-53bb8f07e226
     `.trim()
   }
