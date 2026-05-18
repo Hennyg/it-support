@@ -555,7 +555,11 @@ async function loadDisplayLink() {
     var html = "";
 
     // DisplayLink version fra registry (mere pålidelig end GPU-liste)
-    html += '<div class="row"><span class="row-label">DisplayLink driver</span><span class="row-value ' + (installed ? "ok" : "warn") + '">' + (installed ? esc(dlVersion) : "Ikke installeret") + '</span></div>';
+    if (installed) {
+      html += '<div class="row"><span class="row-label">DisplayLink driver</span><span class="row-value ok">' + esc(dlVersion) + '</span></div>';
+    } else {
+      html += '<div class="row"><span class="row-label">DisplayLink driver</span><span class="row-value warn" style="display:flex;align-items:center;gap:8px">Ikke installeret <button class="fix-btn primary" style="padding:4px 10px;font-size:.78rem" onclick="installDisplayLink(this)">📦 Installer</button></span></div>';
+    }
 
     html += '<div class="row"><span class="row-label">Antal skærme</span><span class="row-value">' + monitors.length + '</span></div>';
     monitors.forEach(function(m, i) {
