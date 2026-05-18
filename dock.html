@@ -316,32 +316,83 @@ async function loadDockInfo() {
   var el = document.getElementById("dockInfoBody");
   el.innerHTML = '<div class="loading-ph"><div class="spinner"></div> Henter dock-info...</div>';
   try {
-    var data = await fetch(AGENT + "/api/dock/info").then(r => r.json());
+    var d = await fetch(AGENT + "/api/dock/info").then(r => r.json());
 
-    if (!data.connected) {
-      el.innerHTML = '<p style="color:#6b7280;font-size:.9rem;margin:0">⚠️ Ingen dock fundet. Er docken tilsluttet via USB-C?</p>';
+    if (!d.connected) {
+      el.innerHTML =
+        '<p style="color:#6b7280;font-size:.9rem;margin:0">⚠️ Ingen dock fundet. Er docken tilsluttet?</p>';
       return;
     }
 
-    var svcColor  = data.serviceRunning ? "#166534" : "#991b1b";
-    var svcBadge  = data.serviceRunning
-      ? "<span class='badge ok'>Kører</span>"
-      : "<span class='badge error'>Stoppet</span>";
+    var html = "";
 
-    el.innerHTML =
-      '<div class="row"><span class="row-label">Model</span><span class="row-value">' + esc(data.model) + '</span></div>' +
-      '<div class="row"><span class="row-label">PID</span><span class="row-value" style="color:#6b7280">VID_17EF / PID_' + esc(data.pid) + '</span></div>' +
-      '<div class="row"><span class="row-label">Dock Manager version</span><span class="row-value ' + (data.softwareVersion === "Ikke fundet" ? "warn" : "ok") + '">' + esc(data.softwareVersion) + '</span></div>' +
-      '<div class="row"><span class="row-label">Dock Manager service</span><span class="row-value">' + svcBadge + ' ' + esc(data.serviceStatus || "") + '</span></div>' +
-      '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' +
-        '<a class="fix-btn primary" href="' + esc(data.updateUrl) + '" target="_blank">🔄 Tjek opdateringer (Lenovo)</a>' +
-        '<a class="fix-btn secondary" href="https://support.lenovo.com/dk/da/solutions/pd500265" target="_blank">📄 Lenovo Dock support</a>' +
-        (!data.serviceRunning ? '<button class="fix-btn secondary" onclick="runFix(&quot;restart_dock_service&quot;, this)">&#9654; Start Dock Manager service</button>' : '') +
-      '</div>';
+    // ── Fælles info ──
+    html += row("Model", d.model || "–");
+    html += row("Dock type", d.dockType === "lenovo" ? "Lenovo ThinkPad" : d.dockType === "displaylink" ? "i-Tec / DisplayLink" : "Ukendt");
+    html += row("PID", "VID_" + esc(d.vid) + " / PID_" + esc(d.pid));
+
+    var btns = "";
+
+    // ── Lenovo-specifik ──
+    if (d.dockType === "lenovo") {
+      var dmVer     = d.dockManagerVersion || "Ikke fundet";
+      var dmMissing = dmVer === "Ikke fundet";
+      var svcOk     = d.serviceRunning === true;
+      var svcTxt    = d.serviceStatus  || "–";
+
+      html += row("Dock Manager version",
+        dmMissing
+          ? "<span class='row-value warn'>Ikke installeret</span>"
+          : "<span class='row-value ok'>" + esc(dmVer) + "</span>",
+        true);
+
+      if (!dmMissing) {
+        html += row("Dock Manager service",
+          (svcOk
+            ? "<span class='badge ok'>Kører</span>"
+            : "<span class='badge error'>Stoppet</span>") + " " + esc(svcTxt),
+          true);
+      }
+
+      // Knapper – kun relevante
+      btns += '<a class="fix-btn primary" href="' + esc(d.updateUrl) + '" target="_blank">🔄 Opdater Dock Manager</a>';
+      if (!dmMissing && !svcOk) {
+        btns += '<button class="fix-btn secondary" onclick="runFix(&quot;restart_dock_service&quot;, this)">&#9654; Start Dock Manager service</button>';
+      }
+      btns += '<a class="fix-btn secondary" href="' + esc(d.supportUrl) + '" target="_blank">📄 Lenovo Dock support</a>';
+    }
+
+    // ── DisplayLink/i-Tec-specifik ──
+    if (d.dockType === "displaylink") {
+      var dlVer       = d.displayLinkVersion   || "Ikke installeret";
+      var dlInstalled = d.displayLinkInstalled  === true;
+
+      html += row("DisplayLink driver",
+        dlInstalled
+          ? "<span class='row-value ok'>" + esc(dlVer) + "</span>"
+          : "<span class='row-value warn'>Ikke installeret</span>",
+        true);
+
+      btns += '<button class="fix-btn primary" onclick="installDisplayLink(this)">📦 ' + (dlInstalled ? "Opdater" : "Installer") + ' DisplayLink</button>';
+      btns += '<button class="fix-btn secondary" onclick="checkDLVersionOnly()">📋 Tjek version</button>';
+      btns += '<a class="fix-btn secondary" href="' + esc(d.supportUrl) + '" target="_blank">📄 i-Tec support</a>';
+    }
+
+    if (btns) {
+      html += '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' + btns + '</div>';
+    }
+
+    el.innerHTML = html;
   } catch (e) {
     el.innerHTML = '<p style="color:#991b1b;font-size:.9rem;margin:0">Fejl: ' + esc(e.message) + '</p>';
   }
 }
+
+function row(label, value, rawHtml) {
+  var val = rawHtml ? value : esc(value);
+  return '<div class="row"><span class="row-label">' + label + '</span><span class="row-value">' + val + '</span></div>';
+}
+
 
 // ── Dock-enheder ──────────────────────────────────────────────────────────────
 async function loadDockDevices() {
