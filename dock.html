@@ -340,6 +340,7 @@ async function loadDockInfo() {
     }
 
     el.innerHTML = html;
+    window._dockManagerVersion = d.dockManagerVersion || null;
     renderGuide(d.dockType || 'generic');
   } catch (e) {
     el.innerHTML = '<p style="color:#991b1b;font-size:.9rem;margin:0">Fejl: ' + esc(e.message) + '</p>';
@@ -373,7 +374,7 @@ var GUIDES = {
     },
     {
       title: "Trin 2 — Opdater Dock Manager",
-      desc:  "Version 1.4.x er forældet. Opdater til nyeste version fra Lenovo.",
+      desc:  (window._dockManagerVersion ? "Installeret version: " + window._dockManagerVersion + ". " : "") + "Tjek om der er en nyere version tilgængelig fra Lenovo.",
       btns:  [
         { label: "🔄 Opdater Dock Manager", href: "https://support.lenovo.com/dk/da/solutions/ht037099", primary: true },
       ]
