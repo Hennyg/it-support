@@ -231,7 +231,7 @@
 <script>
 const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
 const AGENT = "http://localhost:5199";
-const DISPLAYLINK_URL = "https://lcherrup.sharepoint.com/:u:/g/IQA6NUsZBZq-TKvYHSPfOHhXAXhSrv5rwbwsBtpVS--kTDc?e=xgVcD1";
+const DISPLAYLINK_URL = "https://allekanbruge.blob.core.windows.net/displaylink/DisplayLink-installer.exe";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 (async () => {
@@ -767,7 +767,7 @@ async function installDisplayLink(btn) {
 
 async function doInstall(btn, origHTML) {
   try {
-    // Trin 2: Download
+    // Trin 2: Download fra Azure Blob
     btn.innerHTML = '<div class="spinner"></div> Downloader...';
     btn.className = "fix-btn running";
     btn.disabled = true;
