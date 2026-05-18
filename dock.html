@@ -545,19 +545,18 @@ function getDeviceIcon(type) {
 async function loadDisplayLink() {
   var el = document.getElementById("displayLinkStatus");
   try {
-    var hw = await fetch(AGENT + "/api/hardware").then(r => r.json());
-    var monitors = hw.monitors ?? [];
-    var gpus     = hw.gpus ?? [];
-    var dlGpu    = gpus.find(function(g) {
-      var n = (g.name || "").toLowerCase();
-      return n.includes("displaylink") || n.includes("display link") || n.includes("dl-");
-    });
+    // Hent hardware info og DisplayLink version parallelt
+    var [hw, dlVersion] = await Promise.all([
+      fetch(AGENT + "/api/hardware").then(r => r.json()),
+      checkDisplayLinkVersion()
+    ]);
+    var monitors  = hw.monitors ?? [];
+    var installed = dlVersion !== "ikke installeret" && dlVersion !== "ukendt" && dlVersion !== "fejl ved tjek";
     var html = "";
-    html += '<div class="row"><span class="row-label">DisplayLink GPU</span><span class="row-value ' + (dlGpu ? "ok" : "warn") + '">' + (dlGpu ? esc(dlGpu.name) : "Ikke fundet") + '</span></div>';
-    if (dlGpu) {
-      html += '<div class="row"><span class="row-label">Driver version</span><span class="row-value">' + esc(dlGpu.driverVersion || "—") + '</span></div>';
-      html += '<div class="row"><span class="row-label">Driver dato</span><span class="row-value">' + esc(dlGpu.driverDate || "—") + '</span></div>';
-    }
+
+    // DisplayLink version fra registry (mere pålidelig end GPU-liste)
+    html += '<div class="row"><span class="row-label">DisplayLink driver</span><span class="row-value ' + (installed ? "ok" : "warn") + '">' + (installed ? esc(dlVersion) : "Ikke installeret") + '</span></div>';
+
     html += '<div class="row"><span class="row-label">Antal skærme</span><span class="row-value">' + monitors.length + '</span></div>';
     monitors.forEach(function(m, i) {
       html += '<div class="row"><span class="row-label">Skærm ' + (i+1) + '</span><span class="row-value">' + esc(m.resolution) + ' — ' + esc(m.name) + '</span></div>';
