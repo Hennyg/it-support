@@ -152,66 +152,21 @@
         </div>
       </div>
 
-      <!-- Kendte problemer & fixes -->
+      <!-- Trin-for-trin fejlfindingsguide -->
       <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
           <div class="card-header-left">
             <div class="card-icon">🛠️</div>
-            <div class="card-title">Kendte dock-problemer & hurtige fixes</div>
+            <div class="card-title">Fejlfinding — prøv disse trin i rækkefølge</div>
           </div>
         </div>
-        <div class="card-body">
-
-          <div class="problem-section">
-            <div class="problem-title">🔲 Skærm blinker / sort skærm</div>
-            <p style="font-size:.85rem;color:#6b7280;margin:0 0 10px;">Oftest forårsaget af forældet DisplayLink driver, USB-strømstyring eller manglende Windows Update.</p>
-            <div class="actions">
-              <button class="fix-btn primary" onclick="runFix('disable_usb_selective_suspend', this)">⚡ Deaktiver USB selective suspend</button>
-              <button class="fix-btn secondary" onclick="runFix('restart_displaylink', this)">🔄 Genstart DisplayLink service</button>
-            </div>
-            <div class="script-output" id="out_disable_usb_selective_suspend"></div>
-            <div class="script-output" id="out_restart_displaylink"></div>
-          </div>
-
-          <div class="problem-section" style="border-top:1px solid #f3f4f6;padding-top:16px;">
-            <div class="problem-title">🔌 PC kobler ikke på dock</div>
-            <p style="font-size:.85rem;color:#6b7280;margin:0 0 10px;">Kan skyldes USB-hub der ikke genkendes, manglende driver eller dock i fejltilstand.</p>
-            <div class="actions">
-              <button class="fix-btn primary" onclick="runFix('reset_usb_hub', this)">🔁 Nulstil USB Hub</button>
-              <button class="fix-btn secondary" onclick="runFix('scan_hardware_changes', this)">🔍 Scan for hardware-ændringer</button>
-              <button class="fix-btn secondary" onclick="runFix('check_itec_driver', this)">🔎 Tjek i-Tec / Dock driver</button>
-            </div>
-            <div class="script-output" id="out_reset_usb_hub"></div>
-            <div class="script-output" id="out_scan_hardware_changes"></div>
-            <div class="script-output" id="out_check_itec_driver"></div>
-          </div>
-
-          <div class="problem-section" style="border-top:1px solid #f3f4f6;padding-top:16px;">
-            <div class="problem-title">🌐 Netværk eller USB-porte virker ikke via dock</div>
-            <p style="font-size:.85rem;color:#6b7280;margin:0 0 10px;">Netværksadapter fra dock ikke genkendt, eller USB 3.0 kontrolleren mangler driver.</p>
-            <div class="actions">
-              <button class="fix-btn primary" onclick="runFix('check_dock_network', this)">🌐 Tjek dock netværksadapter</button>
-              <button class="fix-btn secondary" onclick="runFix('reinstall_usb_controllers', this)">🔧 Geninstaller USB-controllere</button>
-            </div>
-            <div class="script-output" id="out_check_dock_network"></div>
-            <div class="script-output" id="out_reinstall_usb_controllers"></div>
-          </div>
-
-          <div class="problem-section" style="border-top:1px solid #f3f4f6;padding-top:16px;">
-            <div class="problem-title">🔋 PC oplades ikke via dock</div>
-            <p style="font-size:.85rem;color:#6b7280;margin:0 0 10px;">Tjek USB-C power delivery og Windows strømstyring.</p>
-            <div class="actions">
-              <button class="fix-btn primary" onclick="runFix('check_battery_status', this)">🔋 Tjek batteri & opladningsstatus</button>
-              <button class="fix-btn secondary" onclick="runFix('check_power_plan', this)">⚡ Tjek strømplan</button>
-            </div>
-            <div class="script-output" id="out_check_battery_status"></div>
-            <div class="script-output" id="out_check_power_plan"></div>
-          </div>
-
+        <div class="card-body" id="guideBody">
+          <!-- Renderes af JS baseret på dock-type -->
+          <div class="loading-ph"><div class="spinner"></div> Henter guide...</div>
         </div>
       </div>
 
-      <!-- Opdateringer -->
+            <!-- Opdateringer -->
       <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
           <div class="card-header-left">
@@ -321,6 +276,7 @@ async function loadDockInfo() {
     if (!d.connected) {
       el.innerHTML =
         '<p style="color:#6b7280;font-size:.9rem;margin:0">⚠️ Ingen dock fundet. Er docken tilsluttet?</p>';
+      renderGuide('generic');
       return;
     }
 
@@ -359,6 +315,7 @@ async function loadDockInfo() {
       if (!dmMissing && !svcOk) {
         btns += '<button class="fix-btn secondary" onclick="runFix(&quot;restart_dock_service&quot;, this)">&#9654; Start Dock Manager service</button>';
       }
+      btns += '<button class="fix-btn secondary" onclick="openDockManager()">🖥️ Åbn Dock Manager</button>';
       btns += '<a class="fix-btn secondary" href="' + esc(d.supportUrl) + '" target="_blank">📄 Lenovo Dock support</a>';
     }
 
@@ -383,9 +340,19 @@ async function loadDockInfo() {
     }
 
     el.innerHTML = html;
+    renderGuide(d.dockType || 'generic');
   } catch (e) {
     el.innerHTML = '<p style="color:#991b1b;font-size:.9rem;margin:0">Fejl: ' + esc(e.message) + '</p>';
   }
+}
+
+async function openDockManager() {
+  await fetch(AGENT + "/api/run-ps", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ script: "Start-Process 'C:\\Program Files\\Lenovo\\Dock Manager\\dockmgr.exe' -ErrorAction SilentlyContinue" })
+  }).catch(() => {});
+  showToast("Dock Manager åbnes...", "ok");
 }
 
 function row(label, value, rawHtml) {
@@ -393,6 +360,150 @@ function row(label, value, rawHtml) {
   return '<div class="row"><span class="row-label">' + label + '</span><span class="row-value">' + val + '</span></div>';
 }
 
+
+// ── Trin-for-trin guide ──────────────────────────────────────────────────────
+var GUIDES = {
+  lenovo: [
+    {
+      title: "Trin 1 — Genstart Dock Manager service",
+      desc:  "Mange dock-problemer løses ved at genstarte Dock Manager. Start her.",
+      btns:  [
+        { label: "▶ Genstart Dock Manager service", id: "restart_dock_service", primary: true },
+      ]
+    },
+    {
+      title: "Trin 2 — Opdater Dock Manager",
+      desc:  "Version 1.4.x er forældet. Opdater til nyeste version fra Lenovo.",
+      btns:  [
+        { label: "🔄 Opdater Dock Manager", href: "https://support.lenovo.com/dk/da/solutions/ht037099", primary: true },
+      ]
+    },
+    {
+      title: "Trin 3 — Deaktiver USB strømstyring",
+      desc:  "Windows slukker USB-porte for at spare strøm. Det afbryder docken. Deaktiver dette.",
+      btns:  [
+        { label: "⚡ Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true },
+      ]
+    },
+    {
+      title: "Trin 4 — Nulstil USB Hub",
+      desc:  "Docken genkendes ikke? Nulstil USB-hubben så Windows opdager den igen.",
+      btns:  [
+        { label: "🔁 Nulstil USB Hub", id: "reset_usb_hub", primary: true },
+        { label: "🔍 Scan for hardware-ændringer", id: "scan_hardware_changes", primary: false },
+      ]
+    },
+    {
+      title: "Trin 5 — Tjek netværk via dock",
+      desc:  "Ethernet via dock virker ikke? Tjek om netværksadapteren er genkendt.",
+      btns:  [
+        { label: "🌐 Tjek dock netværksadapter", id: "check_dock_network", primary: true },
+      ]
+    },
+    {
+      title: "Trin 6 — Kontakt Lenovo support",
+      desc:  "Intet har virket? Se Lenovos support-side for din dock-model.",
+      btns:  [
+        { label: "📄 Lenovo Dock support", href: "https://support.lenovo.com/dk/da/solutions/pd500265", primary: false },
+      ]
+    },
+  ],
+  displaylink: [
+    {
+      title: "Trin 1 — Installer / opdater DisplayLink driver",
+      desc:  "Skærm blinker eller virker ikke? DisplayLink driveren er den vigtigste. Start her.",
+      btns:  [
+        { label: "📦 Installer / opdater DisplayLink", fn: "installDisplayLink(this)", primary: true },
+      ]
+    },
+    {
+      title: "Trin 2 — Deaktiver USB strømstyring",
+      desc:  "Windows slukker USB-porte for at spare strøm. Det afbryder docken.",
+      btns:  [
+        { label: "⚡ Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true },
+      ]
+    },
+    {
+      title: "Trin 3 — Genstart DisplayLink service",
+      desc:  "Skærm stadig sort? Genstart DisplayLink-tjenesten.",
+      btns:  [
+        { label: "🔄 Genstart DisplayLink service", id: "restart_displaylink", primary: true },
+      ]
+    },
+    {
+      title: "Trin 4 — Nulstil USB Hub",
+      desc:  "Dock genkendes ikke? Nulstil USB-hubben.",
+      btns:  [
+        { label: "🔁 Nulstil USB Hub", id: "reset_usb_hub", primary: true },
+        { label: "🔍 Scan for hardware-ændringer", id: "scan_hardware_changes", primary: false },
+      ]
+    },
+    {
+      title: "Trin 5 — Tjek netværk via dock",
+      desc:  "Ethernet virker ikke? Tjek om netværksadapteren er genkendt.",
+      btns:  [
+        { label: "🌐 Tjek dock netværksadapter", id: "check_dock_network", primary: true },
+      ]
+    },
+    {
+      title: "Trin 6 — i-Tec support",
+      desc:  "Intet har virket? Se i-Tec support og firmware.",
+      btns:  [
+        { label: "📄 i-Tec support", href: "https://i-tec.pro/en/support", primary: false },
+        { label: "⬇️ i-Tec firmware", href: "https://i-tec.pro/en/software", primary: false },
+      ]
+    },
+  ],
+  generic: [
+    {
+      title: "Trin 1 — Deaktiver USB strømstyring",
+      desc:  "Windows slukker USB-porte for at spare strøm. Deaktiver dette.",
+      btns:  [{ label: "⚡ Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true }]
+    },
+    {
+      title: "Trin 2 — Nulstil USB Hub",
+      desc:  "Dock genkendes ikke? Nulstil USB-hubben.",
+      btns:  [
+        { label: "🔁 Nulstil USB Hub", id: "reset_usb_hub", primary: true },
+        { label: "🔍 Scan for hardware-ændringer", id: "scan_hardware_changes", primary: false },
+      ]
+    },
+    {
+      title: "Trin 3 — Tjek driver",
+      desc:  "Tjek om alle dock-enheder har korrekt driver.",
+      btns:  [{ label: "🔎 Tjek dock driver", id: "check_itec_driver", primary: true }]
+    },
+  ]
+};
+
+function renderGuide(dockType) {
+  var steps = GUIDES[dockType] || GUIDES.generic;
+  var el    = document.getElementById("guideBody");
+  if (!el) return;
+
+  el.innerHTML = steps.map(function(step, i) {
+    var btnHtml = step.btns.map(function(b) {
+      if (b.href) {
+        return '<a class="fix-btn ' + (b.primary ? 'primary' : 'secondary') + '" href="' + esc(b.href) + '" target="_blank">' + b.label + '</a>';
+      } else if (b.fn) {
+        return '<button class="fix-btn ' + (b.primary ? 'primary' : 'secondary') + '" onclick="' + b.fn + '">' + b.label + '</button>';
+      } else {
+        return '<button class="fix-btn ' + (b.primary ? 'primary' : 'secondary') + '" onclick="runFix(&quot;' + b.id + '&quot;, this)">' + b.label + '</button>' +
+               '<div class="script-output" id="out_' + b.id + '_guide"></div>';
+      }
+    }).join('');
+
+    var isLast = i === steps.length - 1;
+    return '<div style="display:flex;gap:16px;padding:14px 0;' + (isLast ? '' : 'border-bottom:1px solid #f3f4f6') + '">' +
+      '<div style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:' + (i === 0 ? '#850c18' : '#e5e7eb') + ';color:' + (i === 0 ? '#fff' : '#374151') + ';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem">' + (i+1) + '</div>' +
+      '<div style="flex:1">' +
+        '<div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:4px">' + esc(step.title.replace('Trin ' + (i+1) + ' — ', '')) + '</div>' +
+        '<div style="font-size:.85rem;color:#6b7280;margin-bottom:10px">' + esc(step.desc) + '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px">' + btnHtml + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
 
 // ── Dock-enheder ──────────────────────────────────────────────────────────────
 async function loadDockDevices() {
