@@ -63,18 +63,18 @@
 
     const roleData = await fetchJson("/api/getRoles");
     const roles    = Array.isArray(roleData?.roles) ? roleData.roles : [];
-    const isAdmin  = roles.includes("portal_admin");
 
-    // Vis forside-link på alle sider undtagen forsiden selv
     const path = window.location.pathname;
+
+    // Forside-link på alle sider undtagen forsiden
     if (path !== "/" && path !== "/index.html") {
       addNavLink(navRight, { id: "navHomeLink", href: "/", text: "Forside" });
     }
 
-    // Admin-specifikke links kan tilføjes her fremadrettet
-    // if (isAdmin) {
-    //   addNavLink(navRight, { id: "navAdminLink", href: "/admin.html", text: "Admin" });
-    // }
+    // Adgang-link på adgang-undersider
+    if (path.startsWith("/adgang-")) {
+      addNavLink(navRight, { id: "navAdgangLink", href: "/adgang.html", text: "Adgang" });
+    }
   }
 
   document.addEventListener("DOMContentLoaded", init);
