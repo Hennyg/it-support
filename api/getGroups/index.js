@@ -6,12 +6,12 @@ module.exports = async function (context, req) {
     const token = await getGraphToken();
 
     const filter = encodeURIComponent(
-      "mailEnabled eq true and securityEnabled eq true and startsWith(displayName,'portal_')"
+      "mailEnabled eq true and securityEnabled eq true"
     );
 
     const data = await graphGet(
       token,
-      `/groups?$filter=${filter}&$select=id,displayName,mail,description,createdDateTime&$top=100`
+      `/groups?$filter=${filter}&$select=id,displayName,mail,description,createdDateTime&$top=999`
     );
 
     const groups = (data.value ?? [])
