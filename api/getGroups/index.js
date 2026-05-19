@@ -5,23 +5,24 @@ module.exports = async function (context, req) {
   try {
     const token = await getGraphToken();
 
-    // Hent alle mail-enabled security groups der starter med portal_
     const filter = encodeURIComponent(
       "mailEnabled eq true and securityEnabled eq true and startsWith(displayName,'portal_')"
     );
 
     const data = await graphGet(
       token,
-      `/groups?$filter=${filter}&$select=id,displayName,mail,description,createdDateTime&$orderby=displayName&$top=100`
+      `/groups?$filter=${filter}&$select=id,displayName,mail,description,createdDateTime&$top=100`
     );
 
-    const groups = (data.value ?? []).map(g => ({
-      id:              g.id,
-      displayName:     g.displayName,
-      mail:            g.mail,
-      description:     g.description,
-      createdDateTime: g.createdDateTime
-    }));
+    const groups = (data.value ?? [])
+      .map(g => ({
+        id:              g.id,
+        displayName:     g.displayName,
+        mail:            g.mail,
+        description:     g.description,
+        createdDateTime: g.createdDateTime
+      }))
+      .sort((a, b) => a.displayName?.localeCompare(b.displayName, "da"));
 
     context.res = jsonResponse(200, { groups });
   } catch (err) {
