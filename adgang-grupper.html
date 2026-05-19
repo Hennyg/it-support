@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="da">
 <head>
@@ -179,6 +178,7 @@ let allGroups = [], allUsers = [], currentGroup = null, activeCategory = null;
 let workingMembers = [], originalMembers = [];
 let selectedMembers = new Set(), selectedUsers = new Set();
 
+// ── Auth ──────────────────────────────────────────────────────────────────────
 (async () => {
   const me = await fetch("/.auth/me").then(r => r.json()).catch(() => null);
   if (!me?.clientPrincipal?.userDetails) { location.href = "/unauthorized.html"; return; }
@@ -188,6 +188,7 @@ let selectedMembers = new Set(), selectedUsers = new Set();
   init();
 })();
 
+// ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   const [groupRes, userRes] = await Promise.all([
     fetch("/api/getGroups").then(r => r.json()).catch(() => ({ groups: [] })),
@@ -200,21 +201,16 @@ async function init() {
   renderCatTiles();
 }
 
-const isResource = u =>
-  u.displayName?.match(/^(projector|screen|room|lokale|møderum|ressource|resource|projek)/i) ||
-  u.mail?.match(/ressource|resource|room|lokale/i);
-
-const isShared = u =>
-  u.displayName?.match(/^(fælles|shared|info@|kontakt|support|noreply|no-reply)/i) ||
-  u.mail?.match(/info@|kontakt@|support@|noreply@|no-reply@|fælles/i) ||
-  (u.displayName?.includes(" - ") && !u.mail?.includes(u.displayName?.split(" ")[0]?.toLowerCase()));
-
+// ── Filter — bruger mailboxType fra API ───────────────────────────────────────
 function passesFilter(u) {
-  if (!document.getElementById("filterResources").checked && isResource(u)) return false;
-  if (!document.getElementById("filterShared").checked    && isShared(u))   return false;
+  const showResources = document.getElementById("filterResources").checked;
+  const showShared    = document.getElementById("filterShared").checked;
+  if (!showResources && u.mailboxType === "room")   return false;
+  if (!showShared    && u.mailboxType === "shared") return false;
   return true;
 }
 
+// ── Kategori-tiles ────────────────────────────────────────────────────────────
 function renderCatTiles() {
   const container = document.getElementById("catTiles");
   container.innerHTML = "";
@@ -239,6 +235,7 @@ function selectCategory(cat) {
   document.getElementById("editorTile").style.removeProperty("display");
 }
 
+// ── Gruppe liste ──────────────────────────────────────────────────────────────
 function renderGroupList(groups) {
   const list = document.getElementById("groupList");
   list.innerHTML = "";
@@ -246,25 +243,34 @@ function renderGroupList(groups) {
   groups.forEach(g => {
     const div = document.createElement("div");
     div.className = "group-item" + (currentGroup?.id === g.id ? " active" : "");
-    div.innerHTML = `<div style="flex:1;min-width:0;"><div class="group-name">${esc(g.displayName)}</div><div class="group-email">${esc(g.mail ?? "")}</div></div><div class="member-count" id="mc-${g.id}">⏳</div>`;
+    div.innerHTML = `
+      <div style="flex:1;min-width:0;">
+        <div class="group-name">${esc(g.displayName)}</div>
+        <div class="group-email">${esc(g.mail ?? "")}</div>
+      </div>
+      <div class="member-count" id="mc-${g.id}">⏳</div>`;
     div.onclick = () => selectGroup(g);
     list.appendChild(div);
   });
 }
 
+// ── Vælg gruppe ───────────────────────────────────────────────────────────────
 async function selectGroup(group) {
   currentGroup = group;
   renderGroupList(allGroups.filter(g => g.displayName?.toLowerCase().startsWith(activeCategory?.prefix?.toLowerCase() ?? "")));
+
   const editorTile = document.getElementById("editorTile");
   editorTile.style.setProperty("display", "block", "important");
   document.getElementById("editorTileTitle").textContent = `Medlemmer — ${group.displayName}`;
   editorTile.querySelector(".tile-body").style.display = "";
   editorTile.querySelector(".tile-chevron").classList.add("open");
   setTimeout(() => editorTile.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+
   renderStamdata(group);
   document.getElementById("memberBody").innerHTML = '<div class="loading"><span class="spinner"></span>Henter...</div>';
   document.getElementById("memberCount").textContent = "";
   selectedMembers.clear(); selectedUsers.clear();
+
   try {
     const data = await fetch(`/api/getGroupMembers?id=${encodeURIComponent(group.id)}`).then(r => r.json());
     originalMembers = data.members ?? [];
@@ -291,6 +297,7 @@ function updateMemberCount(groupId, count) {
   if (el) el.textContent = count + " medlemmer";
 }
 
+// ── Tile toggle ───────────────────────────────────────────────────────────────
 function toggleTile(header) {
   const body = header.nextElementSibling;
   const chevron = header.querySelector(".tile-chevron");
@@ -299,6 +306,7 @@ function toggleTile(header) {
   chevron.classList.toggle("open", !isOpen);
 }
 
+// ── Render medlemmer ──────────────────────────────────────────────────────────
 function renderMembers(filter = "") {
   const body = document.getElementById("memberBody");
   const q = filter.toLowerCase();
@@ -313,14 +321,24 @@ function renderMembers(filter = "") {
   list.forEach(u => {
     const div = document.createElement("div");
     div.className = "user-item" + (selectedMembers.has(u.id) ? " selected" : "");
-    div.innerHTML = `<div class="user-avatar">${initials(u.displayName)}</div><div class="user-info"><div class="user-name">${esc(u.displayName)}</div><div class="user-email">${esc(u.mail ?? "")}</div></div><div class="user-check"></div>`;
-    div.onclick = () => { selectedMembers.has(u.id) ? selectedMembers.delete(u.id) : selectedMembers.add(u.id); renderMembers(document.getElementById("memberSearch").value); };
+    div.innerHTML = `
+      <div class="user-avatar">${initials(u.displayName)}</div>
+      <div class="user-info">
+        <div class="user-name">${esc(u.displayName)}</div>
+        <div class="user-email">${esc(u.mail ?? "")}</div>
+      </div>
+      <div class="user-check"></div>`;
+    div.onclick = () => {
+      selectedMembers.has(u.id) ? selectedMembers.delete(u.id) : selectedMembers.add(u.id);
+      renderMembers(document.getElementById("memberSearch").value);
+    };
     body.appendChild(div);
   });
 }
 
 function filterMembers() { renderMembers(document.getElementById("memberSearch").value); }
 
+// ── Render alle brugere ───────────────────────────────────────────────────────
 function getVisibleUsers() {
   const q = document.getElementById("userSearch").value.toLowerCase();
   const memberIds = new Set(workingMembers.map(m => m.id));
@@ -340,7 +358,13 @@ function renderUsers() {
   list.forEach(u => {
     const div = document.createElement("div");
     div.className = "user-item" + (selectedUsers.has(u.id) ? " selected" : "");
-    div.innerHTML = `<div class="user-avatar">${initials(u.displayName)}</div><div class="user-info"><div class="user-name">${esc(u.displayName)}</div><div class="user-email">${esc(u.mail ?? "")}</div></div><div class="user-check"></div>`;
+    div.innerHTML = `
+      <div class="user-avatar">${initials(u.displayName)}</div>
+      <div class="user-info">
+        <div class="user-name">${esc(u.displayName)}</div>
+        <div class="user-email">${esc(u.mail ?? "")}</div>
+      </div>
+      <div class="user-check"></div>`;
     div.onclick = () => {
       selectedUsers.has(u.id) ? selectedUsers.delete(u.id) : selectedUsers.add(u.id);
       const vis = getVisibleUsers().map(v => v.id);
@@ -365,6 +389,7 @@ function toggleSelectAll() {
   renderUsers();
 }
 
+// ── Tilføj / fjern ────────────────────────────────────────────────────────────
 function addSelected() {
   if (selectedUsers.size === 0) return;
   workingMembers = [...workingMembers, ...allUsers.filter(u => selectedUsers.has(u.id))];
@@ -382,6 +407,7 @@ function removeSelected() {
   renderUsers(); updateFooter();
 }
 
+// ── Footer ────────────────────────────────────────────────────────────────────
 function updateFooter() {
   const origIds = new Set(originalMembers.map(m => m.id));
   const workIds = new Set(workingMembers.map(m => m.id));
@@ -407,6 +433,7 @@ function cancelChanges() {
   renderMembers(); renderUsers(); updateFooter();
 }
 
+// ── Gem ───────────────────────────────────────────────────────────────────────
 async function saveChanges() {
   const origIds = new Set(originalMembers.map(m => m.id));
   const workIds = new Set(workingMembers.map(m => m.id));
@@ -416,7 +443,11 @@ async function saveChanges() {
   const btn = document.getElementById("saveBtn");
   btn.disabled = true; btn.textContent = "Gemmer...";
   try {
-    const res  = await fetch("/api/updateGroupMembers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ groupId: currentGroup.id, add: toAdd, remove: toRem }) });
+    const res  = await fetch("/api/updateGroupMembers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupId: currentGroup.id, add: toAdd, remove: toRem })
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Ukendt fejl");
     originalMembers = [...workingMembers];
@@ -430,6 +461,7 @@ async function saveChanges() {
   }
 }
 
+// ── Hjælpere ──────────────────────────────────────────────────────────────────
 function initials(name) {
   if (!name) return "?";
   const parts = name.trim().split(" ");
