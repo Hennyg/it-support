@@ -14,7 +14,6 @@
     body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; color: #111827; }
     .container { max-width: 1400px; margin: 0 auto; padding: 32px 20px; }
 
-    /* Kategori-tiles øverst */
     .cat-tiles { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
     .cat-tile { display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: #fff; border: 2px solid #e5e7eb; border-radius: 14px; cursor: pointer; transition: all .15s; user-select: none; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
     .cat-tile:hover { border-color: #850c18; background: #fef3f2; }
@@ -23,7 +22,6 @@
     .cat-tile-label { font-size: .95rem; font-weight: 700; }
     .cat-tile-count { font-size: .8rem; opacity: .7; margin-left: 4px; }
 
-    /* Tile */
     .tile { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 16px; overflow: hidden; }
     .tile-header { display: flex; align-items: center; gap: 12px; padding: 16px 24px; border-bottom: 1px solid #f3f4f6; cursor: pointer; user-select: none; }
     .tile-icon { font-size: 1.2rem; }
@@ -32,7 +30,6 @@
     .tile-chevron.open { transform: rotate(180deg); }
     .tile-body { padding: 20px 24px; }
 
-    /* Gruppe liste */
     .group-list { display: flex; flex-direction: column; gap: 6px; }
     .group-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: background .15s; }
     .group-item:hover { background: #f9fafb; }
@@ -41,24 +38,20 @@
     .group-email { font-size: .78rem; color: #6b7280; }
     .member-count { margin-left: auto; background: #f3f4f6; border-radius: 999px; padding: 2px 10px; font-size: .78rem; color: #374151; font-weight: 600; white-space: nowrap; }
 
-    /* Editor grid */
     .editor { display: none; }
     .editor.visible { display: grid; grid-template-columns: 260px 1fr auto 1fr; gap: 0; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
 
-    /* Kolonner */
     .col { display: flex; flex-direction: column; min-width: 0; }
     .col-header { padding: 11px 16px; background: #1f2937; color: #fff; font-size: .83rem; font-weight: 700; flex-shrink: 0; }
     .col-header.light { background: #f8fafc; color: #374151; border-bottom: 1px solid #e5e7eb; }
     .col-body { flex: 1; overflow-y: auto; max-height: 380px; }
 
-    /* Stamdata */
     .stamdata { border-right: 1px solid #e5e7eb; }
     .stamdata .col-body { padding: 14px 16px; }
     .sd-row { margin-bottom: 12px; }
     .sd-label { font-size: .72rem; color: #6b7280; margin-bottom: 2px; text-transform: uppercase; letter-spacing: .03em; }
     .sd-value { font-size: .87rem; color: #111827; font-weight: 500; word-break: break-word; }
 
-    /* Brugerliste */
     .member-list { border-right: 1px solid #e5e7eb; }
     .user-item { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer; border-bottom: 1px solid #f9fafb; transition: background .1s; }
     .user-item:hover { background: #f9fafb; }
@@ -70,13 +63,11 @@
     .user-check { width: 15px; height: 15px; border-radius: 3px; border: 2px solid #d1d5db; flex-shrink: 0; }
     .user-item.selected .user-check { background: #850c18; border-color: #850c18; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 10 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 4l3 3 5-6' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; }
 
-    /* Pile */
     .btn-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px 10px; background: #f8fafc; border-right: 1px solid #e5e7eb; min-width: 50px; }
     .arrow-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; font-size: .95rem; display: flex; align-items: center; justify-content: center; transition: background .15s; }
     .arrow-btn:hover { background: #850c18; color: #fff; border-color: #850c18; }
     .arrow-btn:disabled { opacity: .35; cursor: not-allowed; }
 
-    /* Søg + filtre */
     .col-search { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
     .col-search input { width: 100%; padding: 5px 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: .82rem; outline: none; }
     .col-search input:focus { border-color: #850c18; }
@@ -84,8 +75,7 @@
     .filter-check { display: flex; align-items: center; gap: 5px; font-size: .78rem; color: #374151; cursor: pointer; user-select: none; }
     .filter-check input[type=checkbox] { accent-color: #850c18; width: 13px; height: 13px; cursor: pointer; }
 
-    /* Footer */
-    .editor-footer { padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 0; }
+    .editor-footer { padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .changes-info { font-size: .85rem; color: #6b7280; }
     .changes-info strong { color: #111827; }
     .btn-save { padding: 8px 22px; background: #850c18; color: #fff; border: none; border-radius: 10px; font-size: .88rem; font-weight: 600; cursor: pointer; }
@@ -94,19 +84,16 @@
     .btn-cancel { padding: 8px 14px; background: #fff; color: #374151; border: 1px solid #e5e7eb; border-radius: 10px; font-size: .88rem; cursor: pointer; }
     .btn-cancel:hover { background: #f3f4f6; }
 
-    /* Toast */
     .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 12px; font-size: .9rem; font-weight: 600; color: #fff; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; }
     .toast.show { opacity: 1; }
     .toast.ok  { background: #16a34a; }
     .toast.err { background: #dc2626; }
 
-    /* Loading */
     .loading { padding: 24px; text-align: center; color: #9ca3af; font-size: .88rem; }
     .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #e5e7eb; border-top-color: #850c18; border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: middle; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .empty { padding: 20px; text-align: center; color: #9ca3af; font-size: .85rem; }
 
-    /* Skjul editor-tile som default */
     #editorTile { display: none; }
   </style>
 </head>
@@ -115,12 +102,10 @@
 <div id="appContent" style="display:none;">
   <div class="container">
 
-    <!-- Kategori-tiles -->
     <div class="cat-tiles" id="catTiles">
       <div class="loading"><span class="spinner"></span>Henter grupper...</div>
     </div>
 
-    <!-- Gruppe-liste tile -->
     <div class="tile" id="groupTile" style="display:none;">
       <div class="tile-header" onclick="toggleTile(this)">
         <div class="tile-icon">👥</div>
@@ -132,7 +117,6 @@
       </div>
     </div>
 
-    <!-- Medlemmer tile -->
     <div class="tile" id="editorTile">
       <div class="tile-header" onclick="toggleTile(this)">
         <div class="tile-icon">✏️</div>
@@ -212,16 +196,15 @@
 <script>
 const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
 
-// Kategoridefinitioner — tilføj flere her efterhånden
 const CATEGORIES = [
   { id: "portal", label: "Portal", icon: "🔐", prefix: "portal_" },
-  { id: "alle",   label: "Alle -", icon: "👥", prefix: "Alle" },
+  { id: "alle",   label: "Alle",   icon: "👥", prefix: "Alle" },
 ];
 
-let allGroups      = [];
-let allUsers       = [];
-let currentGroup   = null;
-let activeCategory = null;
+let allGroups       = [];
+let allUsers        = [];
+let currentGroup    = null;
+let activeCategory  = null;
 let workingMembers  = [];
 let originalMembers = [];
 let selectedMembers = new Set();
@@ -239,30 +222,49 @@ let selectedUsers   = new Set();
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
-  // Hent grupper og brugere parallelt
   const [groupRes, userRes] = await Promise.all([
     fetch("/api/getGroups").then(r => r.json()).catch(() => ({ groups: [] })),
     fetch("/api/getUsers").then(r => r.json()).catch(() => ({ users: [] }))
   ]);
-
   allGroups = groupRes.groups ?? [];
   allUsers  = userRes.users  ?? [];
-
   document.getElementById("allUserCount").textContent = `(${allUsers.length})`;
   renderUsers();
   renderCatTiles();
+}
+
+// ── Filtre ────────────────────────────────────────────────────────────────────
+const isResource = u =>
+  u.displayName?.match(/^(projector|screen|room|lokale|møderum|ressource|resource|projek)/i) ||
+  u.mail?.match(/ressource|resource|room|lokale/i);
+
+const isShared = u =>
+  u.displayName?.match(/^(fælles|shared|info@|kontakt|support|noreply|no-reply)/i) ||
+  u.mail?.match(/info@|kontakt@|support@|noreply@|no-reply@|fælles/i) ||
+  (u.displayName?.includes(" - ") && !u.mail?.includes(u.displayName?.split(" ")[0]?.toLowerCase()));
+
+function getFilterState() {
+  return {
+    showResources: document.getElementById("filterResources").checked,
+    showShared:    document.getElementById("filterShared").checked,
+  };
+}
+
+function passesFilter(u) {
+  const { showResources, showShared } = getFilterState();
+  if (!showResources && isResource(u)) return false;
+  if (!showShared    && isShared(u))   return false;
+  return true;
 }
 
 // ── Kategori-tiles ────────────────────────────────────────────────────────────
 function renderCatTiles() {
   const container = document.getElementById("catTiles");
   container.innerHTML = "";
-
   CATEGORIES.forEach(cat => {
     const count = allGroups.filter(g =>
       g.displayName?.toLowerCase().startsWith(cat.prefix.toLowerCase())
     ).length;
-
     const div = document.createElement("div");
     div.className = "cat-tile" + (activeCategory?.id === cat.id ? " active" : "");
     div.innerHTML = `
@@ -278,35 +280,25 @@ function renderCatTiles() {
 function selectCategory(cat) {
   activeCategory = cat;
   renderCatTiles();
-
-  // Filtrér grupper til valgt kategori
   const filtered = allGroups.filter(g =>
     g.displayName?.toLowerCase().startsWith(cat.prefix.toLowerCase())
   );
-
-  // Vis gruppe-tile
   const groupTile = document.getElementById("groupTile");
   groupTile.style.display = "";
-  document.getElementById("groupTileTitle").textContent =
-    `${cat.label} grupper (${filtered.length})`;
-
+  document.getElementById("groupTileTitle").textContent = `${cat.label} grupper (${filtered.length})`;
   renderGroupList(filtered);
-
-  // Nulstil editor
   currentGroup = null;
-  document.getElementById("editorTile").style.display = "none";
+  document.getElementById("editorTile").style.removeProperty("display");
 }
 
 // ── Gruppe liste ──────────────────────────────────────────────────────────────
 function renderGroupList(groups) {
   const list = document.getElementById("groupList");
   list.innerHTML = "";
-
   if (groups.length === 0) {
     list.innerHTML = '<div class="empty">Ingen grupper fundet</div>';
     return;
   }
-
   groups.forEach(g => {
     const div = document.createElement("div");
     div.className = "group-item" + (currentGroup?.id === g.id ? " active" : "");
@@ -325,31 +317,23 @@ function renderGroupList(groups) {
 // ── Vælg gruppe ───────────────────────────────────────────────────────────────
 async function selectGroup(group) {
   currentGroup = group;
-
-  // Opdatér aktiv markering i liste
   const filtered = allGroups.filter(g =>
     g.displayName?.toLowerCase().startsWith(activeCategory?.prefix?.toLowerCase() ?? "")
   );
   renderGroupList(filtered);
 
-  // Vis editor-tile og scroll til den
   const editorTile = document.getElementById("editorTile");
   editorTile.style.setProperty("display", "block", "important");
   document.getElementById("editorTileTitle").textContent = `Medlemmer — ${group.displayName}`;
 
-  // Sørg for tile er åben
   const tileBody = editorTile.querySelector(".tile-body");
   tileBody.style.display = "";
-  const chevron = editorTile.querySelector(".tile-chevron");
-  chevron.classList.add("open");
+  editorTile.querySelector(".tile-chevron").classList.add("open");
 
-  // Scroll ned til editor
   setTimeout(() => editorTile.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
 
-  // Stamdata
   renderStamdata(group);
 
-  // Hent medlemmer
   document.getElementById("memberBody").innerHTML = '<div class="loading"><span class="spinner"></span>Henter...</div>';
   document.getElementById("memberCount").textContent = "";
   selectedMembers.clear();
@@ -397,9 +381,12 @@ function toggleTile(header) {
 function renderMembers(filter = "") {
   const body = document.getElementById("memberBody");
   const q    = filter.toLowerCase();
-  const list = workingMembers.filter(u =>
-    !q || u.displayName?.toLowerCase().includes(q) || u.mail?.toLowerCase().includes(q)
-  );
+
+  const list = workingMembers.filter(u => {
+    if (!passesFilter(u)) return false;
+    if (q && !u.displayName?.toLowerCase().includes(q) && !u.mail?.toLowerCase().includes(q)) return false;
+    return true;
+  });
 
   document.getElementById("memberCount").textContent = `(${workingMembers.length})`;
 
@@ -435,25 +422,11 @@ function filterMembers() {
 
 // ── Render alle brugere ───────────────────────────────────────────────────────
 function getVisibleUsers() {
-  const q              = document.getElementById("userSearch").value.toLowerCase();
-  const showResources  = document.getElementById("filterResources").checked;
-  const showShared     = document.getElementById("filterShared").checked;
-  const memberIds      = new Set(workingMembers.map(m => m.id));
-
-  // Genkendelsesmønstre — tilpas til jeres navnekonventioner
-  const isResource = u =>
-    u.displayName?.match(/^(projector|screen|room|lokale|møderum|ressource|resource|projek)/i) ||
-    u.mail?.match(/ressource|resource|room|lokale/i);
-
-  const isShared = u =>
-    u.displayName?.match(/^(fælles|shared|info@|kontakt|support|noreply|no-reply)/i) ||
-    u.mail?.match(/info@|kontakt@|support@|noreply@|no-reply@|fælles/i) ||
-    u.displayName?.includes(" - ") && !u.mail?.includes(u.displayName?.split(" ")[0]?.toLowerCase());
-
+  const q         = document.getElementById("userSearch").value.toLowerCase();
+  const memberIds = new Set(workingMembers.map(m => m.id));
   return allUsers.filter(u => {
     if (memberIds.has(u.id)) return false;
-    if (!showResources && isResource(u)) return false;
-    if (!showShared    && isShared(u))   return false;
+    if (!passesFilter(u)) return false;
     if (q && !u.displayName?.toLowerCase().includes(q) && !u.mail?.toLowerCase().includes(q)) return false;
     return true;
   });
@@ -462,12 +435,10 @@ function getVisibleUsers() {
 function renderUsers() {
   const body = document.getElementById("userBody");
   const list = getVisibleUsers();
-
   if (list.length === 0) {
     body.innerHTML = '<div class="empty">Ingen brugere at vise</div>';
     return;
   }
-
   body.innerHTML = "";
   list.forEach(u => {
     const div = document.createElement("div");
@@ -483,10 +454,9 @@ function renderUsers() {
     div.onclick = () => {
       if (selectedUsers.has(u.id)) selectedUsers.delete(u.id);
       else selectedUsers.add(u.id);
-      // Opdatér markér-alle checkbox
-      const visibleIds = getVisibleUsers().map(u => u.id);
-      const allSelected = visibleIds.every(id => selectedUsers.has(id));
-      document.getElementById("selectAll").checked = allSelected && visibleIds.length > 0;
+      const visibleIds  = getVisibleUsers().map(v => v.id);
+      const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedUsers.has(id));
+      document.getElementById("selectAll").checked = allSelected;
       renderUsers();
     };
     body.appendChild(div);
@@ -494,10 +464,10 @@ function renderUsers() {
 }
 
 function filterUsers() {
-  // Nulstil markér-alle når filter ændres
   document.getElementById("selectAll").checked = false;
   selectedUsers.clear();
   renderUsers();
+  renderMembers(document.getElementById("memberSearch").value);
 }
 
 function toggleSelectAll() {
@@ -510,7 +480,6 @@ function toggleSelectAll() {
 
 // ── Tilføj / fjern ────────────────────────────────────────────────────────────
 function addSelected() {
-  // ◀ = tilføj valgte fra højre kolonne (alle brugere) til gruppen
   if (selectedUsers.size === 0) return;
   const toAdd = allUsers.filter(u => selectedUsers.has(u.id));
   workingMembers = [...workingMembers, ...toAdd];
@@ -522,7 +491,6 @@ function addSelected() {
 }
 
 function removeSelected() {
-  // ▶ = fjern valgte fra venstre kolonne (nuværende medlemmer)
   if (selectedMembers.size === 0) return;
   workingMembers = workingMembers.filter(u => !selectedMembers.has(u.id));
   selectedMembers.clear();
@@ -538,7 +506,6 @@ function updateFooter() {
   const toAdd      = workingMembers.filter(m => !origIds.has(m.id));
   const toRemove   = originalMembers.filter(m => !workingIds.has(m.id));
   const info       = document.getElementById("changesInfo");
-
   if (toAdd.length === 0 && toRemove.length === 0) {
     info.innerHTML = "Ingen ændringer";
     document.getElementById("saveBtn").disabled = true;
@@ -581,7 +548,6 @@ async function saveChanges() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Ukendt fejl");
-
     originalMembers = [...workingMembers];
     updateMemberCount(currentGroup.id, originalMembers.length);
     updateFooter();
