@@ -333,7 +333,7 @@ async function selectGroup(group) {
 
   // Vis editor-tile og scroll til den
   const editorTile = document.getElementById("editorTile");
-  editorTile.style.display = "";
+  editorTile.style.setProperty("display", "block", "important");
   document.getElementById("editorTileTitle").textContent = `Medlemmer — ${group.displayName}`;
 
   // Sørg for tile er åben
