@@ -114,9 +114,14 @@ const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
     document.getElementById("appContent").style.setProperty("display", "block", "important");
     document.getElementById("greetingUser").textContent = "Logget ind som: " + user;
 
-    // Vis adgangsstyring-tile kun for portal_admin
+    // Vis adgangsstyring kun for admin
     if (roles.includes("portal_admin")) {
       document.getElementById("adgangTile").style.setProperty("display", "block", "important");
+    }
+    
+    // Vis hardware udlån for IT support
+    if (roles.some(r => ["portal_admin", "portal_it_support"].includes(r))) {
+      document.getElementById("hardwareTile").style.setProperty("display", "block", "important");
     }
 
     const appRoles = roles.filter(r => !["anonymous", "authenticated"].includes(r));
