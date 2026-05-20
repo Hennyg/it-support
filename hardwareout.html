@@ -303,9 +303,35 @@
             <input id="lch_hvad">
           </div>
 
-          <div class="field">
+          <div class="field" style="position:relative;">
             <label>Udlånt til</label>
-            <input id="lch_hvem">
+          
+            <input
+              id="lch_hvem"
+              type="search"
+              autocomplete="off"
+              placeholder="Søg person..."
+              oninput="searchUsers()"
+              onfocus="openUserDropdown()"
+            >
+          
+            <div
+              id="userDropdown"
+              style="
+                position:absolute;
+                top:100%;
+                left:0;
+                right:0;
+                background:#fff;
+                border:1px solid #d1d5db;
+                border-radius:12px;
+                box-shadow:0 8px 24px rgba(0,0,0,.12);
+                max-height:320px;
+                overflow-y:auto;
+                z-index:100;
+                display:none;
+              "
+            ></div>
           </div>
 
           <div class="field">
@@ -367,6 +393,7 @@ const ALLOWED_ROLES = [
 
 let allItems = [];
 let current = null;
+let allUsers = [];
 
 // ─────────────────────────────────────────────────────────────
 // Auth
@@ -397,7 +424,10 @@ let current = null;
     .style
     .display = "block";
 
-  await loadData();
+  await Promise.all([
+    loadData(),
+    loadUsers()
+]);
 
 })();
 
@@ -416,6 +446,25 @@ async function loadData() {
 
   if (allItems.length > 0) {
     selectItem(allItems[0]);
+  }
+
+}
+
+async function loadUsers() {
+
+  try {
+
+    const res = await fetch("/api/getUsers");
+    const data = await res.json();
+
+    allUsers = (data.users || [])
+      .filter(u => u.mailboxType === "user");
+
+  }
+  catch (err) {
+
+    console.error(err);
+
   }
 
 }
@@ -549,8 +598,8 @@ function newItem() {
     lch_hvad: "",
     lch_hvem: "",
     lch_hvorfor: "",
-    lch_when: "",
-    lch_retur: "",
+    lch_when: today(),
+    lch_retur: plus30Days(),
     lch_aktiv: true
   };
 
@@ -686,6 +735,124 @@ function esc(s) {
     .replace(/>/g, "&gt;");
 
 }
+
+  function searchUsers() {
+
+  const q = document
+    .getElementById("lch_hvem")
+    .value
+    .trim()
+    .toLowerCase();
+
+  const dd = document.getElementById("userDropdown");
+
+  if (q.length < 2) {
+    dd.style.display = "none";
+    return;
+  }
+
+  const matches = allUsers
+    .filter(u =>
+      u.displayName?.toLowerCase().includes(q) ||
+      u.mail?.toLowerCase().includes(q)
+    )
+    .slice(0, 25);
+
+  if (matches.length === 0) {
+    dd.innerHTML = `
+      <div style="padding:12px;color:#9ca3af;">
+        Ingen resultater
+      </div>
+    `;
+    dd.style.display = "block";
+    return;
+  }
+
+  dd.innerHTML = matches.map(u => `
+    <div
+      onclick="selectUser('${escJs(u.displayName)}')"
+      style="
+        padding:10px 14px;
+        border-bottom:1px solid #f3f4f6;
+        cursor:pointer;
+      "
+      onmouseover="this.style.background='#f9fafb'"
+      onmouseout="this.style.background='#fff'"
+    >
+      <div style="font-weight:600;">
+        ${esc(u.displayName)}
+      </div>
+
+      <div style="font-size:.8rem;color:#6b7280;">
+        ${esc(u.mail || "")}
+      </div>
+    </div>
+  `).join("");
+
+  dd.style.display = "block";
+
+}
+
+function selectUser(name) {
+
+  document.getElementById("lch_hvem").value = name;
+
+  document.getElementById("userDropdown").style.display = "none";
+
+}
+
+function openUserDropdown() {
+
+  if (
+    document
+      .getElementById("lch_hvem")
+      .value
+      .trim()
+      .length >= 2
+  ) {
+    searchUsers();
+  }
+
+}
+
+document.addEventListener("click", e => {
+
+  if (!e.target.closest("#lch_hvem") &&
+      !e.target.closest("#userDropdown")) {
+
+    document.getElementById("userDropdown").style.display = "none";
+
+  }
+
+});
+
+function escJs(str) {
+
+  return String(str || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'");
+
+}
+
+function today() {
+
+  return new Date()
+    .toISOString()
+    .substring(0, 10);
+
+}
+
+function plus30Days() {
+
+  const d = new Date();
+
+  d.setDate(d.getDate() + 30);
+
+  return d
+    .toISOString()
+    .substring(0, 10);
+
+}  
 </script>
 
 </body>
