@@ -1,1 +1,32 @@
-{"routes":[{"route":"/favicon.ico","allowedRoles":["anonymous","authenticated"]},{"route":"/manifest.json","allowedRoles":["anonymous","authenticated"]},{"route":"/assets/*","allowedRoles":["anonymous","authenticated"]},{"route":"/.auth/*","allowedRoles":["anonymous","authenticated"]},{"route":"/unauthorized.html","allowedRoles":["anonymous","authenticated"]},{"route":"/api/getRoles","allowedRoles":["authenticated"]},{"route":"/api/getGroups","allowedRoles":["authenticated"]},{"route":"/api/getAllGroups","allowedRoles":["authenticated"]},{"route":"/api/getGroupMembers","allowedRoles":["authenticated"]},{"route":"/api/getUsers","allowedRoles":["authenticated"]},{"route":"/api/getUserMemberships","allowedRoles":["authenticated"]},{"route":"/api/updateGroupMembers","allowedRoles":["authenticated"]},{"route":"/api/*","allowedRoles":["authenticated"]},{"route":"/","allowedRoles":["authenticated"]},{"route":"/index.html","allowedRoles":["authenticated"]},{"route":"/hardware.html","allowedRoles":["authenticated"]},{"route":"/adgang.html","allowedRoles":["authenticated"]},{"route":"/adgang-grupper.html","allowedRoles":["authenticated"]},{"route":"/adgang-person.html","allowedRoles":["authenticated"]},{"route":"/adgang-kopier.html","allowedRoles":["authenticated"]}],"responseOverrides":{"401":{"rewrite":"/unauthorized.html"},"403":{"rewrite":"/unauthorized.html"}}}
+{
+  "routes": [
+    { "route": "/favicon.ico",       "allowedRoles": ["anonymous", "authenticated"] },
+    { "route": "/manifest.json",     "allowedRoles": ["anonymous", "authenticated"] },
+    { "route": "/assets/*",          "allowedRoles": ["anonymous", "authenticated"] },
+    { "route": "/.auth/*",           "allowedRoles": ["anonymous", "authenticated"] },
+    { "route": "/unauthorized.html", "allowedRoles": ["anonymous", "authenticated"] },
+
+    { "route": "/api/getRoles",           "allowedRoles": ["authenticated"] },
+    { "route": "/api/getGroups",          "allowedRoles": ["authenticated"] },
+    { "route": "/api/getAllGroups",        "allowedRoles": ["authenticated"] },
+    { "route": "/api/getGroupMembers",    "allowedRoles": ["authenticated"] },
+    { "route": "/api/getUsers",           "allowedRoles": ["authenticated"] },
+    { "route": "/api/getUserMemberships", "allowedRoles": ["authenticated"] },
+    { "route": "/api/updateGroupMembers", "allowedRoles": ["authenticated"] },
+    { "route": "/api/*",                  "allowedRoles": ["authenticated"] },
+
+    { "route": "/",                    "allowedRoles": ["authenticated"] },
+    { "route": "/index.html",          "allowedRoles": ["authenticated"] },
+    { "route": "/hardware.html",       "allowedRoles": ["authenticated"] },
+    { "route": "/hardwareout.html",    "allowedRoles": ["authenticated"] },
+    { "route": "/dock.html",           "allowedRoles": ["authenticated"] },
+    { "route": "/adgang.html",         "allowedRoles": ["authenticated"] },
+    { "route": "/adgang-grupper.html", "allowedRoles": ["authenticated"] },
+    { "route": "/adgang-person.html",  "allowedRoles": ["authenticated"] },
+    { "route": "/adgang-kopier.html",  "allowedRoles": ["authenticated"] }
+  ],
+  "responseOverrides": {
+    "401": { "rewrite": "/unauthorized.html" },
+    "403": { "rewrite": "/unauthorized.html" }
+  }
+}
