@@ -8,7 +8,8 @@
   <meta name="herrup-app" content="it-support">
   <meta name="herrup-title" content="IT Support">
   <meta name="herrup-subtitle" content="Hardware & System">
-  <script src="/assets/navbar.js"></script>
+  <script src="/assets/navbar.js" defer></script>
+  <script src="/assets/auth.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; color: #111827; }
@@ -175,15 +176,12 @@ const AGENT = "http://localhost:5199";
 let allSoftware = [];
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
-(async () => {
-  const me = await fetch("/.auth/me").then(r => r.json()).catch(() => null);
-  if (!me?.clientPrincipal?.userDetails) { location.href = "/unauthorized.html"; return; }
-  const roles = (await fetch("/api/getRoles").then(r => r.json()).catch(() => ({roles:[]}))).roles ?? [];
-  if (!roles.some(r => ALLOWED_ROLES.includes(r))) { location.href = "/unauthorized.html"; return; }
-
-  document.getElementById("appContent").style.display = "";
-  initAgent();
-})();
+document.addEventListener("DOMContentLoaded", () => {
+  ITAuth.requireAuth(({ user }) => {
+    document.getElementById("appContent").style.display = "";
+    initAgent();
+  });
+});
 
 // ── Agent ─────────────────────────────────────────────────────────────────────
 async function initAgent() {
