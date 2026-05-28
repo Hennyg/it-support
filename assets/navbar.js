@@ -61,8 +61,12 @@
     const user = me?.clientPrincipal?.userDetails || "";
     userEl.textContent = user ? user : "Ikke logget ind";
 
-    const roleData = await fetchJson("/api/getRoles");
-    const roles    = Array.isArray(roleData?.roles) ? roleData.roles : [];
+    const roles = [
+      ...(me?.clientPrincipal?.userRoles || []),
+      ...(me?.clientPrincipal?.claims || [])
+        .filter(c => ["roles", "role"].includes(String(c.typ || "").toLowerCase()))
+        .map(c => String(c.val || ""))
+    ].map(r => String(r).toLowerCase());
 
     const path = window.location.pathname;
 
