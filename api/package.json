@@ -1,0 +1,8 @@
+{
+  "name": "it-support-api",
+  "version": "1.0.0",
+  "description": "IT Support API functions",
+  "engines": {
+    "node": ">=18"
+  }
+}
