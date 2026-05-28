@@ -53,10 +53,13 @@ window.ITAuth = (function () {
     ].map(r => String(r).toLowerCase());
 
     // Tjek adgang
-    if (!roles.some(r => ALLOWED_ROLES.includes(r))) {
-      window.location.href = "/unauthorized.html";
-      return;
-    }
+        console.log("Roller fundet:", roles);
+        console.log("Leder efter:", ALLOWED_ROLES);
+        console.log("Har adgang:", roles.some(r => ALLOWED_ROLES.includes(r)));
+        if (!roles.some(r => ALLOWED_ROLES.includes(r))) {
+          window.location.href = "/unauthorized.html";
+          return;
+        }
 
     const isAdmin = roles.includes("portal_admin");
     const user    = principal.userDetails;
