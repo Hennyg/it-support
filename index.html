@@ -15,20 +15,62 @@
     body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f3f4f6; color: #111827; min-height: 100vh; }
     #appContent { display: none; }
     .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
-    .welcome-hero { background: linear-gradient(135deg, #850c18 0%, #5a0810 100%); color: #fff; border-radius: 20px; padding: 40px; margin-bottom: 32px; box-shadow: 0 10px 30px rgba(0,0,0,.15); }
+
+    .welcome-hero {
+      background: linear-gradient(135deg, #850c18 0%, #5a0810 100%);
+      color: #fff;
+      border-radius: 20px;
+      padding: 40px;
+      margin-bottom: 32px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.15);
+      position: relative;
+    }
     .welcome-hero h1 { margin: 0 0 12px; font-size: 2.2rem; line-height: 1.15; }
     .welcome-hero p { margin: 0; font-size: 1.05rem; line-height: 1.6; color: rgba(255,255,255,.9); max-width: 620px; }
     .welcome-hero .user-greeting { display: inline-block; margin-top: 18px; background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 6px 16px; font-size: .95rem; font-weight: 600; }
+
+    /* Pil knap */
+    .scroll-arrow {
+      position: absolute;
+      bottom: 16px;
+      right: 20px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.15);
+      border: 1px solid rgba(255,255,255,.25);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background .2s;
+      user-select: none;
+    }
+    .scroll-arrow:hover { background: rgba(255,255,255,.28); }
+    .scroll-arrow.open { transform: rotate(180deg); }
+
+    /* Din adgang tile */
+    .role-info {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: none;
+    }
+    .role-info.visible { display: block; }
+    .role-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .role-badge { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 999px; padding: 4px 14px; font-size: .85rem; font-weight: 600; }
+    .role-badge.admin { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-bottom: 32px; }
-    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.05); transition: box-shadow .15s, border-color .15s; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.05); transition: box-shadow .15s, border-color .15s; text-decoration: none; color: inherit; display: block; }
     .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); border-color: #d1d5db; }
     .card-icon { font-size: 2rem; margin-bottom: 12px; }
     .card h2 { margin: 0 0 8px; font-size: 1.1rem; }
     .card p { margin: 0; font-size: .95rem; color: #6b7280; line-height: 1.55; }
-    .role-info { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; }
-    .role-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-    .role-badge { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; border-radius: 999px; padding: 4px 14px; font-size: .85rem; font-weight: 600; }
-    .role-badge.admin { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
   </style>
 </head>
 <body>
@@ -39,42 +81,53 @@
         <h1>Velkommen til IT Support</h1>
         <p>Dette er den interne IT Support Portal. Her kan du finde værktøjer og ressourcer til daglig IT-understøttelse.</p>
         <div class="user-greeting" id="greetingUser"></div>
+        <div class="scroll-arrow" id="scrollArrow" title="Vis din adgang" onclick="toggleRoleInfo()">▼</div>
       </section>
-      <div class="role-info" id="roleInfo" style="display:none;">
+
+      <div class="role-info" id="roleInfo">
         <strong>Din adgang</strong>
         <div class="role-badges" id="roleBadges"></div>
       </div>
+
       <div class="cards">
-        <a class="card" href="/hardware.html" style="text-decoration:none;color:inherit;">
+        <a class="card" href="/hardware.html">
           <div class="card-icon">🖥️</div>
           <h2>Hardware & System</h2>
           <p>Se hardware-info, installerede programmer og event log på kundens PC.</p>
         </a>
-        <a class="card" href="/dock.html" style="text-decoration:none;color:inherit;">
+        <a class="card" href="/dock.html">
           <div class="card-icon">🔌</div>
           <h2>Dock Diagnostik</h2>
           <p>Diagnosticer i-Tec docking station problemer — skærm blinker, manglende tilkobling, DisplayLink driver og firmware.</p>
         </a>
-        <a class="card" href="/adgang.html" id="adgangTile" style="text-decoration:none;color:inherit;display:none;">
+        <a class="card" href="/otherhelp.html">
+          <div class="card-icon">🛠️</div>
+          <h2>Anden hjælp</h2>
+          <p>Yderligere værktøjer og ressourcer til IT-support.</p>
+        </a>
+        <a class="card" href="/adgang.html" id="adgangTile" style="display:none;">
           <div class="card-icon">🔐</div>
           <h2>Adgangsstyring</h2>
           <p>Administrér brugeradgang og rettigheder i portalgrupper.</p>
         </a>
-        <a class="card" href="/hardwareout.html" id="hardwareTile" style="text-decoration:none;color:inherit;display:none;">
-          <div class="card-icon">🔐</div>
+        <a class="card" href="/hardwareout.html" id="hardwareTile" style="display:none;">
+          <div class="card-icon">📦</div>
           <h2>Hardware udlån</h2>
           <p>Registrér og administrér udlånt hardware som laptops, telefoner, docks, skærme og andet udstyr.</p>
         </a>
-        <div class="card">
-          <div class="card-icon">📋</div>
-          <h2>Dokumentation</h2>
-          <p>Interne guides og teknisk dokumentation.</p>
-        </div>
       </div>
     </div>
   </div>
 
 <script>
+function toggleRoleInfo() {
+  const info = document.getElementById("roleInfo");
+  const arrow = document.getElementById("scrollArrow");
+  const isVisible = info.classList.contains("visible");
+  info.classList.toggle("visible", !isVisible);
+  arrow.classList.toggle("open", !isVisible);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   ITAuth.requireAuth(({ user, roles, isAdmin }) => {
     document.getElementById("appContent").style.setProperty("display", "block", "important");
@@ -90,7 +143,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const appRoles = roles.filter(r => !["anonymous", "authenticated"].includes(r));
     if (appRoles.length > 0) {
-      document.getElementById("roleInfo").style.setProperty("display", "block", "important");
       appRoles.forEach(role => {
         const span = document.createElement("span");
         span.className = "role-badge" + (role === "portal_admin" ? " admin" : "");
