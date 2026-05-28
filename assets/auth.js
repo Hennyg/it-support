@@ -44,9 +44,13 @@ window.ITAuth = (function () {
       return;
     }
 
-    // Hent roller
-    let rolesData = await fetchJson("/api/getRoles");
-    const roles = Array.isArray(rolesData?.roles) ? rolesData.roles : [];
+    // Hent roller direkte fra /.auth/me claims (samme metode som HerrupPortal)
+    const roles = [
+      ...(principal.userRoles || []),
+      ...(principal.claims || [])
+        .filter(c => ["roles", "role"].includes(String(c.typ || "").toLowerCase()))
+        .map(c => String(c.val || ""))
+    ].map(r => String(r).toLowerCase());
 
     // Tjek adgang
     if (!roles.some(r => ALLOWED_ROLES.includes(r))) {
