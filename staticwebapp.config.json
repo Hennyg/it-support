@@ -24,7 +24,9 @@
     { "route": "/adgang.html",         "allowedRoles": ["authenticated"] },
     { "route": "/adgang-grupper.html", "allowedRoles": ["authenticated"] },
     { "route": "/adgang-person.html",  "allowedRoles": ["authenticated"] },
-    { "route": "/adgang-kopier.html",  "allowedRoles": ["authenticated"] }
+    { "route": "/adgang-kopier.html",  "allowedRoles": ["authenticated"] },
+    { "route": "/otherhelp.html",      "allowedRoles": ["authenticated"] },
+    { "route": "/teamsbaggrunde.html", "allowedRoles": ["authenticated"] }
   ],
 "responseOverrides": {
   "401": {
