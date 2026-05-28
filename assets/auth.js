@@ -17,49 +17,46 @@ window.ITAuth = (function () {
     } catch { return null; }
   }
 
-  // Forsøg token-refresh og prøv igen
   async function tryRefresh() {
     try {
       await fetch(REFRESH_URL);
     } catch {}
   }
 
-  // Hoved auth-tjek — kalder callback med { user, roles, isAdmin }
-  // Ved fejl redirecter til login automatisk
+  function getRolesFromPrincipal(principal) {
+    return [
+      ...(principal.userRoles || []),
+      ...(principal.claims || [])
+        .filter(c => {
+          const t = String(c.typ || "").toLowerCase();
+          return t === "roles" || t === "role" || t.includes("claims/role");
+        })
+        .map(c => String(c.val || ""))
+    ].map(r => String(r).toLowerCase());
+  }
+
   async function requireAuth(callback) {
     let me = await fetchJson("/.auth/me");
     let principal = me?.clientPrincipal;
 
-    // Hvis ingen principal — forsøg refresh og prøv igen
     if (!principal?.userDetails) {
       await tryRefresh();
       me = await fetchJson("/.auth/me");
       principal = me?.clientPrincipal;
     }
 
-    // Stadig ingen principal — send til login
     if (!principal?.userDetails) {
       const redirect = encodeURIComponent(window.location.pathname + window.location.search);
       window.location.href = `${LOGIN_URL}?post_login_redirect_uri=${redirect}`;
       return;
     }
 
-    // Hent roller direkte fra /.auth/me claims (samme metode som HerrupPortal)
-    const roles = [
-      ...(principal.userRoles || []),
-      ...(principal.claims || [])
-        .filter(c => String(c.typ || "").includes("claims/role"))
-        .map(c => String(c.val || ""))
-    ].map(r => String(r).toLowerCase());
+    const roles = getRolesFromPrincipal(principal);
 
-    // Tjek adgang
-        console.log("Roller fundet:", roles);
-        console.log("Leder efter:", ALLOWED_ROLES);
-        console.log("Har adgang:", roles.some(r => ALLOWED_ROLES.includes(r)));
-        if (!roles.some(r => ALLOWED_ROLES.includes(r))) {
-          window.location.href = "/unauthorized.html";
-          return;
-        }
+    if (!roles.some(r => ALLOWED_ROLES.includes(r))) {
+      window.location.href = "/unauthorized.html";
+      return;
+    }
 
     const isAdmin = roles.includes("portal_admin");
     const user    = principal.userDetails;
