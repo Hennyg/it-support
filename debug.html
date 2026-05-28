@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <title>Debug auth</title>
+</head>
+<body>
+  <h2>Auth debug</h2>
+  <pre id="out">Henter...</pre>
+  <script>
+    const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
+
+    fetch("/.auth/me", { headers: { Accept: "application/json" } })
+      .then(r => r.json())
+      .then(me => {
+        const principal = me?.clientPrincipal;
+        const userRoles = principal?.userRoles || [];
+        const claimRoles = (principal?.claims || [])
+          .filter(c => String(c.typ || "").includes("claims/role"))
+          .map(c => c.val);
+
+        const allRoles = [...new Set([...userRoles, ...claimRoles])].map(r => r.toLowerCase());
+        const hasAccess = allRoles.some(r => ALLOWED_ROLES.includes(r));
+
+        document.getElementById("out").textContent = JSON.stringify({
+          bruger: principal?.userDetails,
+          userRoles,
+          claimRoles,
+          allRoles,
+          lederEfter: ALLOWED_ROLES,
+          harAdgang: hasAccess
+        }, null, 2);
+      });
+  </script>
+</body>
+</html>
