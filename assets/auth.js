@@ -48,7 +48,7 @@ window.ITAuth = (function () {
     const roles = [
       ...(principal.userRoles || []),
       ...(principal.claims || [])
-        .filter(c => ["roles", "role"].includes(String(c.typ || "").toLowerCase()))
+        .filter(c => String(c.typ || "").includes("claims/role"))
         .map(c => String(c.val || ""))
     ].map(r => String(r).toLowerCase());
 
