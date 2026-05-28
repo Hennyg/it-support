@@ -2,7 +2,11 @@ module.exports = async function (context, req) {
   const principalB64 = req.headers["x-ms-client-principal"];
 
   if (!principalB64) {
-    context.res = { status: 200, headers: { "Content-Type": "application/json; charset=utf-8" }, body: [] };
+    context.res = {
+      status: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: { roles: [] }
+    };
     return;
   }
 
@@ -10,7 +14,11 @@ module.exports = async function (context, req) {
   try {
     cp = JSON.parse(Buffer.from(principalB64, "base64").toString("utf8"));
   } catch {
-    context.res = { status: 200, headers: { "Content-Type": "application/json; charset=utf-8" }, body: [] };
+    context.res = {
+      status: 200,
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: { roles: [] }
+    };
     return;
   }
 
@@ -26,5 +34,9 @@ module.exports = async function (context, req) {
   set.delete("anonymous");
   set.delete("authenticated");
 
-  context.res = { status: 200, headers: { "Content-Type": "application/json; charset=utf-8" }, body: [...set] };
+  context.res = {
+    status: 200,
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: { roles: [...set] }
+  };
 };
