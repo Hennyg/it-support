@@ -16,7 +16,10 @@
         const principal = me?.clientPrincipal;
         const userRoles = principal?.userRoles || [];
         const claimRoles = (principal?.claims || [])
-          .filter(c => String(c.typ || "").includes("claims/role"))
+          .filter(c => {
+            const t = String(c.typ || "").toLowerCase();
+            return t === "roles" || t === "role" || t.includes("claims/role");
+          })
           .map(c => c.val);
 
         const allRoles = [...new Set([...userRoles, ...claimRoles])].map(r => r.toLowerCase());
