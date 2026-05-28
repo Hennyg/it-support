@@ -30,7 +30,6 @@
     "403": { "rewrite": "/unauthorized.html" }
   },
   "auth": {
-    "rolesSource": "/api/getRoles",
     "identityProviders": {
       "azureActiveDirectory": {
         "registration": {
