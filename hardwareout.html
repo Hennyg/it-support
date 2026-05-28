@@ -12,7 +12,8 @@
   <meta name="herrup-title" content="IT Support">
   <meta name="herrup-subtitle" content="Hardware udlån">
 
-  <script src="/assets/navbar.js"></script>
+  <script src="/assets/navbar.js" defer></script>
+  <script src="/assets/auth.js" defer></script>
 
   <style>
     *, *::before, *::after {
@@ -399,34 +400,16 @@ let allUsers = [];
 // Auth
 // ─────────────────────────────────────────────────────────────
 
-(async () => {
+document.addEventListener("DOMContentLoaded", () => {
+  ITAuth.requireAuth(async ({ user }) => {
+    document
+      .getElementById("appContent")
+      .style
+      .display = "block";
 
-  const me = await fetch("/.auth/me")
-    .then(r => r.json())
-    .catch(() => null);
-
-  if (!me?.clientPrincipal?.userDetails) {
-    location.href = "/unauthorized.html";
-    return;
-  }
-
-  const roles = await fetch("/api/getRoles")
-    .then(r => r.json())
-    .catch(() => ({ roles: [] }));
-
-  if (!roles.roles.some(r => ALLOWED_ROLES.includes(r))) {
-    location.href = "/unauthorized.html";
-    return;
-  }
-
-  document
-    .getElementById("appContent")
-    .style
-    .display = "block";
-
-  await Promise.all([
-    loadData(),
-    loadUsers()
+    await Promise.all([
+      loadData(),
+      loadUsers()
 ]);
 
 })();
@@ -448,7 +431,8 @@ async function loadData() {
     selectItem(allItems[0]);
   }
 
-}
+  });
+});
 
 async function loadUsers() {
 
