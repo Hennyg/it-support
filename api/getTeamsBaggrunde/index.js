@@ -1,58 +1,53 @@
 // api/getTeamsBaggrunde/index.js
-// Henter billedfiler fra SharePoint mappen "Teams-baggrunde"
-// Bruger DELING_SPO_SITE_ID og DELING_SPO_DRIVE_ID fra environment variables
-
-const { getGraphToken, jsonResponse } = require("../shared/graph");
-
-async function graphGet(token, path) {
-  const r = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  const txt = await r.text();
-  let data = {};
-  try { data = txt ? JSON.parse(txt) : {}; } catch {}
-  if (!r.ok) throw new Error(`Graph fejl ${r.status}: ${txt}`);
-  return data;
-}
+const { getGraphToken, graphGet, jsonResponse } = require("../shared/graph");
 
 module.exports = async function (context, req) {
+  const debug = { step: "start", siteId: "", driveId: "", folder: "Teams-baggrunde", error: "" };
+
   try {
     const siteId  = process.env.DELING_SPO_SITE_ID;
     const driveId = process.env.DELING_SPO_DRIVE_ID;
     const folder  = "Teams-baggrunde";
 
+    debug.siteId  = siteId ? siteId.substring(0, 8) + "..." : "MANGLER";
+    debug.driveId = driveId ? driveId.substring(0, 8) + "..." : "MANGLER";
+
     if (!siteId || !driveId) {
-      context.res = jsonResponse(500, { error: "Mangler DELING_SPO_SITE_ID eller DELING_SPO_DRIVE_ID" });
+      context.res = jsonResponse(500, { error: "Mangler env vars", debug });
       return;
     }
 
+    debug.step = "get_token";
     const token = await getGraphToken();
 
-    // Hent indhold af mappen
-    const data = await graphGet(
-      token,
-      `/sites/${encodeURIComponent(siteId)}/drives/${encodeURIComponent(driveId)}/root:/${encodeURIComponent(folder)}:/children?$select=id,name,size,file,@microsoft.graph.downloadUrl&$top=200`
-    );
+    debug.step = "graph_call";
+    const path = `/sites/${encodeURIComponent(siteId)}/drives/${encodeURIComponent(driveId)}/root:/${encodeURIComponent(folder)}:/children?$select=id,name,size,file,@microsoft.graph.downloadUrl&$top=200`;
+    debug.path = path;
+
+    const data = await graphGet(token, path);
+
+    debug.step = "done";
+    debug.itemCount = data.value?.length ?? 0;
 
     const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"];
-
     const images = (data.value ?? [])
       .filter(item => {
-        if (!item.file) return false; // kun filer, ikke mapper
+        if (!item.file) return false;
         const ext = item.name.substring(item.name.lastIndexOf(".")).toLowerCase();
         return imageExtensions.includes(ext);
       })
       .map(item => ({
-        id:          item.id,
-        name:        item.name,
-        size:        item.size,
-        downloadUrl: item["@microsoft.graph.downloadUrl"],
-        thumbnailUrl: item["@microsoft.graph.downloadUrl"] // bruges som preview
+        id:           item.id,
+        name:         item.name,
+        size:         item.size,
+        downloadUrl:  item["@microsoft.graph.downloadUrl"],
+        thumbnailUrl: item["@microsoft.graph.downloadUrl"]
       }))
       .sort((a, b) => a.name.localeCompare(b.name, "da"));
 
-    context.res = jsonResponse(200, { count: images.length, images });
+    context.res = jsonResponse(200, { count: images.length, images, debug });
   } catch (err) {
-    context.res = jsonResponse(500, { error: err.message });
+    debug.error = err?.message || String(err);
+    context.res = jsonResponse(500, { error: err.message, debug });
   }
 };
