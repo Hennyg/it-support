@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teams baggrunde — IT Support</title>
+  <link rel="stylesheet" href="/assets/navbar.css" />
+  <meta name="herrup-app" content="it-support">
+  <meta name="herrup-title" content="IT Support">
+  <meta name="herrup-subtitle" content="Teams baggrunde">
+  <script src="/assets/navbar.js"></script>
+  <script src="/assets/auth.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f3f4f6; color: #111827; min-height: 100vh; }
+    #appContent { display: none; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 40px 20px; }
+    h1 { font-size: 1.8rem; margin: 0 0 8px; }
+    .subtitle { color: #6b7280; margin: 0 0 24px; font-size: 1rem; }
+
+    .agent-status { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: 12px; margin-bottom: 24px; font-size: .95rem; font-weight: 600; }
+    .agent-status.ok      { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .agent-status.error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .agent-status.loading { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot.green { background: #16a34a; }
+    .dot.red   { background: #dc2626; }
+    .dot.gray  { background: #94a3b8; }
+
+    .no-agent-box { background: #fff; border: 1px solid #fecaca; border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 24px; }
+    .no-agent-box h2 { color: #991b1b; margin: 0 0 12px; }
+    .no-agent-box p { color: #6b7280; margin: 0 0 8px; line-height: 1.6; }
+
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .btn { padding: 10px 22px; background: #850c18; color: #fff; border: none; border-radius: 10px; font-size: .95rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+    .btn:hover { background: #6b0913; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn.secondary { background: #fff; color: #374151; border: 1px solid #e5e7eb; }
+    .btn.secondary:hover { background: #f3f4f6; }
+    .selected-count { font-size: .9rem; color: #6b7280; }
+
+    .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+    .image-card {
+      background: #fff;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color .15s, box-shadow .15s;
+      position: relative;
+    }
+    .image-card:hover { border-color: #850c18; box-shadow: 0 4px 12px rgba(133,12,24,.1); }
+    .image-card.selected { border-color: #850c18; box-shadow: 0 4px 12px rgba(133,12,24,.2); }
+    .image-card img { width: 100%; height: 120px; object-fit: cover; display: block; background: #f3f4f6; }
+    .image-card .img-name { padding: 8px 10px; font-size: .82rem; color: #374151; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .check-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      background: #850c18;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: .8rem;
+      font-weight: 700;
+    }
+    .image-card.selected .check-badge { display: flex; }
+
+    .loading { padding: 48px; text-align: center; color: #9ca3af; font-size: .95rem; }
+    .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #e5e7eb; border-top-color: #850c18; border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty { padding: 48px; text-align: center; color: #9ca3af; }
+
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 12px; font-size: .9rem; font-weight: 600; color: #fff; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; }
+    .toast.show { opacity: 1; }
+    .toast.ok  { background: #16a34a; }
+    .toast.err { background: #dc2626; }
+    .toast.info { background: #2563eb; }
+
+    .progress-box { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; display: none; }
+    .progress-box.visible { display: block; }
+    .progress-title { font-weight: 600; margin-bottom: 10px; font-size: .95rem; }
+    .progress-bar-wrap { background: #f3f4f6; border-radius: 999px; height: 8px; overflow: hidden; }
+    .progress-bar { height: 8px; background: #850c18; border-radius: 999px; transition: width .3s; }
+    .progress-text { font-size: .82rem; color: #6b7280; margin-top: 6px; }
+  </style>
+</head>
+<body>
+
+<div id="appContent">
+  <div class="container">
+    <h1>Teams baggrunde</h1>
+    <p class="subtitle">Udvælg de baggrunde du vil benytte i Teams møder og hent dem direkte til din PC.</p>
+
+    <div class="agent-status loading" id="agentStatus">
+      <div class="dot gray" id="agentDot"></div>
+      <span id="agentStatusText">Forbinder til IT Support Agent...</span>
+    </div>
+
+    <div id="noAgent" style="display:none;">
+      <div class="no-agent-box">
+        <h2>🔌 IT Support Agent ikke fundet</h2>
+        <p>IT Support Agent er ikke installeret eller kørende på denne PC.</p>
+        <p style="font-size:.85rem;color:#9ca3af;">Forventer agent på <code>http://localhost:5199</code></p>
+      </div>
+    </div>
+
+    <div id="mainContent" style="display:none;">
+      <div class="progress-box" id="progressBox">
+        <div class="progress-title" id="progressTitle">Henter billeder...</div>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+        <div class="progress-text" id="progressText"></div>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" id="downloadBtn" onclick="downloadSelected()" disabled>⬇️ Hent valgte til Teams</button>
+        <button class="btn secondary" onclick="selectAll()">Vælg alle</button>
+        <button class="btn secondary" onclick="selectNone()">Fravælg alle</button>
+        <span class="selected-count" id="selectedCount">0 valgt</span>
+      </div>
+
+      <div id="imageGrid" class="image-grid">
+        <div class="loading"><span class="spinner"></span>Henter billeder fra SharePoint...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const AGENT = "http://localhost:5199";
+let images = [];
+let selected = new Set();
+let agentOk = false;
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  ITAuth.requireAuth(async ({ user }) => {
+    document.getElementById("appContent").style.setProperty("display", "block", "important");
+    await initAgent();
+  });
+});
+
+// ── Agent check ───────────────────────────────────────────────────────────────
+async function initAgent() {
+  try {
+    const ping = await fetch(AGENT + "/api/ping", { signal: AbortSignal.timeout(3000) });
+    if (ping.ok) {
+      agentOk = true;
+      setStatus("ok", "IT Support Agent forbundet");
+      document.getElementById("mainContent").style.display = "";
+      await loadImages();
+      return;
+    }
+  } catch {}
+  setStatus("error", "IT Support Agent ikke fundet på localhost:5199");
+  document.getElementById("noAgent").style.display = "";
+}
+
+function setStatus(type, text) {
+  document.getElementById("agentStatus").className = "agent-status " + type;
+  document.getElementById("agentDot").className = "dot " + (type === "ok" ? "green" : type === "error" ? "red" : "gray");
+  document.getElementById("agentStatusText").textContent = text;
+}
+
+// ── Hent billeder fra SPO via API ─────────────────────────────────────────────
+async function loadImages() {
+  const grid = document.getElementById("imageGrid");
+  grid.innerHTML = '<div class="loading"><span class="spinner"></span>Henter billeder fra SharePoint...</div>';
+
+  try {
+    const res = await fetch("/api/getTeamsBaggrunde");
+    if (!res.ok) throw new Error("API fejlede: " + res.status);
+    const data = await res.json();
+    images = data.images || [];
+
+    if (images.length === 0) {
+      grid.innerHTML = '<div class="empty">Ingen billeder fundet i Teams-baggrunde mappen.</div>';
+      return;
+    }
+
+    renderGrid();
+  } catch (err) {
+    grid.innerHTML = `<div class="empty">Kunne ikke hente billeder: ${err.message}</div>`;
+  }
+}
+
+// ── Render billeder ───────────────────────────────────────────────────────────
+function renderGrid() {
+  const grid = document.getElementById("imageGrid");
+  grid.innerHTML = "";
+  images.forEach((img, i) => {
+    const card = document.createElement("div");
+    card.className = "image-card" + (selected.has(i) ? " selected" : "");
+    card.innerHTML = `
+      <img src="${img.thumbnailUrl || img.downloadUrl}" alt="${esc(img.name)}" loading="lazy" onerror="this.style.display='none'" />
+      <div class="img-name">${esc(img.name)}</div>
+      <div class="check-badge">✓</div>`;
+    card.onclick = () => toggleSelect(i, card);
+    grid.appendChild(card);
+  });
+  updateCount();
+}
+
+function toggleSelect(i, card) {
+  if (selected.has(i)) { selected.delete(i); card.classList.remove("selected"); }
+  else { selected.add(i); card.classList.add("selected"); }
+  updateCount();
+}
+
+function selectAll() {
+  images.forEach((_, i) => selected.add(i));
+  renderGrid();
+}
+
+function selectNone() {
+  selected.clear();
+  renderGrid();
+}
+
+function updateCount() {
+  document.getElementById("selectedCount").textContent = selected.size + " valgt";
+  document.getElementById("downloadBtn").disabled = selected.size === 0;
+}
+
+// ── Download via agent ────────────────────────────────────────────────────────
+async function downloadSelected() {
+  if (selected.size === 0) return;
+  const btn = document.getElementById("downloadBtn");
+  btn.disabled = true;
+
+  const toDownload = [...selected].map(i => images[i]);
+  const total = toDownload.length;
+
+  showProgress(true, "Henter billeder til Teams...", 0, total);
+
+  let ok = 0, fail = 0;
+
+  for (let i = 0; i < toDownload.length; i++) {
+    const img = toDownload[i];
+    updateProgress(i, total, `Henter ${img.name}...`);
+
+    try {
+      // Brug agentens /api/run-ps til at downloade og gemme i Teams baggrundsmappen
+      const teamsFolder = `$env:APPDATA\\Microsoft\\Teams\\Backgrounds\\Uploads`;
+      const safeName = img.name.replace(/[^a-zA-Z0-9æøåÆØÅ._\- ]/g, "_");
+      const script = `
+$url = '${img.downloadUrl.replace(/'/g, "''")}';
+$folder = "$env:APPDATA\\Microsoft\\Teams\\Backgrounds\\Uploads";
+if (!(Test-Path $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
+$dest = Join-Path $folder '${safeName.replace(/'/g, "''")}';
+Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing;
+Write-Host "OK: $dest"
+      `.trim();
+
+      const res = await fetch(AGENT + "/api/run-ps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ script })
+      });
+
+      if (res.ok) { ok++; }
+      else { fail++; }
+    } catch { fail++; }
+  }
+
+  showProgress(false);
+  btn.disabled = false;
+  updateCount();
+
+  if (fail === 0) {
+    showToast(`✅ ${ok} billede${ok !== 1 ? "r" : ""} gemt i Teams baggrundsmappen`, "ok");
+  } else {
+    showToast(`${ok} gemt, ${fail} fejlede`, fail > 0 && ok === 0 ? "err" : "info");
+  }
+}
+
+function showProgress(visible, title = "", current = 0, total = 1) {
+  const box = document.getElementById("progressBox");
+  box.classList.toggle("visible", visible);
+  if (visible) {
+    document.getElementById("progressTitle").textContent = title;
+    updateProgress(current, total, "");
+  }
+}
+
+function updateProgress(current, total, text) {
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+  document.getElementById("progressBar").style.width = pct + "%";
+  document.getElementById("progressText").textContent = text || `${current} / ${total}`;
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove("show"), 4000);
+}
+
+function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+</script>
+
+</body>
+</html>
