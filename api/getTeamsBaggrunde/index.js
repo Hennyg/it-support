@@ -14,10 +14,10 @@ module.exports = async function (context, req) {
 
     const token = await getGraphToken();
 
-    // Hent filer i mappen
+    // Hent filer — uden $select så vi får alle felter inkl. @microsoft.graph.downloadUrl
     const data = await graphGet(
       token,
-      `/sites/${encodeURIComponent(siteId)}/drives/${encodeURIComponent(driveId)}/root:/${encodeURIComponent(folder)}:/children?$select=id,name,size,file,@microsoft.graph.downloadUrl&$top=200`
+      `/sites/${encodeURIComponent(siteId)}/drives/${encodeURIComponent(driveId)}/root:/${encodeURIComponent(folder)}:/children?$top=200`
     );
 
     const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"];
@@ -28,9 +28,11 @@ module.exports = async function (context, req) {
       return imageExtensions.includes(ext);
     });
 
-    // Hent thumbnails for hvert billede parallelt
+    // Hent thumbnails parallelt
     const images = await Promise.all(items.map(async item => {
-      let thumbnailUrl = item["@microsoft.graph.downloadUrl"];
+      const downloadUrl = item["@microsoft.graph.downloadUrl"] || null;
+
+      let thumbnailUrl = downloadUrl;
       try {
         const thumbData = await graphGet(
           token,
@@ -43,7 +45,7 @@ module.exports = async function (context, req) {
         id:          item.id,
         name:        item.name,
         size:        item.size,
-        downloadUrl: item["@microsoft.graph.downloadUrl"],
+        downloadUrl,
         thumbnailUrl
       };
     }));
