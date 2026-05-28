@@ -8,18 +8,16 @@
   <meta name="herrup-app" content="it-support">
   <meta name="herrup-title" content="IT Support">
   <meta name="herrup-subtitle" content="Adgangsstyring">
-  <script src="/assets/navbar.js"></script>
+  <script src="/assets/navbar.js" defer></script>
+  <script src="/assets/auth.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; color: #111827; }
     #appContent { display: none; }
     .container { max-width: 1000px; margin: 0 auto; padding: 32px 20px; }
-
     .page-title { font-size: 1.6rem; font-weight: 800; color: #111827; margin: 0 0 6px; }
     .page-sub { font-size: .95rem; color: #6b7280; margin: 0 0 32px; }
-
     .section-title { font-size: .75rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 12px; }
-
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 40px; }
     .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.05); text-decoration: none; color: inherit; display: block; transition: box-shadow .15s, border-color .15s, transform .15s; }
     .card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.1); border-color: #850c18; transform: translateY(-2px); }
@@ -31,12 +29,10 @@
   </style>
 </head>
 <body>
-
 <div id="appContent">
   <div class="container">
     <h1 class="page-title">Adgangsstyring</h1>
     <p class="page-sub">Administrér brugeradgang, gruppemedlemskaber og opret nye brugere.</p>
-
     <div class="section-title">Adgangsgrupper</div>
     <div class="cards">
       <a class="card" href="/adgang-grupper.html">
@@ -46,7 +42,6 @@
         <span class="card-badge green">Grupper</span>
       </a>
     </div>
-
     <div class="section-title">Brugeradministration</div>
     <div class="cards">
       <a class="card" href="/adgang-person.html">
@@ -68,20 +63,14 @@
         <span class="card-badge">Kommer snart</span>
       </div>
     </div>
-
   </div>
 </div>
-
 <script>
-const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
-(async () => {
-  const me = await fetch("/.auth/me").then(r => r.json()).catch(() => null);
-  if (!me?.clientPrincipal?.userDetails) { location.href = "/unauthorized.html"; return; }
-  const roles = (await fetch("/api/getRoles").then(r => r.json()).catch(() => ({roles:[]}))).roles ?? [];
-  if (!roles.some(r => ALLOWED_ROLES.includes(r))) { location.href = "/unauthorized.html"; return; }
-  document.getElementById("appContent").style.setProperty("display", "block", "important");
-})();
+document.addEventListener("DOMContentLoaded", () => {
+  ITAuth.requireAuth(({ user }) => {
+    document.getElementById("appContent").style.setProperty("display", "block", "important");
+  });
+});
 </script>
-
 </body>
 </html>
