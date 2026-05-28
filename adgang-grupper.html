@@ -8,12 +8,12 @@
   <meta name="herrup-app" content="it-support">
   <meta name="herrup-title" content="IT Support">
   <meta name="herrup-subtitle" content="Portalgrupper">
-  <script src="/assets/navbar.js"></script>
+  <script src="/assets/navbar.js" defer></script>
+  <script src="/assets/auth.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; color: #111827; }
     .container { max-width: 1400px; margin: 0 auto; padding: 32px 20px; }
-
     .cat-tiles { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
     .cat-tile { display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: #fff; border: 2px solid #e5e7eb; border-radius: 14px; cursor: pointer; transition: all .15s; user-select: none; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
     .cat-tile:hover { border-color: #850c18; background: #fef3f2; }
@@ -21,7 +21,6 @@
     .cat-tile-icon { font-size: 1.4rem; }
     .cat-tile-label { font-size: .95rem; font-weight: 700; }
     .cat-tile-count { font-size: .8rem; opacity: .7; margin-left: 4px; }
-
     .tile { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 16px; overflow: hidden; }
     .tile-header { display: flex; align-items: center; gap: 12px; padding: 16px 24px; border-bottom: 1px solid #f3f4f6; cursor: pointer; user-select: none; }
     .tile-icon { font-size: 1.2rem; }
@@ -29,7 +28,6 @@
     .tile-chevron { color: #9ca3af; font-size: .9rem; transition: transform .2s; }
     .tile-chevron.open { transform: rotate(180deg); }
     .tile-body { padding: 20px 24px; }
-
     .group-list { display: flex; flex-direction: column; gap: 6px; }
     .group-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border: 1px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: background .15s; }
     .group-item:hover { background: #f9fafb; }
@@ -37,21 +35,17 @@
     .group-name { font-weight: 600; font-size: .9rem; color: #111827; }
     .group-email { font-size: .78rem; color: #6b7280; }
     .member-count { margin-left: auto; background: #f3f4f6; border-radius: 999px; padding: 2px 10px; font-size: .78rem; color: #374151; font-weight: 600; white-space: nowrap; }
-
     .editor { display: none; }
     .editor.visible { display: grid; grid-template-columns: 260px 1fr auto 1fr; gap: 0; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
-
     .col { display: flex; flex-direction: column; min-width: 0; }
     .col-header { padding: 11px 16px; background: #1f2937; color: #fff; font-size: .83rem; font-weight: 700; flex-shrink: 0; }
     .col-header.light { background: #f8fafc; color: #374151; border-bottom: 1px solid #e5e7eb; }
     .col-body { flex: 1; overflow-y: auto; max-height: 380px; }
-
     .stamdata { border-right: 1px solid #e5e7eb; }
     .stamdata .col-body { padding: 14px 16px; }
     .sd-row { margin-bottom: 12px; }
     .sd-label { font-size: .72rem; color: #6b7280; margin-bottom: 2px; text-transform: uppercase; letter-spacing: .03em; }
     .sd-value { font-size: .87rem; color: #111827; font-weight: 500; word-break: break-word; }
-
     .member-list { border-right: 1px solid #e5e7eb; }
     .user-item { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer; border-bottom: 1px solid #f9fafb; transition: background .1s; }
     .user-item:hover { background: #f9fafb; }
@@ -62,18 +56,15 @@
     .user-email { font-size: .72rem; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .user-check { width: 15px; height: 15px; border-radius: 3px; border: 2px solid #d1d5db; flex-shrink: 0; }
     .user-item.selected .user-check { background: #850c18; border-color: #850c18; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 10 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 4l3 3 5-6' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; }
-
     .btn-col { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px 10px; background: #f8fafc; border-right: 1px solid #e5e7eb; min-width: 50px; }
     .arrow-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; font-size: .95rem; display: flex; align-items: center; justify-content: center; transition: background .15s; }
     .arrow-btn:hover { background: #850c18; color: #fff; border-color: #850c18; }
-
     .col-search { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
     .col-search input { width: 100%; padding: 5px 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: .82rem; outline: none; }
     .col-search input:focus { border-color: #850c18; }
     .filter-checks { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 2px; }
     .filter-check { display: flex; align-items: center; gap: 5px; font-size: .78rem; color: #374151; cursor: pointer; user-select: none; }
     .filter-check input[type=checkbox] { accent-color: #850c18; width: 13px; height: 13px; cursor: pointer; }
-
     .editor-footer { padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .changes-info { font-size: .85rem; color: #6b7280; }
     .changes-info strong { color: #111827; }
@@ -82,12 +73,10 @@
     .btn-save:disabled { opacity: .5; cursor: not-allowed; }
     .btn-cancel { padding: 8px 14px; background: #fff; color: #374151; border: 1px solid #e5e7eb; border-radius: 10px; font-size: .88rem; cursor: pointer; }
     .btn-cancel:hover { background: #f3f4f6; }
-
     .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 12px; font-size: .9rem; font-weight: 600; color: #fff; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; }
     .toast.show { opacity: 1; }
     .toast.ok  { background: #16a34a; }
     .toast.err { background: #dc2626; }
-
     .loading { padding: 24px; text-align: center; color: #9ca3af; font-size: .88rem; }
     .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #e5e7eb; border-top-color: #850c18; border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: middle; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -96,14 +85,11 @@
   </style>
 </head>
 <body>
-
 <div id="appContent" style="display:none;">
   <div class="container">
-
     <div class="cat-tiles" id="catTiles">
       <div class="loading"><span class="spinner"></span>Henter grupper...</div>
     </div>
-
     <div class="tile" id="groupTile" style="display:none;">
       <div class="tile-header" onclick="toggleTile(this)">
         <div class="tile-icon">👥</div>
@@ -114,7 +100,6 @@
         <div class="group-list" id="groupList"></div>
       </div>
     </div>
-
     <div class="tile" id="editorTile">
       <div class="tile-header" onclick="toggleTile(this)">
         <div class="tile-icon">✏️</div>
@@ -160,35 +145,26 @@
         </div>
       </div>
     </div>
-
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
-
 <script>
 const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
-
 const CATEGORIES = [
   { id: "portal", label: "Portal", icon: "🔐", prefix: "portal_" },
   { id: "alle",   label: "Alle",   icon: "👥", prefix: "Alle" },
 ];
-
 let allGroups = [], allUsers = [], currentGroup = null, activeCategory = null;
 let workingMembers = [], originalMembers = [];
 let selectedMembers = new Set(), selectedUsers = new Set();
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-(async () => {
-  const me = await fetch("/.auth/me").then(r => r.json()).catch(() => null);
-  if (!me?.clientPrincipal?.userDetails) { location.href = "/unauthorized.html"; return; }
-  const roles = (await fetch("/api/getRoles").then(r => r.json()).catch(() => ({roles:[]}))).roles ?? [];
-  if (!roles.some(r => ALLOWED_ROLES.includes(r))) { location.href = "/unauthorized.html"; return; }
-  document.getElementById("appContent").style.setProperty("display", "block", "important");
-  init();
-})();
+document.addEventListener("DOMContentLoaded", () => {
+  ITAuth.requireAuth(({ user, roles, isAdmin }) => {
+    document.getElementById("appContent").style.setProperty("display", "block", "important");
+    init();
+  });
+});
 
-// ── Init ──────────────────────────────────────────────────────────────────────
 async function init() {
   const [groupRes, userRes] = await Promise.all([
     fetch("/api/getGroups").then(r => r.json()).catch(() => ({ groups: [] })),
@@ -201,7 +177,6 @@ async function init() {
   renderCatTiles();
 }
 
-// ── Filter — bruger mailboxType fra API ───────────────────────────────────────
 function passesFilter(u) {
   const showResources = document.getElementById("filterResources").checked;
   const showShared    = document.getElementById("filterShared").checked;
@@ -210,7 +185,6 @@ function passesFilter(u) {
   return true;
 }
 
-// ── Kategori-tiles ────────────────────────────────────────────────────────────
 function renderCatTiles() {
   const container = document.getElementById("catTiles");
   container.innerHTML = "";
@@ -235,7 +209,6 @@ function selectCategory(cat) {
   document.getElementById("editorTile").style.removeProperty("display");
 }
 
-// ── Gruppe liste ──────────────────────────────────────────────────────────────
 function renderGroupList(groups) {
   const list = document.getElementById("groupList");
   list.innerHTML = "";
@@ -254,23 +227,19 @@ function renderGroupList(groups) {
   });
 }
 
-// ── Vælg gruppe ───────────────────────────────────────────────────────────────
 async function selectGroup(group) {
   currentGroup = group;
   renderGroupList(allGroups.filter(g => g.displayName?.toLowerCase().startsWith(activeCategory?.prefix?.toLowerCase() ?? "")));
-
   const editorTile = document.getElementById("editorTile");
   editorTile.style.setProperty("display", "block", "important");
   document.getElementById("editorTileTitle").textContent = `Medlemmer — ${group.displayName}`;
   editorTile.querySelector(".tile-body").style.display = "";
   editorTile.querySelector(".tile-chevron").classList.add("open");
   setTimeout(() => editorTile.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
-
   renderStamdata(group);
   document.getElementById("memberBody").innerHTML = '<div class="loading"><span class="spinner"></span>Henter...</div>';
   document.getElementById("memberCount").textContent = "";
   selectedMembers.clear(); selectedUsers.clear();
-
   try {
     const data = await fetch(`/api/getGroupMembers?id=${encodeURIComponent(group.id)}`).then(r => r.json());
     originalMembers = data.members ?? [];
@@ -297,7 +266,6 @@ function updateMemberCount(groupId, count) {
   if (el) el.textContent = count + " medlemmer";
 }
 
-// ── Tile toggle ───────────────────────────────────────────────────────────────
 function toggleTile(header) {
   const body = header.nextElementSibling;
   const chevron = header.querySelector(".tile-chevron");
@@ -306,39 +274,23 @@ function toggleTile(header) {
   chevron.classList.toggle("open", !isOpen);
 }
 
-// ── Render medlemmer ──────────────────────────────────────────────────────────
-function renderMembers(filter = "") {
+function renderMembers(q = "") {
   const body = document.getElementById("memberBody");
-  const q = filter.toLowerCase();
-  const list = workingMembers.filter(u => {
-    if (!passesFilter(u)) return false;
-    if (q && !u.displayName?.toLowerCase().includes(q) && !u.mail?.toLowerCase().includes(q)) return false;
-    return true;
-  });
+  const list = workingMembers.filter(u => !q || u.displayName?.toLowerCase().includes(q.toLowerCase()) || u.mail?.toLowerCase().includes(q.toLowerCase()));
   document.getElementById("memberCount").textContent = `(${workingMembers.length})`;
   if (list.length === 0) { body.innerHTML = '<div class="empty">Ingen medlemmer</div>'; return; }
   body.innerHTML = "";
   list.forEach(u => {
     const div = document.createElement("div");
     div.className = "user-item" + (selectedMembers.has(u.id) ? " selected" : "");
-    div.innerHTML = `
-      <div class="user-avatar">${initials(u.displayName)}</div>
-      <div class="user-info">
-        <div class="user-name">${esc(u.displayName)}</div>
-        <div class="user-email">${esc(u.mail ?? "")}</div>
-      </div>
-      <div class="user-check"></div>`;
-    div.onclick = () => {
-      selectedMembers.has(u.id) ? selectedMembers.delete(u.id) : selectedMembers.add(u.id);
-      renderMembers(document.getElementById("memberSearch").value);
-    };
+    div.innerHTML = `<div class="user-avatar">${initials(u.displayName)}</div><div class="user-info"><div class="user-name">${esc(u.displayName)}</div><div class="user-email">${esc(u.mail ?? "")}</div></div><div class="user-check"></div>`;
+    div.onclick = () => { selectedMembers.has(u.id) ? selectedMembers.delete(u.id) : selectedMembers.add(u.id); renderMembers(document.getElementById("memberSearch").value); };
     body.appendChild(div);
   });
 }
 
 function filterMembers() { renderMembers(document.getElementById("memberSearch").value); }
 
-// ── Render alle brugere ───────────────────────────────────────────────────────
 function getVisibleUsers() {
   const q = document.getElementById("userSearch").value.toLowerCase();
   const memberIds = new Set(workingMembers.map(m => m.id));
@@ -358,13 +310,7 @@ function renderUsers() {
   list.forEach(u => {
     const div = document.createElement("div");
     div.className = "user-item" + (selectedUsers.has(u.id) ? " selected" : "");
-    div.innerHTML = `
-      <div class="user-avatar">${initials(u.displayName)}</div>
-      <div class="user-info">
-        <div class="user-name">${esc(u.displayName)}</div>
-        <div class="user-email">${esc(u.mail ?? "")}</div>
-      </div>
-      <div class="user-check"></div>`;
+    div.innerHTML = `<div class="user-avatar">${initials(u.displayName)}</div><div class="user-info"><div class="user-name">${esc(u.displayName)}</div><div class="user-email">${esc(u.mail ?? "")}</div></div><div class="user-check"></div>`;
     div.onclick = () => {
       selectedUsers.has(u.id) ? selectedUsers.delete(u.id) : selectedUsers.add(u.id);
       const vis = getVisibleUsers().map(v => v.id);
@@ -375,106 +321,57 @@ function renderUsers() {
   });
 }
 
-function filterUsers() {
-  document.getElementById("selectAll").checked = false;
-  selectedUsers.clear();
-  renderUsers();
-  renderMembers(document.getElementById("memberSearch").value);
-}
+function filterUsers() { document.getElementById("selectAll").checked = false; selectedUsers.clear(); renderUsers(); renderMembers(document.getElementById("memberSearch").value); }
+function toggleSelectAll() { const checked = document.getElementById("selectAll").checked; const vis = getVisibleUsers().map(u => u.id); if (checked) vis.forEach(id => selectedUsers.add(id)); else selectedUsers.clear(); renderUsers(); }
 
-function toggleSelectAll() {
-  const checked = document.getElementById("selectAll").checked;
-  const vis = getVisibleUsers().map(u => u.id);
-  if (checked) vis.forEach(id => selectedUsers.add(id)); else selectedUsers.clear();
-  renderUsers();
-}
-
-// ── Tilføj / fjern ────────────────────────────────────────────────────────────
 function addSelected() {
   if (selectedUsers.size === 0) return;
   workingMembers = [...workingMembers, ...allUsers.filter(u => selectedUsers.has(u.id))];
-  selectedUsers.clear();
-  document.getElementById("selectAll").checked = false;
-  renderMembers(document.getElementById("memberSearch").value);
-  renderUsers(); updateFooter();
+  selectedUsers.clear(); document.getElementById("selectAll").checked = false;
+  renderMembers(document.getElementById("memberSearch").value); renderUsers(); updateFooter();
 }
 
 function removeSelected() {
   if (selectedMembers.size === 0) return;
   workingMembers = workingMembers.filter(u => !selectedMembers.has(u.id));
-  selectedMembers.clear();
-  renderMembers(document.getElementById("memberSearch").value);
-  renderUsers(); updateFooter();
+  selectedMembers.clear(); renderMembers(document.getElementById("memberSearch").value); renderUsers(); updateFooter();
 }
 
-// ── Footer ────────────────────────────────────────────────────────────────────
 function updateFooter() {
   const origIds = new Set(originalMembers.map(m => m.id));
   const workIds = new Set(workingMembers.map(m => m.id));
-  const toAdd   = workingMembers.filter(m => !origIds.has(m.id));
-  const toRem   = originalMembers.filter(m => !workIds.has(m.id));
-  const info    = document.getElementById("changesInfo");
-  if (toAdd.length === 0 && toRem.length === 0) {
-    info.innerHTML = "Ingen ændringer";
-    document.getElementById("saveBtn").disabled = true;
-  } else {
-    const parts = [];
-    if (toAdd.length > 0) parts.push(`<strong>+${toAdd.length}</strong> tilføjes`);
-    if (toRem.length > 0) parts.push(`<strong>-${toRem.length}</strong> fjernes`);
-    info.innerHTML = parts.join(" · ");
-    document.getElementById("saveBtn").disabled = false;
-  }
+  const toAdd = workingMembers.filter(m => !origIds.has(m.id));
+  const toRem = originalMembers.filter(m => !workIds.has(m.id));
+  const info = document.getElementById("changesInfo");
+  if (toAdd.length === 0 && toRem.length === 0) { info.innerHTML = "Ingen ændringer"; document.getElementById("saveBtn").disabled = true; }
+  else { const parts = []; if (toAdd.length > 0) parts.push(`<strong>+${toAdd.length}</strong> tilføjes`); if (toRem.length > 0) parts.push(`<strong>-${toRem.length}</strong> fjernes`); info.innerHTML = parts.join(" · "); document.getElementById("saveBtn").disabled = false; }
 }
 
-function cancelChanges() {
-  workingMembers = [...originalMembers];
-  selectedMembers.clear(); selectedUsers.clear();
-  document.getElementById("selectAll").checked = false;
-  renderMembers(); renderUsers(); updateFooter();
-}
+function cancelChanges() { workingMembers = [...originalMembers]; selectedMembers.clear(); selectedUsers.clear(); document.getElementById("selectAll").checked = false; renderMembers(); renderUsers(); updateFooter(); }
 
-// ── Gem ───────────────────────────────────────────────────────────────────────
 async function saveChanges() {
   const origIds = new Set(originalMembers.map(m => m.id));
   const workIds = new Set(workingMembers.map(m => m.id));
-  const toAdd   = workingMembers.filter(m => !origIds.has(m.id)).map(m => m.id);
-  const toRem   = originalMembers.filter(m => !workIds.has(m.id)).map(m => m.id);
+  const toAdd = workingMembers.filter(m => !origIds.has(m.id)).map(m => m.id);
+  const toRem = originalMembers.filter(m => !workIds.has(m.id)).map(m => m.id);
   if (toAdd.length === 0 && toRem.length === 0) return;
   const btn = document.getElementById("saveBtn");
   btn.disabled = true; btn.textContent = "Gemmer...";
   try {
-    const res  = await fetch("/api/updateGroupMembers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groupId: currentGroup.id, add: toAdd, remove: toRem })
-    });
+    const res = await fetch("/api/updateGroupMembers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ groupId: currentGroup.id, add: toAdd, remove: toRem }) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Ukendt fejl");
     originalMembers = [...workingMembers];
     updateMemberCount(currentGroup.id, originalMembers.length);
     updateFooter();
     showToast("Ændringer gemt ✓", "ok");
-  } catch (err) {
-    showToast("Fejl: " + err.message, "err");
-  } finally {
-    btn.textContent = "Gem ændringer"; btn.disabled = false;
-  }
+  } catch (err) { showToast("Fejl: " + err.message, "err"); }
+  finally { btn.textContent = "Gem ændringer"; btn.disabled = false; }
 }
 
-// ── Hjælpere ──────────────────────────────────────────────────────────────────
-function initials(name) {
-  if (!name) return "?";
-  const parts = name.trim().split(" ");
-  return parts.length >= 2 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : name[0].toUpperCase();
-}
-
+function initials(name) { if (!name) return "?"; const parts = name.trim().split(" "); return parts.length >= 2 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : name[0].toUpperCase(); }
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-
-function showToast(msg, type) {
-  const t = document.getElementById("toast");
-  t.textContent = msg; t.className = `toast ${type} show`;
-  setTimeout(() => t.classList.remove("show"), 3500);
-}
+function showToast(msg, type) { const t = document.getElementById("toast"); t.textContent = msg; t.className = `toast ${type} show`; setTimeout(() => t.classList.remove("show"), 3500); }
 </script>
 </body>
 </html>
