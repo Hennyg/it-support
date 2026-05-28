@@ -26,10 +26,12 @@
     { "route": "/adgang-person.html",  "allowedRoles": ["authenticated"] },
     { "route": "/adgang-kopier.html",  "allowedRoles": ["authenticated"] }
   ],
-  "responseOverrides": {
-    "401": { "rewrite": "/unauthorized.html" },
-    "403": { "rewrite": "/unauthorized.html" }
-  },
+"responseOverrides": {
+  "401": {
+    "redirect": "/.auth/login/aad?post_login_redirect_uri=.referrer",
+    "statusCode": 302
+  }
+},
   "auth": {
     "identityProviders": {
       "azureActiveDirectory": {
