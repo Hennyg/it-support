@@ -28,5 +28,17 @@
   "responseOverrides": {
     "401": { "rewrite": "/unauthorized.html" },
     "403": { "rewrite": "/unauthorized.html" }
+  },
+  "auth": {
+    "rolesSource": "/api/getRoles",
+    "identityProviders": {
+      "azureActiveDirectory": {
+        "registration": {
+          "openIdIssuer": "https://login.microsoftonline.com/5fbd2064-b472-4740-b035-3cb52bb46de4",
+          "clientIdSettingName": "CLIENT_ID",
+          "clientSecretSettingName": "CLIENT_SECRET"
+        }
+      }
+    }
   }
 }
