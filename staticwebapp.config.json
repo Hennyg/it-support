@@ -7,7 +7,7 @@
     { "route": "/unauthorized.html", "allowedRoles": ["anonymous", "authenticated"] },
     { "route": "/debug.html", "allowedRoles": ["anonymous", "authenticated"] },
     { "route": "/nybruger.html", "allowedRoles": ["authenticated"] },
-    { "route": "/api/createUser", "allowedRoles": ["authenticated"] }
+    { "route": "/api/createUser", "allowedRoles": ["authenticated"] },
 
     { "route": "/api/getRoles",           "allowedRoles": ["authenticated"] },
     { "route": "/api/getGroups",          "allowedRoles": ["authenticated"] },
