@@ -300,15 +300,13 @@ async function renderLocalGrid() {
   const escapedPaths = paths.map(p => p.replace(/'/g, "''"));
   const script = escapedPaths.map(p =>
     `if (Test-Path '${p}') { $b = [Convert]::ToBase64String([IO.File]::ReadAllBytes('${p}')); Write-Host $b } else { Write-Host "NOTFOUND" }`
-  ).join("
-");
+  ).join("\n");
 
   let base64List = [];
   try {
     const res = await fetch(AGENT + "/api/run-ps", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script }) });
     const data = await res.json().catch(() => ({}));
-    base64List = (data.output || "").trim().split("
-").map(s => s.trim());
+    base64List = (data.output || "").trim().split("\n").map(s => s.trim());
   } catch {}
 
   localImages.forEach((img, i) => {
