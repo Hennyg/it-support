@@ -265,6 +265,21 @@ async function downloadSelected() {
 
       // Trin 2: Flyt fra temp til Teams baggrundsmappen via PowerShell
       const tempPath = dlData.path;
+      // Debug: vis hvad PS kan se
+      const debugScript = `
+$explorerProc = Get-WmiObject Win32_Process -Filter "Name='explorer.exe'" | Select-Object -First 1;
+$explorerOwner = if ($explorerProc) { $explorerProc.GetOwner() } else { $null };
+$users = (Get-ChildItem "C:\\Users" | Where-Object { $_.Name -notin @("Public","Default","Default User","All Users") }).Name -join ", ";
+Write-Host "Explorer owner: $($explorerOwner.User)";
+Write-Host "Explorer domain: $($explorerOwner.Domain)";
+Write-Host "Users i C:\\Users: $users";
+Write-Host "TEMP: $env:TEMP";
+Write-Host "SystemTemp filer: $(Get-ChildItem $env:TEMP | Select-Object -First 3 | ForEach-Object { $_.Name } | Out-String)";
+      `.trim();
+      const debugRes = await fetch(AGENT + "/api/run-ps", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script: debugScript }) });
+      const debugData = await debugRes.json().catch(() => ({}));
+      console.log("=== PC DEBUG ===", JSON.stringify(debugData));
+
       const moveScript = `
 $src = '${tempPath.replace(/\\/g, "\\\\").replace(/'/g, "''")}';
 # Find den loggede bruger via Explorer.exe processen
