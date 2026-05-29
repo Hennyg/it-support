@@ -251,7 +251,14 @@ async function downloadSelected() {
       const safeName = img.name.replace(/[^a-zA-Z0-9æøåÆØÅ._\- ]/g, "_");
       const script = `
 $url = '${img.downloadUrl.replace(/'/g, "''")}';
-$folder = "$env:APPDATA\\Microsoft\\Teams\\Backgrounds\\Uploads";
+# Prøv ny Teams sti først, derefter gammel
+$newTeams = "$env:LOCALAPPDATA\\Packages\\MSTeams_8wekyb3d8bbwe\\LocalCache\\Microsoft\\MSTeams\\Backgrounds\\Uploads";
+$oldTeams = "$env:APPDATA\\Microsoft\\Teams\\Backgrounds\\Uploads";
+if (Test-Path "$env:LOCALAPPDATA\\Packages\\MSTeams_8wekyb3d8bbwe") {
+  $folder = $newTeams
+} else {
+  $folder = $oldTeams
+}
 if (!(Test-Path $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
 $dest = Join-Path $folder '${safeName.replace(/'/g, "''")}';
 Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing;
