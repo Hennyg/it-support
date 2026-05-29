@@ -298,7 +298,7 @@ if (!(Test-Path $src)) { Write-Host "FEJL: Kildefil ikke fundet: $src"; exit 1 }
 $guid = [System.Guid]::NewGuid().ToString();
 $ext = [System.IO.Path]::GetExtension($src);
 $dest = Join-Path $folder "$guid$ext";
-$thumb = Join-Path $folder "${guid}_thumb$ext";
+$thumb = Join-Path $folder "\${guid}_thumb$ext";
 
 # Kopiér hovedfil
 Copy-Item -Path $src -Destination $dest -Force -ErrorAction Stop;
