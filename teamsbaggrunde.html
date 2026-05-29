@@ -265,20 +265,49 @@ Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing;
 Write-Host "OK: $dest"
       `.trim();
 
-      const res = await fetch(AGENT + "/api/run-ps", {
+      const safeName = img.name.replace(/[^a-zA-Z0-9æøåÆØÅ._\- ]/g, "_");
+
+      // Trin 1: Download til temp via agentens /api/download
+      const dlRes = await fetch(AGENT + "/api/download", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ script })
+        body: JSON.stringify({ url: img.downloadUrl, filename: safeName })
       });
+      const dlData = await dlRes.json().catch(() => ({}));
+      console.log("Download svar:", JSON.stringify(dlData));
 
-      const data = await res.json().catch(() => ({}));
-      console.log("Agent svar for", img.name, ":", JSON.stringify(data));
+      if (!dlRes.ok || !dlData.path) {
+        fail++;
+        console.error("Download fejl for", img.name, ":", JSON.stringify(dlData));
+        continue;
+      }
 
-      if (res.ok && !data.error) {
+      // Trin 2: Flyt fra temp til Teams baggrundsmappen via PowerShell
+      const tempPath = dlData.path;
+      const moveScript = `
+$src = '${tempPath.replace(/\\/g, "\\\\").replace(/'/g, "''")}';
+$newTeams = "$env:LOCALAPPDATA\\Packages\\MSTeams_8wekyb3d8bbwe\\LocalCache\\Microsoft\\MSTeams\\Backgrounds\\Uploads";
+$oldTeams = "$env:APPDATA\\Microsoft\\Teams\\Backgrounds\\Uploads";
+if (Test-Path "$env:LOCALAPPDATA\\Packages\\MSTeams_8wekyb3d8bbwe") { $folder = $newTeams } else { $folder = $oldTeams }
+if (!(Test-Path $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
+$dest = Join-Path $folder '${safeName.replace(/'/g, "''")}';
+Copy-Item -Path $src -Destination $dest -Force;
+Write-Host "OK: $dest"
+      `.trim();
+
+      const moveRes = await fetch(AGENT + "/api/run-ps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ script: moveScript })
+      });
+      const moveData = await moveRes.json().catch(() => ({}));
+      console.log("Flyt svar:", JSON.stringify(moveData));
+
+      if (moveRes.ok && !moveData.error) {
         ok++;
       } else {
         fail++;
-        const msg = data.error || data.output || data.stderr || JSON.stringify(data);
+        const msg = moveData.error || moveData.output || moveData.stderr || JSON.stringify(moveData);
         console.error("Fejl for", img.name, ":", msg);
         showToast("Fejl: " + msg.substring(0, 120), "err");
       }
