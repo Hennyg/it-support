@@ -280,25 +280,22 @@ Write-Host "SystemTemp filer: $(Get-ChildItem $env:TEMP | Select-Object -First 3
       const debugData = await debugRes.json().catch(() => ({}));
       console.log("=== PC DEBUG ===", JSON.stringify(debugData));
 
+      const escapedTempPath = tempPath.replace(/'/g, "''");
+      const escapedSafeName = safeName.replace(/'/g, "''");
       const moveScript = `
-$src = '${tempPath.replace(/\\/g, "\\\\").replace(/'/g, "''")}';
-# Find den loggede bruger via Explorer.exe processen
+$src = '${escapedTempPath}';
+# Find bruger via Explorer.exe
 $explorerProc = Get-WmiObject Win32_Process -Filter "Name='explorer.exe'" | Select-Object -First 1;
-if ($explorerProc) {
-  $explorerOwner = $explorerProc.GetOwner();
-  $username = $explorerOwner.User;
-} else {
-  # Fallback: find senest aktive bruger i C:\\Users
-  $username = (Get-ChildItem "C:\\Users" | Where-Object { $_.Name -notin @("Public","Default","Default User","All Users") } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name;
-}
+$username = if ($explorerProc) { $explorerProc.GetOwner().User } else { (Get-ChildItem "C:\\Users" | Where-Object { $_.Name -notin @("Public","Default","Default User","All Users") } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name };
 $userLocal = "C:\\Users\\$username\\AppData\\Local";
 $userRoaming = "C:\\Users\\$username\\AppData\\Roaming";
 $newTeams = "$userLocal\\Packages\\MSTeams_8wekyb3d8bbwe\\LocalCache\\Microsoft\\MSTeams\\Backgrounds\\Uploads";
 $oldTeams = "$userRoaming\\Microsoft\\Teams\\Backgrounds\\Uploads";
 if (Test-Path "$userLocal\\Packages\\MSTeams_8wekyb3d8bbwe") { $folder = $newTeams } else { $folder = $oldTeams }
 if (!(Test-Path $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
-$dest = Join-Path $folder '${safeName.replace(/'/g, "''")}';
-Copy-Item -Path $src -Destination $dest -Force;
+$dest = Join-Path $folder '${escapedSafeName}';
+if (!(Test-Path $src)) { Write-Host "FEJL: Kildefil ikke fundet: $src"; exit 1 }
+Copy-Item -Path $src -Destination $dest -Force -ErrorAction Stop;
 Write-Host "OK: $dest"
       `.trim();
 
