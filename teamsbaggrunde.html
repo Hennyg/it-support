@@ -74,6 +74,24 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .empty { padding: 40px; text-align: center; color: #9ca3af; font-size: .88rem; }
 
+    /* Teams vejledning */
+    .teams-guide { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 14px; margin-bottom: 16px; overflow: hidden; }
+    .teams-guide-header { display: flex; align-items: center; gap: 12px; padding: 15px 20px; cursor: pointer; user-select: none; }
+    .teams-guide-header:hover { background: #dbeafe; }
+    .teams-guide-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .teams-guide-title { font-size: .95rem; font-weight: 700; color: #1e40af; flex: 1; }
+    .teams-guide-arrow { color: #3b82f6; font-size: .85rem; transition: transform .25s; flex-shrink: 0; }
+    .teams-guide-arrow.open { transform: rotate(180deg); }
+    .teams-guide-body { display: none; padding: 0 20px 20px; border-top: 1px solid #bfdbfe; }
+    .teams-guide-body.open { display: block; }
+    .guide-steps { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; }
+    .guide-step { display: flex; gap: 16px; align-items: flex-start; }
+    .step-num { width: 28px; height: 28px; border-radius: 50%; background: #1d4ed8; color: #fff; font-size: .82rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+    .step-content { flex: 1; }
+    .step-title { font-size: .92rem; font-weight: 700; color: #1e3a8a; margin: 0 0 6px; }
+    .step-text { font-size: .85rem; color: #1e40af; margin: 0 0 10px; line-height: 1.6; }
+    .step-illustration { border-radius: 10px; overflow: hidden; border: 1px solid #bfdbfe; background: #f0f7ff; }
+
     .no-agent-box { background: #fff; border: 1px solid #fecaca; border-radius: 16px; padding: 28px; text-align: center; margin-bottom: 24px; }
     .no-agent-box h2 { color: #991b1b; margin: 0 0 10px; font-size: 1.1rem; }
     .no-agent-box p { color: #6b7280; margin: 0 0 6px; font-size: .9rem; line-height: 1.6; }
@@ -94,6 +112,125 @@
     <div class="guide-box">
       <div class="guide-icon">💡</div>
       <p><strong>Sådan bruger du siden:</strong> Marker de billeder du vil arbejde med ved at klikke på dem — der vises et flueben. Brug derefter <em>Vælg alle</em> eller <em>Fravælg alle</em> til hurtig markering. Når du har valgt dine billeder, trykker du på den ønskede handlingsknap — enten <strong>Hent til Teams</strong> for at downloade fra SharePoint, eller <strong>Slet markerede</strong> for at fjerne eksisterende baggrunde fra din PC.</p>
+    </div>
+
+    <!-- Teams vejledning -->
+    <div class="teams-guide">
+      <div class="teams-guide-header" onclick="toggleTeamsGuide()">
+        <div class="teams-guide-icon">🎥</div>
+        <div class="teams-guide-title">Vejledning til valg af baggrunde i Teams møder</div>
+        <div class="teams-guide-arrow" id="teamsGuideArrow">▼</div>
+      </div>
+      <div class="teams-guide-body" id="teamsGuideBody">
+        <div class="guide-steps">
+
+          <div class="guide-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <div class="step-title">Start eller deltag i et Teams møde</div>
+              <div class="step-text">Åbn Microsoft Teams og start et møde, eller deltag i et eksisterende. Du behøver ikke at tænde for kameraet endnu.</div>
+              <div class="step-illustration">
+                <svg viewBox="0 0 480 120" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+                  <rect width="480" height="120" fill="#1a1a2e"/>
+                  <rect x="16" y="16" width="448" height="88" rx="8" fill="#252540"/>
+                  <circle cx="60" cy="60" r="28" fill="#464680"/>
+                  <text x="60" y="65" text-anchor="middle" fill="#fff" font-size="18" font-family="sans-serif">HN</text>
+                  <rect x="104" y="44" width="180" height="14" rx="4" fill="#3a3a60"/>
+                  <rect x="104" y="64" width="120" height="10" rx="4" fill="#2a2a50"/>
+                  <rect x="340" y="40" width="100" height="36" rx="8" fill="#6264a7"/>
+                  <text x="390" y="63" text-anchor="middle" fill="#fff" font-size="13" font-family="sans-serif">Start møde</text>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="guide-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <div class="step-title">Find "Effekter og avatarer" i mødeværktøjslinjen</div>
+              <div class="step-text">Klik på de tre prikker <strong>···</strong> (Flere handlinger) i mødeværktøjslinjen nederst på skærmen, og vælg <strong>"Videoeffekter og avatarer"</strong> — eller klik direkte på kamera-ikonet med en stjerne.</div>
+              <div class="step-illustration">
+                <svg viewBox="0 0 480 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+                  <rect width="480" height="80" fill="#1a1a2e"/>
+                  <rect x="0" y="50" width="480" height="30" fill="#252540"/>
+                  <!-- Toolbar icons -->
+                  <circle cx="160" cy="65" r="14" fill="#464680"/>
+                  <text x="160" y="70" text-anchor="middle" fill="#fff" font-size="14" font-family="sans-serif">🎤</text>
+                  <circle cx="200" cy="65" r="14" fill="#464680"/>
+                  <text x="200" y="70" text-anchor="middle" fill="#fff" font-size="14" font-family="sans-serif">📷</text>
+                  <circle cx="240" cy="65" r="14" fill="#c23b22"/>
+                  <text x="240" y="70" text-anchor="middle" fill="#fff" font-size="14" font-family="sans-serif">📞</text>
+                  <circle cx="280" cy="65" r="14" fill="#464680"/>
+                  <text x="280" y="70" text-anchor="middle" fill="#fff" font-size="14" font-family="sans-serif">···</text>
+                  <!-- Highlight the ··· button -->
+                  <circle cx="280" cy="65" r="16" fill="none" stroke="#fbbf24" stroke-width="2" stroke-dasharray="4 2"/>
+                  <!-- Arrow pointing to it -->
+                  <line x1="280" y1="44" x2="280" y2="49" stroke="#fbbf24" stroke-width="2" marker-end="url(#arr)"/>
+                  <text x="280" y="38" text-anchor="middle" fill="#fbbf24" font-size="11" font-family="sans-serif">Klik her</text>
+                  <defs><marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#fbbf24"/></marker></defs>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="guide-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <div class="step-title">Vælg "Baggrunde"</div>
+              <div class="step-text">I panelet der åbner til højre, klik på <strong>"Baggrunde"</strong>. Du vil nu se en oversigt over alle dine tilgængelige baggrunde — inklusiv dem du netop har hentet.</div>
+              <div class="step-illustration">
+                <svg viewBox="0 0 480 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+                  <rect width="480" height="130" fill="#1a1a2e"/>
+                  <rect x="300" y="0" width="180" height="130" fill="#252540"/>
+                  <text x="390" y="24" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold" font-family="sans-serif">Videoeffekter</text>
+                  <line x1="300" y1="32" x2="480" y2="32" stroke="#3a3a60" stroke-width="1"/>
+                  <!-- Menu items -->
+                  <rect x="310" y="42" width="160" height="32" rx="6" fill="#3a3a6080"/>
+                  <text x="390" y="63" text-anchor="middle" fill="#9ca3af" font-size="12" font-family="sans-serif">Sløringseffekter</text>
+                  <rect x="310" y="82" width="160" height="32" rx="6" fill="#6264a7"/>
+                  <text x="390" y="103" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold" font-family="sans-serif">Baggrunde ✓</text>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="guide-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <div class="step-title">Vælg din nye baggrund</div>
+              <div class="step-text">Du ser nu en gittervisning med alle tilgængelige baggrunde. Dine downloadede billeder vises i oversigten. Klik på det billede du ønsker — det aktiveres straks som din baggrund i mødet.</div>
+              <div class="step-illustration">
+                <svg viewBox="0 0 480 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;">
+                  <rect width="480" height="130" fill="#1a1a2e"/>
+                  <rect x="300" y="0" width="180" height="130" fill="#252540"/>
+                  <text x="390" y="20" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold" font-family="sans-serif">Baggrunde</text>
+                  <!-- Grid of backgrounds -->
+                  <rect x="310" y="28" width="50" height="38" rx="4" fill="#374151"/>
+                  <text x="335" y="51" text-anchor="middle" fill="#6b7280" font-size="18">⛔</text>
+                  <rect x="368" y="28" width="50" height="38" rx="4" fill="#1e3a5f"/>
+                  <rect x="426" y="28" width="50" height="38" rx="4" fill="#1a3a2e"/>
+                  <!-- Highlighted selected -->
+                  <rect x="310" y="72" width="50" height="38" rx="4" fill="#4a1942"/>
+                  <rect x="310" y="72" width="50" height="38" rx="4" fill="none" stroke="#fbbf24" stroke-width="2"/>
+                  <text x="335" y="97" text-anchor="middle" fill="#fbbf24" font-size="16">★</text>
+                  <rect x="368" y="72" width="50" height="38" rx="4" fill="#2d4a1e"/>
+                  <rect x="426" y="72" width="50" height="38" rx="4" fill="#3a2010"/>
+                  <text x="335" y="122" text-anchor="middle" fill="#fbbf24" font-size="10" font-family="sans-serif">Valgt</text>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div class="guide-step">
+            <div class="step-num">5</div>
+            <div class="step-content">
+              <div class="step-title">Baggrunden er aktiv!</div>
+              <div class="step-text">Din valgte baggrund vises nu i dit kamerafeed. Baggrunden huskes til næste gang du starter et møde. Du kan til enhver tid skifte til en anden baggrund ved at gentage trin 2-4.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
 
     <!-- Agent status -->
@@ -463,6 +600,13 @@ function showToast(msg, type) {
   t.textContent = msg; t.className = `toast ${type} show`;
   setTimeout(() => t.classList.remove("show"), 4000);
 }
+function toggleTeamsGuide() {
+  const body = document.getElementById("teamsGuideBody");
+  const arrow = document.getElementById("teamsGuideArrow");
+  body.classList.toggle("open");
+  arrow.classList.toggle("open");
+}
+
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 </script>
 </body>
