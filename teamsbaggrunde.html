@@ -287,18 +287,36 @@ $files | ForEach-Object { Write-Host "$($_.FullName)|$($_.Name)|$($_.LastWriteTi
     return;
   }
 
-  renderLocalGrid();
+  grid.innerHTML = '<div class="loading"><span class="spinner"></span>Henter previews...</div>';
+  await renderLocalGrid();
 }
 
-function renderLocalGrid() {
+async function renderLocalGrid() {
   const grid = document.getElementById("localGrid");
   grid.innerHTML = "";
+
+  // Hent alle thumbnails som base64 via PowerShell
+  const paths = localImages.map(img => img.path.replace(/(\.[^.]+)$/, '_thumb$1'));
+  const escapedPaths = paths.map(p => p.replace(/'/g, "''"));
+  const script = escapedPaths.map(p =>
+    `if (Test-Path '${p}') { $b = [Convert]::ToBase64String([IO.File]::ReadAllBytes('${p}')); Write-Host $b } else { Write-Host "NOTFOUND" }`
+  ).join("
+");
+
+  let base64List = [];
+  try {
+    const res = await fetch(AGENT + "/api/run-ps", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script }) });
+    const data = await res.json().catch(() => ({}));
+    base64List = (data.output || "").trim().split("
+").map(s => s.trim());
+  } catch {}
+
   localImages.forEach((img, i) => {
-    // Byg thumbnail URL via agent
-    const thumbPath = img.path.replace(/(\.[^.]+)$/, '_thumb$1');
+    const b64 = base64List[i] && base64List[i] !== "NOTFOUND" ? base64List[i] : null;
+    const imgSrc = b64 ? `data:image/png;base64,${b64}` : "";
     const card = document.createElement("div");
     card.className = "image-card" + (localSelected.has(i) ? " selected" : "");
-    card.innerHTML = `<img src="${AGENT}/api/file?path=${encodeURIComponent(thumbPath)}" alt="${esc(img.name)}" loading="lazy" onerror="this.src='${AGENT}/api/file?path=${encodeURIComponent(img.path)}'" /><div class="img-name">${esc(img.name)}</div><div class="check-badge">✓</div>`;
+    card.innerHTML = `${imgSrc ? `<img src="${imgSrc}" alt="${esc(img.name)}" />` : `<div style="height:110px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:.8rem;">Ingen preview</div>`}<div class="img-name">${esc(img.name)}</div><div class="check-badge">✓</div>`;
     card.onclick = () => { localSelected.has(i) ? localSelected.delete(i) : localSelected.add(i); card.classList.toggle("selected"); updateCounts(); };
     grid.appendChild(card);
   });
