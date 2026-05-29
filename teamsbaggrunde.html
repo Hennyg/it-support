@@ -246,25 +246,6 @@ async function downloadSelected() {
     updateProgress(i, total, `Henter ${img.name}...`);
 
     try {
-      // Brug agentens /api/run-ps til at downloade og gemme i Teams baggrundsmappen
-      const teamsFolder = `$env:APPDATA\\Microsoft\\Teams\\Backgrounds\\Uploads`;
-      const safeName = img.name.replace(/[^a-zA-Z0-9æøåÆØÅ._\- ]/g, "_");
-      const script = `
-$url = '${img.downloadUrl.replace(/'/g, "''")}';
-# Prøv ny Teams sti først, derefter gammel
-$newTeams = "$env:LOCALAPPDATA\\Packages\\MSTeams_8wekyb3d8bbwe\\LocalCache\\Microsoft\\MSTeams\\Backgrounds\\Uploads";
-$oldTeams = "$env:APPDATA\\Microsoft\\Teams\\Backgrounds\\Uploads";
-if (Test-Path "$env:LOCALAPPDATA\\Packages\\MSTeams_8wekyb3d8bbwe") {
-  $folder = $newTeams
-} else {
-  $folder = $oldTeams
-}
-if (!(Test-Path $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
-$dest = Join-Path $folder '${safeName.replace(/'/g, "''")}';
-Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing;
-Write-Host "OK: $dest"
-      `.trim();
-
       const safeName = img.name.replace(/[^a-zA-Z0-9æøåÆØÅ._\- ]/g, "_");
 
       // Trin 1: Download til temp via agentens /api/download
