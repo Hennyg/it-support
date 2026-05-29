@@ -267,18 +267,17 @@ async function downloadSelected() {
       const tempPath = dlData.path;
       const moveScript = `
 $src = '${tempPath.replace(/\\/g, "\\\\").replace(/'/g, "''")}';
-# Find den rigtige brugers profil-mappe (ikke system-profilen)
-$userProfile = (Get-CimInstance Win32_ComputerSystem).UserName;
-if ($userProfile -and $userProfile -ne '') {
-  $username = $userProfile.Split('\\')[-1];
-  $userLocal = "C:\\Users\\$username\\AppData\\Local";
-  $userRoaming = "C:\\Users\\$username\\AppData\\Roaming";
+# Find den loggede bruger via Explorer.exe processen
+$explorerProc = Get-WmiObject Win32_Process -Filter "Name='explorer.exe'" | Select-Object -First 1;
+if ($explorerProc) {
+  $explorerOwner = $explorerProc.GetOwner();
+  $username = $explorerOwner.User;
 } else {
-  # Fallback: find senest aktive bruger
-  $username = (Get-ChildItem "C:\\Users" | Where-Object { $_.Name -ne "Public" -and $_.Name -ne "Default" } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name;
-  $userLocal = "C:\\Users\\$username\\AppData\\Local";
-  $userRoaming = "C:\\Users\\$username\\AppData\\Roaming";
+  # Fallback: find senest aktive bruger i C:\\Users
+  $username = (Get-ChildItem "C:\\Users" | Where-Object { $_.Name -notin @("Public","Default","Default User","All Users") } | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name;
 }
+$userLocal = "C:\\Users\\$username\\AppData\\Local";
+$userRoaming = "C:\\Users\\$username\\AppData\\Roaming";
 $newTeams = "$userLocal\\Packages\\MSTeams_8wekyb3d8bbwe\\LocalCache\\Microsoft\\MSTeams\\Backgrounds\\Uploads";
 $oldTeams = "$userRoaming\\Microsoft\\Teams\\Backgrounds\\Uploads";
 if (Test-Path "$userLocal\\Packages\\MSTeams_8wekyb3d8bbwe") { $folder = $newTeams } else { $folder = $oldTeams }
