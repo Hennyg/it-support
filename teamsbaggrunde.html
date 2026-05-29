@@ -281,7 +281,6 @@ Write-Host "SystemTemp filer: $(Get-ChildItem $env:TEMP | Select-Object -First 3
       console.log("=== PC DEBUG ===", JSON.stringify(debugData));
 
       const escapedTempPath = tempPath.replace(/'/g, "''");
-      const escapedSafeName = safeName.replace(/'/g, "''");
       const moveScript = `
 $src = '${escapedTempPath}';
 # Find bruger via Explorer.exe
@@ -293,9 +292,29 @@ $newTeams = "$userLocal\\Packages\\MSTeams_8wekyb3d8bbwe\\LocalCache\\Microsoft\
 $oldTeams = "$userRoaming\\Microsoft\\Teams\\Backgrounds\\Uploads";
 if (Test-Path "$userLocal\\Packages\\MSTeams_8wekyb3d8bbwe") { $folder = $newTeams } else { $folder = $oldTeams }
 if (!(Test-Path $folder)) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
-$dest = Join-Path $folder '${escapedSafeName}';
 if (!(Test-Path $src)) { Write-Host "FEJL: Kildefil ikke fundet: $src"; exit 1 }
+
+# Teams kræver GUID-filnavn + _thumb fil
+$guid = [System.Guid]::NewGuid().ToString();
+$ext = [System.IO.Path]::GetExtension($src);
+$dest = Join-Path $folder "$guid$ext";
+$thumb = Join-Path $folder "${guid}_thumb$ext";
+
+# Kopiér hovedfil
 Copy-Item -Path $src -Destination $dest -Force -ErrorAction Stop;
+
+# Lav thumbnail (resize til 220x158 med System.Drawing)
+Add-Type -AssemblyName System.Drawing;
+$img = [System.Drawing.Image]::FromFile($src);
+$thumbW = 220; $thumbH = 158;
+$thumbBmp = New-Object System.Drawing.Bitmap($thumbW, $thumbH);
+$g = [System.Drawing.Graphics]::FromImage($thumbBmp);
+$g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic;
+$g.DrawImage($img, 0, 0, $thumbW, $thumbH);
+$g.Dispose(); $img.Dispose();
+$thumbBmp.Save($thumb, [System.Drawing.Imaging.ImageFormat]::Png);
+$thumbBmp.Dispose();
+
 Write-Host "OK: $dest"
       `.trim();
 
