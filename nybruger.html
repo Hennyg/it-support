@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ny bruger — IT Support</title>
+  <link rel="stylesheet" href="/assets/navbar.css" />
+  <meta name="herrup-app" content="it-support">
+  <meta name="herrup-title" content="IT Support">
+  <meta name="herrup-subtitle" content="Ny bruger">
+  <script src="/assets/navbar.js" defer></script>
+  <script src="/assets/auth.js" defer></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; color: #111827; min-height: 100vh; }
+    #appContent { display: none; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 32px 20px; }
+    h1 { font-size: 1.7rem; font-weight: 800; margin: 0 0 6px; }
+    .page-sub { color: #6b7280; font-size: .95rem; margin: 0 0 28px; }
+
+    /* Sektioner */
+    .section { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 28px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .section-title { font-size: 1rem; font-weight: 700; color: #111827; margin: 0 0 20px; display: flex; align-items: center; gap: 8px; }
+    .section-title span { font-size: 1.2rem; }
+
+    /* Formular */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: .82rem; font-weight: 600; color: #374151; }
+    label .req { color: #dc2626; margin-left: 2px; }
+    input, select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: .9rem; color: #111827; outline: none; transition: border-color .15s; background: #fff; }
+    input:focus, select:focus { border-color: #850c18; box-shadow: 0 0 0 3px rgba(133,12,24,.08); }
+    input.error, select.error { border-color: #dc2626; }
+    .field-hint { font-size: .75rem; color: #9ca3af; margin-top: 2px; }
+    .field-error { font-size: .75rem; color: #dc2626; margin-top: 2px; display: none; }
+    .field-error.show { display: block; }
+
+    /* Gruppe-editor */
+    .group-editor { display: grid; grid-template-columns: 1fr 44px 1fr; gap: 0; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; margin-top: 4px; }
+    .ge-col { display: flex; flex-direction: column; min-width: 0; }
+    .ge-header { padding: 10px 16px; background: #1f2937; color: #fff; font-size: .82rem; font-weight: 700; flex-shrink: 0; }
+    .ge-header.light { background: #f8fafc; color: #374151; border-bottom: 1px solid #e5e7eb; }
+    .ge-search { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; flex-shrink: 0; }
+    .ge-search input { width: 100%; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: .82rem; }
+    .ge-filters { padding: 6px 10px 8px; border-bottom: 1px solid #f3f4f6; display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+    .filter-pill { display: flex; align-items: center; gap: 4px; font-size: .75rem; color: #374151; cursor: pointer; user-select: none; }
+    .filter-pill input { accent-color: #850c18; width: 13px; height: 13px; }
+    .ge-col-body { flex: 1; overflow-y: auto; max-height: 360px; }
+    .ge-item { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid #f9fafb; cursor: pointer; transition: background .1s; }
+    .ge-item:hover { background: #f9fafb; }
+    .ge-item.selected { background: #fef3f2; }
+    .ge-item-icon { font-size: .9rem; flex-shrink: 0; }
+    .ge-item-info { flex: 1; min-width: 0; }
+    .ge-item-name { font-size: .82rem; font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ge-item-sub { font-size: .72rem; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ge-item-check { width: 15px; height: 15px; border-radius: 3px; border: 2px solid #d1d5db; flex-shrink: 0; }
+    .ge-item.selected .ge-item-check { background: #850c18; border-color: #850c18; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 10 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 4l3 3 5-6' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; }
+
+    /* Kopier fra bruger */
+    .copy-user-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+    .copy-user-row .form-group { flex: 1; margin: 0; }
+    .copy-user-row select { width: 100%; }
+
+    /* Pilknapper */
+    .ge-arrows { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: #f8fafc; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb; padding: 12px 6px; }
+    .arrow-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; font-size: .9rem; display: flex; align-items: center; justify-content: center; transition: background .15s; }
+    .arrow-btn:hover { background: #850c18; color: #fff; border-color: #850c18; }
+
+    /* Gem/annuller */
+    .action-bar { display: flex; align-items: center; gap: 12px; justify-content: flex-end; padding-top: 8px; }
+    .btn { padding: 10px 24px; background: #850c18; color: #fff; border: none; border-radius: 10px; font-size: .92rem; font-weight: 600; cursor: pointer; transition: background .15s; }
+    .btn:hover { background: #6b0913; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn.secondary { background: #fff; color: #374151; border: 1px solid #e5e7eb; }
+    .btn.secondary:hover { background: #f3f4f6; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 12px; font-size: .9rem; font-weight: 600; color: #fff; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 360px; }
+    .toast.show { opacity: 1; }
+    .toast.ok  { background: #16a34a; }
+    .toast.err { background: #dc2626; }
+
+    /* Spinner */
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #850c18; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading { padding: 24px; text-align: center; color: #9ca3af; font-size: .85rem; }
+    .empty { padding: 16px; text-align: center; color: #9ca3af; font-size: .82rem; }
+
+    /* Result box */
+    .result-box { display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px 24px; margin-top: 20px; }
+    .result-box.show { display: block; }
+    .result-box h3 { margin: 0 0 12px; color: #166534; font-size: 1rem; }
+    .result-box p { margin: 4px 0; font-size: .88rem; color: #166534; }
+    .result-box.err { background: #fef2f2; border-color: #fecaca; }
+    .result-box.err h3, .result-box.err p { color: #991b1b; }
+
+    .ge-count { font-size: .75rem; font-weight: 400; opacity: .8; margin-left: 6px; }
+  </style>
+</head>
+<body>
+<div id="appContent">
+  <div class="container">
+    <h1>Ny bruger</h1>
+    <p class="page-sub">Opret en ny Entra ID member med stamdata og gruppemedlemskaber.</p>
+
+    <!-- Stamdata -->
+    <div class="section">
+      <div class="section-title"><span>👤</span> Stamdata</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Fornavn <span class="req">*</span></label>
+          <input type="text" id="firstName" placeholder="Henrik" autocomplete="off" />
+          <div class="field-error" id="err-firstName">Fornavn er påkrævet</div>
+        </div>
+        <div class="form-group">
+          <label>Efternavn <span class="req">*</span></label>
+          <input type="text" id="lastName" placeholder="Nygaard" autocomplete="off" />
+          <div class="field-error" id="err-lastName">Efternavn er påkrævet</div>
+        </div>
+        <div class="form-group">
+          <label>Vist navn <span class="req">*</span></label>
+          <input type="text" id="displayName" placeholder="Henrik Nygaard" autocomplete="off" />
+          <div class="field-hint">Navn som vises i Entra ID og Teams</div>
+          <div class="field-error" id="err-displayName">Vist navn er påkrævet</div>
+        </div>
+        <div class="form-group">
+          <label>Brugernavn (UPN) <span class="req">*</span></label>
+          <input type="text" id="upn" placeholder="hn@lcherrup.dk" autocomplete="off" />
+          <div class="field-hint">Brugerens login-email i formatet navn@lcherrup.dk</div>
+          <div class="field-error" id="err-upn">Gyldigt UPN er påkrævet (fx navn@lcherrup.dk)</div>
+        </div>
+        <div class="form-group">
+          <label>Adgangskode <span class="req">*</span></label>
+          <input type="text" id="password" placeholder="Midlertidig adgangskode" autocomplete="off" />
+          <div class="field-hint">Brugeren skal skifte ved første login</div>
+          <div class="field-error" id="err-password">Adgangskode er påkrævet (min. 8 tegn)</div>
+        </div>
+        <div class="form-group">
+          <label>Mail-alias</label>
+          <input type="text" id="mailNickname" placeholder="hn" autocomplete="off" />
+          <div class="field-hint">Udfyldes automatisk fra UPN hvis tom</div>
+        </div>
+        <div class="form-group">
+          <label>Stilling (Job title)</label>
+          <input type="text" id="jobTitle" placeholder="IT-Supporter" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>Afdeling</label>
+          <input type="text" id="department" placeholder="IT" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>Virksomhed</label>
+          <input type="text" id="companyName" placeholder="Lely Center Herrup" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>Telefon</label>
+          <input type="text" id="phone" placeholder="22576099" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>Gade</label>
+          <input type="text" id="streetAddress" placeholder="Nr. Bjertvej 12" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>By</label>
+          <input type="text" id="city" placeholder="Vinderup" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>Postnummer</label>
+          <input type="text" id="postalCode" placeholder="7830" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>Land</label>
+          <input type="text" id="country" placeholder="Danmark" value="Danmark" autocomplete="off" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Gruppemedlemskaber -->
+    <div class="section">
+      <div class="section-title"><span>🔐</span> Gruppemedlemskaber</div>
+
+      <!-- Kopier fra eksisterende bruger -->
+      <div class="copy-user-row">
+        <div class="form-group">
+          <label>Kopier grupper fra eksisterende bruger</label>
+          <select id="copyFromUser" onchange="copyFromUser()">
+            <option value="">— Vælg bruger at kopiere fra —</option>
+          </select>
+        </div>
+        <button class="btn secondary" onclick="clearSelectedGroups()" style="white-space:nowrap;padding:9px 16px;">🗑️ Ryd valgte</button>
+      </div>
+
+      <div class="group-editor">
+        <!-- Kolonne 1: Alle grupper -->
+        <div class="ge-col">
+          <div class="ge-header">Tilgængelige grupper <span class="ge-count" id="availCount"></span></div>
+          <div class="ge-search"><input type="search" id="availSearch" placeholder="Søg grupper..." oninput="filterAvail()" /></div>
+          <div class="ge-filters">
+            <label class="filter-pill"><input type="checkbox" id="fSecurity" checked onchange="filterAvail()" /> Security</label>
+            <label class="filter-pill"><input type="checkbox" id="fM365" checked onchange="filterAvail()" /> Microsoft 365</label>
+            <label class="filter-pill"><input type="checkbox" id="fMail" checked onchange="filterAvail()" /> Mail-enabled</label>
+            <label class="filter-pill"><input type="checkbox" id="fSelectAll" onchange="toggleSelectAllAvail()" /> Markér alle</label>
+          </div>
+          <div class="ge-col-body" id="availBody">
+            <div class="loading"><span class="spinner"></span>Henter grupper...</div>
+          </div>
+        </div>
+
+        <!-- Pile -->
+        <div class="ge-arrows">
+          <button class="arrow-btn" onclick="moveToSelected()" title="Tilføj markerede">▶</button>
+          <button class="arrow-btn" onclick="moveToAvail()" title="Fjern markerede">◀</button>
+        </div>
+
+        <!-- Kolonne 2: Valgte grupper -->
+        <div class="ge-col">
+          <div class="ge-header light">Valgte grupper <span class="ge-count" id="selectedCount"></span></div>
+          <div class="ge-search"><input type="search" id="selectedSearch" placeholder="Søg valgte..." oninput="filterSelected()" /></div>
+          <div class="ge-col-body" id="selectedBody">
+            <div class="empty">Ingen grupper valgt endnu</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Handlingsknapper -->
+    <div class="action-bar">
+      <button class="btn secondary" onclick="resetForm()">Nulstil</button>
+      <button class="btn" id="saveBtn" onclick="saveUser()">💾 Opret bruger</button>
+    </div>
+
+    <!-- Resultat -->
+    <div class="result-box" id="resultBox">
+      <h3 id="resultTitle"></h3>
+      <div id="resultBody"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let allGroups    = [];
+let allUsers     = [];
+let availSelected = new Set(); // markeret i kolonne 1
+let selectedGrps  = [];        // valgte grupper til ny bruger
+let selSelected   = new Set(); // markeret i kolonne 2
+
+document.addEventListener("DOMContentLoaded", () => {
+  ITAuth.requireAuth(({ user, isAdmin }) => {
+    document.getElementById("appContent").style.setProperty("display", "block", "important");
+    init();
+  });
+});
+
+// Auto-udfyld displayName og mailNickname
+document.addEventListener("DOMContentLoaded", () => {
+  const fn = document.getElementById("firstName");
+  const ln = document.getElementById("lastName");
+  const dn = document.getElementById("displayName");
+  const upn = document.getElementById("upn");
+  const mn = document.getElementById("mailNickname");
+
+  function autoFill() {
+    if (dn.dataset.manual !== "1") dn.value = [fn.value, ln.value].filter(Boolean).join(" ");
+  }
+  fn.addEventListener("input", autoFill);
+  ln.addEventListener("input", autoFill);
+  dn.addEventListener("input", () => { dn.dataset.manual = "1"; });
+
+  upn.addEventListener("input", () => {
+    if (mn.dataset.manual !== "1") {
+      const alias = upn.value.split("@")[0];
+      mn.value = alias;
+    }
+  });
+  mn.addEventListener("input", () => { mn.dataset.manual = "1"; });
+});
+
+async function init() {
+  const [groupRes, userRes] = await Promise.all([
+    fetch("/api/getAllGroups").then(r => r.json()).catch(() => ({ groups: [] })),
+    fetch("/api/getUsers").then(r => r.json()).catch(() => ({ users: [] }))
+  ]);
+  allGroups = groupRes.groups ?? [];
+  allUsers  = userRes.users  ?? [];
+
+  // Udfyld kopier-dropdown
+  const sel = document.getElementById("copyFromUser");
+  allUsers.forEach(u => {
+    const opt = document.createElement("option");
+    opt.value = u.id;
+    opt.textContent = u.displayName + (u.mail ? ` (${u.mail})` : "");
+    sel.appendChild(opt);
+  });
+
+  renderAvail();
+}
+
+// ── Render tilgængelige grupper ───────────────────────────────────────────────
+function getFilteredAvail() {
+  const q  = document.getElementById("availSearch").value.toLowerCase();
+  const fS = document.getElementById("fSecurity").checked;
+  const fM = document.getElementById("fM365").checked;
+  const fE = document.getElementById("fMail").checked;
+  const selectedIds = new Set(selectedGrps.map(g => g.id));
+  return allGroups.filter(g => {
+    if (selectedIds.has(g.id)) return false;
+    if (!fS && g.type === "Security") return false;
+    if (!fM && g.type === "Microsoft 365") return false;
+    if (!fE && g.type === "Mail-enabled Security") return false;
+    if (q && !g.displayName?.toLowerCase().includes(q) && !g.mail?.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function renderAvail() {
+  const body = document.getElementById("availBody");
+  const list = getFilteredAvail();
+  document.getElementById("availCount").textContent = `(${list.length})`;
+  if (list.length === 0) { body.innerHTML = '<div class="empty">Ingen grupper at vise</div>'; return; }
+  body.innerHTML = "";
+  list.forEach(g => {
+    const div = document.createElement("div");
+    div.className = "ge-item" + (availSelected.has(g.id) ? " selected" : "");
+    div.innerHTML = `<div class="ge-item-icon">${groupIcon(g.type)}</div><div class="ge-item-info"><div class="ge-item-name">${esc(g.displayName)}</div><div class="ge-item-sub">${esc(g.mail ?? g.type)}</div></div><div class="ge-item-check"></div>`;
+    div.onclick = () => { availSelected.has(g.id) ? availSelected.delete(g.id) : availSelected.add(g.id); renderAvail(); updateSelectAllState(); };
+    body.appendChild(div);
+  });
+}
+
+function filterAvail() { availSelected.clear(); document.getElementById("fSelectAll").checked = false; renderAvail(); }
+
+function toggleSelectAllAvail() {
+  const checked = document.getElementById("fSelectAll").checked;
+  const list = getFilteredAvail();
+  if (checked) list.forEach(g => availSelected.add(g.id));
+  else availSelected.clear();
+  renderAvail();
+}
+
+function updateSelectAllState() {
+  const list = getFilteredAvail();
+  document.getElementById("fSelectAll").checked = list.length > 0 && list.every(g => availSelected.has(g.id));
+}
+
+// ── Render valgte grupper ─────────────────────────────────────────────────────
+function renderSelected() {
+  const body = document.getElementById("selectedBody");
+  const q = document.getElementById("selectedSearch").value.toLowerCase();
+  const list = selectedGrps.filter(g => !q || g.displayName?.toLowerCase().includes(q) || g.mail?.toLowerCase().includes(q));
+  document.getElementById("selectedCount").textContent = `(${selectedGrps.length})`;
+  if (list.length === 0) { body.innerHTML = '<div class="empty">Ingen grupper valgt endnu</div>'; return; }
+  body.innerHTML = "";
+  list.forEach(g => {
+    const div = document.createElement("div");
+    div.className = "ge-item" + (selSelected.has(g.id) ? " selected" : "");
+    div.innerHTML = `<div class="ge-item-icon">${groupIcon(g.type)}</div><div class="ge-item-info"><div class="ge-item-name">${esc(g.displayName)}</div><div class="ge-item-sub">${esc(g.mail ?? g.type)}</div></div><div class="ge-item-check"></div>`;
+    div.onclick = () => { selSelected.has(g.id) ? selSelected.delete(g.id) : selSelected.add(g.id); renderSelected(); };
+    body.appendChild(div);
+  });
+}
+
+function filterSelected() { selSelected.clear(); renderSelected(); }
+
+// ── Flyt grupper ──────────────────────────────────────────────────────────────
+function moveToSelected() {
+  if (availSelected.size === 0) return;
+  const toAdd = allGroups.filter(g => availSelected.has(g.id) && !selectedGrps.find(s => s.id === g.id));
+  selectedGrps = [...selectedGrps, ...toAdd].sort((a, b) => a.displayName?.localeCompare(b.displayName, "da"));
+  availSelected.clear();
+  document.getElementById("fSelectAll").checked = false;
+  renderAvail();
+  renderSelected();
+}
+
+function moveToAvail() {
+  if (selSelected.size === 0) return;
+  selectedGrps = selectedGrps.filter(g => !selSelected.has(g.id));
+  selSelected.clear();
+  renderAvail();
+  renderSelected();
+}
+
+function clearSelectedGroups() {
+  selectedGrps = [];
+  selSelected.clear();
+  availSelected.clear();
+  renderAvail();
+  renderSelected();
+}
+
+// ── Kopier fra bruger ─────────────────────────────────────────────────────────
+async function copyFromUser() {
+  const userId = document.getElementById("copyFromUser").value;
+  if (!userId) return;
+  const body = document.getElementById("availBody");
+  body.innerHTML = '<div class="loading"><span class="spinner"></span>Henter gruppemedlemskaber...</div>';
+  try {
+    const data = await fetch(`/api/getUserMemberships?id=${encodeURIComponent(userId)}`).then(r => r.json());
+    const groups = data.groups ?? [];
+    // Tilføj til valgte
+    groups.forEach(g => { if (!selectedGrps.find(s => s.id === g.id)) selectedGrps.push(g); });
+    selectedGrps.sort((a, b) => a.displayName?.localeCompare(b.displayName, "da"));
+    availSelected.clear();
+    renderAvail();
+    renderSelected();
+    showToast(`✓ ${groups.length} grupper kopieret`, "ok");
+  } catch (err) {
+    showToast("Fejl: " + err.message, "err");
+    renderAvail();
+  }
+  document.getElementById("copyFromUser").value = "";
+}
+
+// ── Validering ────────────────────────────────────────────────────────────────
+function validate() {
+  let ok = true;
+  const fields = [
+    { id: "firstName",   check: v => v.trim().length > 0 },
+    { id: "lastName",    check: v => v.trim().length > 0 },
+    { id: "displayName", check: v => v.trim().length > 0 },
+    { id: "upn",         check: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) },
+    { id: "password",    check: v => v.trim().length >= 8 },
+  ];
+  fields.forEach(f => {
+    const el = document.getElementById(f.id);
+    const errEl = document.getElementById("err-" + f.id);
+    const valid = f.check(el.value);
+    el.classList.toggle("error", !valid);
+    errEl.classList.toggle("show", !valid);
+    if (!valid) ok = false;
+  });
+  return ok;
+}
+
+// ── Gem bruger ────────────────────────────────────────────────────────────────
+async function saveUser() {
+  if (!validate()) { showToast("Ret venligst fejlene i formularen", "err"); return; }
+
+  const btn = document.getElementById("saveBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Opretter...';
+
+  const upn = document.getElementById("upn").value.trim();
+  const mnVal = document.getElementById("mailNickname").value.trim() || upn.split("@")[0];
+
+  const payload = {
+    firstName:     document.getElementById("firstName").value.trim(),
+    lastName:      document.getElementById("lastName").value.trim(),
+    displayName:   document.getElementById("displayName").value.trim(),
+    upn,
+    password:      document.getElementById("password").value.trim(),
+    mailNickname:  mnVal,
+    jobTitle:      document.getElementById("jobTitle").value.trim(),
+    department:    document.getElementById("department").value.trim(),
+    companyName:   document.getElementById("companyName").value.trim(),
+    phone:         document.getElementById("phone").value.trim(),
+    streetAddress: document.getElementById("streetAddress").value.trim(),
+    city:          document.getElementById("city").value.trim(),
+    postalCode:    document.getElementById("postalCode").value.trim(),
+    country:       document.getElementById("country").value.trim(),
+    groupIds:      selectedGrps.map(g => g.id)
+  };
+
+  try {
+    const res = await fetch("/api/createUser", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || "Ukendt fejl");
+
+    const resultBox = document.getElementById("resultBox");
+    resultBox.className = "result-box show";
+    document.getElementById("resultTitle").textContent = "✅ Bruger oprettet!";
+    document.getElementById("resultBody").innerHTML = `
+      <p><strong>Navn:</strong> ${esc(payload.displayName)}</p>
+      <p><strong>Login:</strong> ${esc(payload.upn)}</p>
+      <p><strong>Grupper tilføjet:</strong> ${payload.groupIds.length}</p>
+      ${data.groupErrors?.length ? `<p style="color:#92400e;"><strong>Gruppefejl:</strong> ${data.groupErrors.length} grupper kunne ikke tilføjes</p>` : ""}
+    `;
+    resultBox.scrollIntoView({ behavior: "smooth", block: "center" });
+    showToast("✅ Bruger oprettet!", "ok");
+    resetForm();
+  } catch (err) {
+    const resultBox = document.getElementById("resultBox");
+    resultBox.className = "result-box show err";
+    document.getElementById("resultTitle").textContent = "❌ Fejl ved oprettelse";
+    document.getElementById("resultBody").innerHTML = `<p>${esc(err.message)}</p>`;
+    showToast("Fejl: " + err.message, "err");
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '💾 Opret bruger';
+}
+
+function resetForm() {
+  ["firstName","lastName","displayName","upn","password","mailNickname","jobTitle","department","companyName","phone","streetAddress","city","postalCode"].forEach(id => {
+    document.getElementById(id).value = "";
+    document.getElementById(id).classList.remove("error");
+    const err = document.getElementById("err-" + id);
+    if (err) err.classList.remove("show");
+  });
+  document.getElementById("country").value = "Danmark";
+  document.getElementById("displayName").dataset.manual = "";
+  document.getElementById("mailNickname").dataset.manual = "";
+  clearSelectedGroups();
+  document.getElementById("resultBox").className = "result-box";
+}
+
+// ── Hjælpefunktioner ──────────────────────────────────────────────────────────
+function groupIcon(type) {
+  if (type === "Microsoft 365") return "🟦";
+  if (type === "Mail-enabled Security") return "📧";
+  return "🔒";
+}
+function showToast(msg, type) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove("show"), 4000);
+}
+function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+</script>
+</body>
+</html>
