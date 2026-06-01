@@ -3,6 +3,7 @@ const { getGraphToken, graphPost, graphDelete, jsonResponse } = require("../shar
 
 module.exports = async function (context, req) {
   let body;
+
   try {
     body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
   } catch {
@@ -18,51 +19,68 @@ module.exports = async function (context, req) {
   }
 
   if (add.length === 0 && remove.length === 0) {
-    context.res = jsonResponse(200, { message: "Ingen ændringer" });
+    context.res = jsonResponse(200, {
+      message: "Ingen ændringer",
+      added: 0,
+      removed: 0,
+      errors: []
+    });
     return;
   }
 
-  try {
-    const token = await getGraphToken();
-    const errors = [];
+  const token = await getGraphToken();
 
-    // Tilføj medlemmer (maks 20 ad gangen via batch)
-    for (let i = 0; i < add.length; i += 20) {
-      const chunk = add.slice(i, i + 20);
-      const refs = chunk.map(id => `https://graph.microsoft.com/v1.0/directoryObjects/${id}`);
-      try {
-        await graphPost(token, `/groups/${encodeURIComponent(groupId)}/members/$ref`, {
-          "members@odata.bind": refs
-        });
-      } catch (err) {
-        errors.push(`Tilføj fejl: ${err.message}`);
-      }
-    }
+  const errors = [];
+  let added = 0;
+  let removed = 0;
 
-    // Fjern medlemmer én ad gangen
-    for (const userId of remove) {
-      try {
-        await graphDelete(token, `/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}/$ref`);
-      } catch (err) {
-        errors.push(`Fjern fejl for ${userId}: ${err.message}`);
-      }
-    }
+  for (const userId of add) {
+    try {
+      await graphPost(
+        token,
+        `/groups/${encodeURIComponent(groupId)}/members/$ref`,
+        {
+          "@odata.id": `https://graph.microsoft.com/v1.0/directoryObjects/${userId}`
+        }
+      );
 
-    if (errors.length > 0) {
-      context.res = jsonResponse(207, {
-        message: "Delvist gennemført",
-        added:   add.length,
-        removed: remove.length,
-        errors
-      });
-    } else {
-      context.res = jsonResponse(200, {
-        message: "OK",
-        added:   add.length,
-        removed: remove.length
-      });
+      added++;
+    } catch (err) {
+      errors.push(`Tilføj fejl for ${userId}: ${err.message}`);
     }
-  } catch (err) {
-    context.res = jsonResponse(500, { error: err.message });
   }
+
+  for (const userId of remove) {
+    try {
+      await graphDelete(
+        token,
+        `/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}/$ref`
+      );
+
+      removed++;
+    } catch (err) {
+      errors.push(`Fjern fejl for ${userId}: ${err.message}`);
+    }
+  }
+
+  if (errors.length > 0) {
+    context.res = jsonResponse(207, {
+      message: "Delvist gennemført",
+      requestedAdd: add.length,
+      requestedRemove: remove.length,
+      added,
+      removed,
+      errors
+    });
+    return;
+  }
+
+  context.res = jsonResponse(200, {
+    message: "OK",
+    requestedAdd: add.length,
+    requestedRemove: remove.length,
+    added,
+    removed,
+    errors: []
+  });
 };
