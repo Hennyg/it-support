@@ -479,52 +479,88 @@ async function saveChanges() {
 
   const errors = [];
 
+  console.group("Gem gruppemedlemskaber");
+  console.log("Person:", currentUser);
+  console.log("Tilføjes:", toAdd);
+  console.log("Fjernes:", toRem);
+
   for (const group of toAdd) {
+    console.group(`Tilføjer til gruppe: ${group.displayName}`);
+    console.log("Group:", group);
+    console.log("User:", currentUser);
+
     try {
+      const payload = {
+        groupId: group.id,
+        add: [currentUser.id],
+        remove: []
+      };
+
+      console.log("Request payload:", payload);
+
       const res = await fetch("/api/updateGroupMembers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          groupId: group.id,
-          add: [currentUser.id],
-          remove: []
-        })
+        body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        errors.push(`Tilføj til ${group.displayName}: ${data.error}`);
+      console.log("Response status:", res.status);
+      console.log("Response body:", data);
+
+      if (!res.ok || data.errors?.length > 0) {
+        errors.push(`Tilføj til ${group.displayName}: ${data.errors?.join(" | ") || data.error || "Ukendt fejl"}`);
       }
     } catch (e) {
+      console.error(e);
       errors.push(`Tilføj til ${group.displayName}: ${e.message}`);
     }
+
+    console.groupEnd();
   }
 
   for (const group of toRem) {
+    console.group(`Fjerner fra gruppe: ${group.displayName}`);
+    console.log("Group:", group);
+    console.log("User:", currentUser);
+
     try {
+      const payload = {
+        groupId: group.id,
+        add: [],
+        remove: [currentUser.id]
+      };
+
+      console.log("Request payload:", payload);
+
       const res = await fetch("/api/updateGroupMembers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          groupId: group.id,
-          add: [],
-          remove: [currentUser.id]
-        })
+        body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        errors.push(`Fjern fra ${group.displayName}: ${data.error}`);
+      console.log("Response status:", res.status);
+      console.log("Response body:", data);
+
+      if (!res.ok || data.errors?.length > 0) {
+        errors.push(`Fjern fra ${group.displayName}: ${data.errors?.join(" | ") || data.error || "Ukendt fejl"}`);
       }
     } catch (e) {
+      console.error(e);
       errors.push(`Fjern fra ${group.displayName}: ${e.message}`);
     }
+
+    console.groupEnd();
   }
 
+  console.log("Samlede fejl:", errors);
+  console.groupEnd();
+
   if (errors.length > 0) {
-    showToast(`${errors.length} fejl — se console`, "err");
+    showToast(`${errors.length} fejl — se Console`, "err");
     console.error("Fejl ved gem:", errors);
   } else {
     originalMemberships = [...workingMemberships];
