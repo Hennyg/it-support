@@ -1,0 +1,1107 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Person egenskaber — IT Support</title>
+
+  <link rel="stylesheet" href="/assets/navbar.css" />
+  <meta name="herrup-app" content="it-support">
+  <meta name="herrup-title" content="IT Support">
+  <meta name="herrup-subtitle" content="Person egenskaber">
+
+  <script src="/assets/navbar.js" defer></script>
+  <script src="/assets/auth.js" defer></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px 20px;
+    }
+
+    .tile {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.05);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    #searchTile { overflow: visible; }
+
+    .tile-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 24px;
+      border-bottom: 1px solid #f3f4f6;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .tile-icon { font-size: 1.2rem; }
+
+    .tile-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #111827;
+      flex: 1;
+    }
+
+    .tile-chevron {
+      color: #9ca3af;
+      font-size: .9rem;
+      transition: transform .2s;
+    }
+
+    .tile-chevron.open { transform: rotate(180deg); }
+
+    .tile-body { padding: 20px 24px; }
+
+    .person-search-wrap {
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    .person-search-wrap input {
+      width: 100%;
+      padding: 10px 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      font-size: .95rem;
+      outline: none;
+    }
+
+    .person-search-wrap input:focus {
+      border-color: #850c18;
+      box-shadow: 0 0 0 3px rgba(133,12,24,.08);
+    }
+
+    .person-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.12);
+      z-index: 200;
+      max-height: 320px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .person-dropdown.open { display: block; }
+
+    .person-opt {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #f9fafb;
+      transition: background .1s;
+    }
+
+    .person-opt:hover { background: #fef3f2; }
+
+    .p-avatar,
+    .profile-avatar {
+      border-radius: 50%;
+      background: #850c18;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .p-avatar {
+      width: 30px;
+      height: 30px;
+      font-size: .75rem;
+    }
+
+    .profile-avatar {
+      width: 72px;
+      height: 72px;
+      font-size: 1.6rem;
+    }
+
+    .p-name {
+      font-size: .88rem;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .p-mail {
+      font-size: .75rem;
+      color: #6b7280;
+    }
+
+    #editorArea { display: none; }
+
+    .profile-top {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .profile-name {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #111827;
+      margin-bottom: 4px;
+    }
+
+    .profile-mail {
+      font-size: .9rem;
+      color: #6b7280;
+    }
+
+    .profile-meta {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 700;
+      border: 1px solid #e5e7eb;
+      background: #f8fafc;
+      color: #374151;
+    }
+
+    .badge.ok {
+      background: #f0fdf4;
+      border-color: #bbf7d0;
+      color: #166534;
+    }
+
+    .badge.warn {
+      background: #fffbeb;
+      border-color: #fde68a;
+      color: #92400e;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px 18px;
+    }
+
+    .field.full { grid-column: 1 / -1; }
+
+    .field label {
+      display: block;
+      font-size: .74rem;
+      font-weight: 700;
+      color: #6b7280;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      font-size: .9rem;
+      outline: none;
+      background: #fff;
+      color: #111827;
+    }
+
+    .field input:focus,
+    .field select:focus {
+      border-color: #850c18;
+      box-shadow: 0 0 0 3px rgba(133,12,24,.08);
+    }
+
+    .field input[readonly] {
+      background: #f9fafb;
+      color: #6b7280;
+    }
+
+    .hint {
+      font-size: .78rem;
+      color: #9ca3af;
+      margin-top: 5px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .list-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .list-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #f3f4f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .85rem;
+      flex-shrink: 0;
+    }
+
+    .list-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .list-title {
+      font-size: .85rem;
+      font-weight: 700;
+      color: #111827;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .list-sub {
+      font-size: .74rem;
+      color: #6b7280;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .footer-actions {
+      position: sticky;
+      bottom: 0;
+      z-index: 50;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.08);
+      margin-top: 16px;
+    }
+
+    .changes-info {
+      font-size: .86rem;
+      color: #6b7280;
+    }
+
+    .changes-info strong { color: #111827; }
+
+    .btn-save,
+    .btn-cancel {
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: .88rem;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .btn-save {
+      background: #850c18;
+      color: #fff;
+      border: none;
+    }
+
+    .btn-save:hover { background: #6b0913; }
+
+    .btn-save:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .btn-cancel {
+      background: #fff;
+      color: #374151;
+      border: 1px solid #e5e7eb;
+    }
+
+    .btn-cancel:hover { background: #f3f4f6; }
+
+    .loading {
+      padding: 24px;
+      text-align: center;
+      color: #9ca3af;
+      font-size: .88rem;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #e5e7eb;
+      border-top-color: #850c18;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty {
+      padding: 18px;
+      text-align: center;
+      color: #9ca3af;
+      font-size: .85rem;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: .9rem;
+      font-weight: 700;
+      color: #fff;
+      z-index: 999;
+      opacity: 0;
+      transition: opacity .3s;
+      pointer-events: none;
+    }
+
+    .toast.show { opacity: 1; }
+    .toast.ok { background: #16a34a; }
+    .toast.err { background: #dc2626; }
+
+    @media (max-width: 900px) {
+      .two-col,
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .profile-top {
+        align-items: flex-start;
+      }
+
+      .footer-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .footer-actions > div:last-child {
+        display: flex;
+        gap: 8px;
+      }
+
+      .footer-actions button {
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+
+<body>
+<div id="appContent" style="display:none;">
+  <div class="container">
+
+    <div class="tile" id="searchTile">
+      <div class="tile-header" onclick="toggleTile(this)">
+        <div class="tile-icon">🔎</div>
+        <div class="tile-title">Vælg person</div>
+        <div class="tile-chevron open">▼</div>
+      </div>
+      <div class="tile-body">
+        <div class="person-search-wrap">
+          <input
+            type="search"
+            id="personSearch"
+            placeholder="Søg efter navn eller e-mail..."
+            autocomplete="off"
+            oninput="searchPersons()"
+            onfocus="openDropdown()"
+          />
+          <div class="person-dropdown" id="personDropdown"></div>
+        </div>
+        <div id="searchHint" class="hint">Skriv mindst 2 tegn for at søge</div>
+      </div>
+    </div>
+
+    <div id="editorArea">
+
+      <div class="tile">
+        <div class="tile-header" onclick="toggleTile(this)">
+          <div class="tile-icon">🪪</div>
+          <div class="tile-title">Oversigt</div>
+          <div class="tile-chevron open">▼</div>
+        </div>
+        <div class="tile-body">
+          <div class="profile-top">
+            <div class="profile-avatar" id="profileAvatar">?</div>
+            <div>
+              <div class="profile-name" id="profileName">—</div>
+              <div class="profile-mail" id="profileMail">—</div>
+              <div class="profile-meta">
+                <span class="badge" id="badgeUpn">UPN</span>
+                <span class="badge" id="badgeEnabled">Status</span>
+                <span class="badge" id="badgeSync">Sync</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col">
+
+        <div class="tile">
+          <div class="tile-header" onclick="toggleTile(this)">
+            <div class="tile-icon">👤</div>
+            <div class="tile-title">Stamdata</div>
+            <div class="tile-chevron open">▼</div>
+          </div>
+          <div class="tile-body">
+            <div class="form-grid">
+              <div class="field full">
+                <label for="displayName">Display name</label>
+                <input id="displayName" data-prop="displayName" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="givenName">Fornavn</label>
+                <input id="givenName" data-prop="givenName" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="surname">Efternavn</label>
+                <input id="surname" data-prop="surname" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="jobTitle">Jobtitel</label>
+                <input id="jobTitle" data-prop="jobTitle" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="department">Afdeling</label>
+                <input id="department" data-prop="department" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="companyName">Firma</label>
+                <input id="companyName" data-prop="companyName" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="officeLocation">Kontor</label>
+                <input id="officeLocation" data-prop="officeLocation" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="employeeId">Medarbejdernummer</label>
+                <input id="employeeId" data-prop="employeeId" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="mailNickname">Mail nickname</label>
+                <input id="mailNickname" readonly />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-header" onclick="toggleTile(this)">
+            <div class="tile-icon">📞</div>
+            <div class="tile-title">Kontakt</div>
+            <div class="tile-chevron open">▼</div>
+          </div>
+          <div class="tile-body">
+            <div class="form-grid">
+              <div class="field full">
+                <label for="mail">Mail</label>
+                <input id="mail" readonly />
+                <div class="hint">Mail redigeres normalt ikke direkte her. Brug Exchange/M365 admin hvis primær mail skal ændres.</div>
+              </div>
+
+              <div class="field">
+                <label for="mobilePhone">Mobil</label>
+                <input id="mobilePhone" data-prop="mobilePhone" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="businessPhone">Telefon</label>
+                <input id="businessPhone" oninput="markDirty()" />
+                <div class="hint">Gemmes som første værdi i businessPhones.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-header" onclick="toggleTile(this)">
+            <div class="tile-icon">🏠</div>
+            <div class="tile-title">Adresse</div>
+            <div class="tile-chevron open">▼</div>
+          </div>
+          <div class="tile-body">
+            <div class="form-grid">
+              <div class="field full">
+                <label for="streetAddress">Gade</label>
+                <input id="streetAddress" data-prop="streetAddress" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="postalCode">Postnr.</label>
+                <input id="postalCode" data-prop="postalCode" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="city">By</label>
+                <input id="city" data-prop="city" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="state">Stat / region</label>
+                <input id="state" data-prop="state" oninput="markDirty()" />
+              </div>
+
+              <div class="field">
+                <label for="country">Land</label>
+                <input id="country" data-prop="country" oninput="markDirty()" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tile">
+          <div class="tile-header" onclick="toggleTile(this)">
+            <div class="tile-icon">🔐</div>
+            <div class="tile-title">Konto</div>
+            <div class="tile-chevron open">▼</div>
+          </div>
+          <div class="tile-body">
+            <div class="form-grid">
+              <div class="field full">
+                <label for="userPrincipalName">User principal name</label>
+                <input id="userPrincipalName" readonly />
+              </div>
+
+              <div class="field">
+                <label for="accountEnabled">Konto aktiv</label>
+                <select id="accountEnabled" onchange="markDirty()">
+                  <option value="true">Aktiv</option>
+                  <option value="false">Deaktiveret</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="createdDateTime">Oprettet</label>
+                <input id="createdDateTime" readonly />
+              </div>
+
+              <div class="field">
+                <label for="onPremisesSyncEnabled">On-premises sync</label>
+                <input id="onPremisesSyncEnabled" readonly />
+              </div>
+
+              <div class="field full">
+                <label for="objectId">Objekt ID</label>
+                <input id="objectId" readonly />
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="tile">
+        <div class="tile-header" onclick="toggleTile(this)">
+          <div class="tile-icon">🎫</div>
+          <div class="tile-title">Licenser <span id="licenseCount" style="font-weight:400;"></span></div>
+          <div class="tile-chevron open">▼</div>
+        </div>
+        <div class="tile-body">
+          <div id="licensesBody" class="list">
+            <div class="empty">Vælg en person</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tile">
+        <div class="tile-header" onclick="toggleTile(this)">
+          <div class="tile-icon">👥</div>
+          <div class="tile-title">Gruppemedlemskaber <span id="groupCount" style="font-weight:400;"></span></div>
+          <div class="tile-chevron open">▼</div>
+        </div>
+        <div class="tile-body">
+          <div id="groupsBody" class="list">
+            <div class="empty">Vælg en person</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-actions">
+        <div class="changes-info" id="changesInfo">Ingen ændringer</div>
+        <div>
+          <button class="btn-cancel" onclick="cancelChanges()">Annuller</button>
+          <button class="btn-save" id="saveBtn" onclick="saveChanges()" disabled>Gem ændringer</button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
+
+let allUsers = [];
+let currentUser = null;
+let loadedProperties = null;
+let originalSnapshot = null;
+let isDirty = false;
+
+document.addEventListener("DOMContentLoaded", () => {
+  ITAuth.requireAuth(({ user, roles, isAdmin }) => {
+    document.getElementById("appContent").style.setProperty("display", "block", "important");
+    init();
+  });
+});
+
+async function init() {
+  const userRes = await fetch("/api/getUsers")
+    .then(r => r.json())
+    .catch(() => ({ users: [] }));
+
+  allUsers = (userRes.users ?? []).filter(u => u.mailboxType === "user");
+}
+
+function searchPersons() {
+  const q = document.getElementById("personSearch").value.toLowerCase().trim();
+  const hint = document.getElementById("searchHint");
+
+  if (q.length < 2) {
+    hint.style.display = "";
+    closeDropdown();
+    return;
+  }
+
+  hint.style.display = "none";
+
+  const matches = allUsers.filter(u =>
+    u.displayName?.toLowerCase().includes(q) ||
+    u.mail?.toLowerCase().includes(q)
+  ).slice(0, 25);
+
+  renderDropdown(matches);
+  openDropdown();
+}
+
+function renderDropdown(users) {
+  const dd = document.getElementById("personDropdown");
+
+  if (users.length === 0) {
+    dd.innerHTML = '<div class="empty">Ingen resultater</div>';
+    return;
+  }
+
+  dd.innerHTML = "";
+
+  users.forEach(u => {
+    const div = document.createElement("div");
+    div.className = "person-opt";
+    div.innerHTML = `
+      <div class="p-avatar">${initials(u.displayName)}</div>
+      <div>
+        <div class="p-name">${esc(u.displayName)}</div>
+        <div class="p-mail">${esc(u.mail ?? "")}</div>
+      </div>`;
+    div.onclick = () => selectPerson(u);
+    dd.appendChild(div);
+  });
+}
+
+function openDropdown() {
+  if (document.getElementById("personSearch").value.trim().length >= 2) {
+    document.getElementById("personDropdown").classList.add("open");
+  }
+}
+
+function closeDropdown() {
+  document.getElementById("personDropdown").classList.remove("open");
+}
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".person-search-wrap")) closeDropdown();
+});
+
+async function selectPerson(user) {
+  currentUser = user;
+  closeDropdown();
+
+  document.getElementById("personSearch").value = user.displayName;
+  document.getElementById("searchHint").style.display = "none";
+  document.getElementById("editorArea").style.display = "block";
+
+  setLoadingState();
+
+  try {
+    const data = await fetch(`/api/getUserProperties?id=${encodeURIComponent(user.id)}`)
+      .then(async r => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error ?? "Kunne ikke hente egenskaber");
+        return json;
+      });
+
+    loadedProperties = data;
+    originalSnapshot = makeSnapshot(data.user);
+    isDirty = false;
+
+    renderUser(data.user);
+    renderLicenses(data.licenses ?? []);
+    renderGroups(data.groups ?? []);
+    updateFooter();
+
+    setTimeout(() => document.getElementById("editorArea").scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  } catch (err) {
+    showToast("Fejl: " + err.message, "err");
+  }
+}
+
+function setLoadingState() {
+  document.getElementById("profileAvatar").textContent = initials(currentUser?.displayName);
+  document.getElementById("profileName").textContent = currentUser?.displayName ?? "Henter...";
+  document.getElementById("profileMail").textContent = currentUser?.mail ?? "";
+  document.getElementById("licensesBody").innerHTML = '<div class="loading"><span class="spinner"></span>Henter licenser...</div>';
+  document.getElementById("groupsBody").innerHTML = '<div class="loading"><span class="spinner"></span>Henter grupper...</div>';
+}
+
+function renderUser(u) {
+  setValue("displayName", u.displayName);
+  setValue("givenName", u.givenName);
+  setValue("surname", u.surname);
+  setValue("jobTitle", u.jobTitle);
+  setValue("department", u.department);
+  setValue("companyName", u.companyName);
+  setValue("officeLocation", u.officeLocation);
+  setValue("employeeId", u.employeeId);
+  setValue("mailNickname", u.mailNickname);
+
+  setValue("mail", u.mail);
+  setValue("mobilePhone", u.mobilePhone);
+  setValue("businessPhone", Array.isArray(u.businessPhones) ? (u.businessPhones[0] ?? "") : "");
+
+  setValue("streetAddress", u.streetAddress);
+  setValue("postalCode", u.postalCode);
+  setValue("city", u.city);
+  setValue("state", u.state);
+  setValue("country", u.country);
+
+  setValue("userPrincipalName", u.userPrincipalName);
+  setValue("accountEnabled", String(u.accountEnabled === true));
+  setValue("createdDateTime", formatDateTime(u.createdDateTime));
+  setValue("onPremisesSyncEnabled", u.onPremisesSyncEnabled === true ? "Ja" : "Nej");
+  setValue("objectId", u.id);
+
+  document.getElementById("profileAvatar").textContent = initials(u.displayName);
+  document.getElementById("profileName").textContent = u.displayName ?? "—";
+  document.getElementById("profileMail").textContent = u.mail ?? u.userPrincipalName ?? "—";
+
+  document.getElementById("badgeUpn").textContent = u.userPrincipalName ?? "Ingen UPN";
+
+  const enabled = document.getElementById("badgeEnabled");
+  enabled.textContent = u.accountEnabled ? "Aktiv konto" : "Deaktiveret konto";
+  enabled.className = u.accountEnabled ? "badge ok" : "badge warn";
+
+  const sync = document.getElementById("badgeSync");
+  sync.textContent = u.onPremisesSyncEnabled ? "Synkroniseret" : "Cloud only";
+  sync.className = "badge";
+}
+
+function renderLicenses(licenses) {
+  const body = document.getElementById("licensesBody");
+  document.getElementById("licenseCount").textContent = `(${licenses.length})`;
+
+  if (!licenses.length) {
+    body.innerHTML = '<div class="empty">Ingen licenser fundet</div>';
+    return;
+  }
+
+  body.innerHTML = "";
+
+  licenses
+    .sort((a, b) => String(a.skuPartNumber ?? "").localeCompare(String(b.skuPartNumber ?? ""), "da"))
+    .forEach(l => {
+      const div = document.createElement("div");
+      div.className = "list-item";
+      div.innerHTML = `
+        <div class="list-icon">🎫</div>
+        <div class="list-main">
+          <div class="list-title">${esc(l.skuPartNumber ?? l.skuId ?? "Licens")}</div>
+          <div class="list-sub">${esc(l.servicePlans?.length ? `${l.servicePlans.length} service plans` : "—")}</div>
+        </div>`;
+      body.appendChild(div);
+    });
+}
+
+function renderGroups(groups) {
+  const body = document.getElementById("groupsBody");
+  const onlyGroups = groups.filter(g =>
+    !g["@odata.type"] || g["@odata.type"] === "#microsoft.graph.group"
+  );
+
+  document.getElementById("groupCount").textContent = `(${onlyGroups.length})`;
+
+  if (!onlyGroups.length) {
+    body.innerHTML = '<div class="empty">Ingen gruppemedlemskaber fundet</div>';
+    return;
+  }
+
+  body.innerHTML = "";
+
+  onlyGroups
+    .sort((a, b) => String(a.displayName ?? "").localeCompare(String(b.displayName ?? ""), "da"))
+    .forEach(g => {
+      const div = document.createElement("div");
+      div.className = "list-item";
+      div.innerHTML = `
+        <div class="list-icon">👥</div>
+        <div class="list-main">
+          <div class="list-title">${esc(g.displayName ?? "Gruppe")}</div>
+          <div class="list-sub">${esc(g.mail ?? g.id ?? "—")}</div>
+        </div>`;
+      body.appendChild(div);
+    });
+}
+
+function markDirty() {
+  isDirty = true;
+  updateFooter();
+}
+
+function updateFooter() {
+  const info = document.getElementById("changesInfo");
+  const saveBtn = document.getElementById("saveBtn");
+
+  if (!isDirty) {
+    info.innerHTML = "Ingen ændringer";
+    saveBtn.disabled = true;
+    return;
+  }
+
+  const changes = getChangedFields();
+
+  if (changes.length === 0) {
+    info.innerHTML = "Ingen ændringer";
+    saveBtn.disabled = true;
+    isDirty = false;
+    return;
+  }
+
+  info.innerHTML = `<strong>${changes.length}</strong> felt(er) ændret`;
+  saveBtn.disabled = false;
+}
+
+function getChangedFields() {
+  if (!originalSnapshot) return [];
+
+  const current = collectPayload();
+  const changed = [];
+
+  Object.keys(current).forEach(key => {
+    if (key === "id") return;
+
+    const a = JSON.stringify(originalSnapshot[key] ?? null);
+    const b = JSON.stringify(current[key] ?? null);
+
+    if (a !== b) changed.push(key);
+  });
+
+  return changed;
+}
+
+function collectPayload() {
+  return {
+    id: loadedProperties?.user?.id,
+    displayName: val("displayName"),
+    givenName: val("givenName"),
+    surname: val("surname"),
+    jobTitle: val("jobTitle"),
+    department: val("department"),
+    companyName: val("companyName"),
+    officeLocation: val("officeLocation"),
+    employeeId: val("employeeId"),
+    mobilePhone: val("mobilePhone"),
+    businessPhones: val("businessPhone") ? [val("businessPhone")] : [],
+    streetAddress: val("streetAddress"),
+    postalCode: val("postalCode"),
+    city: val("city"),
+    state: val("state"),
+    country: val("country"),
+    accountEnabled: val("accountEnabled") === "true"
+  };
+}
+
+function makeSnapshot(u) {
+  return {
+    id: u.id,
+    displayName: u.displayName ?? "",
+    givenName: u.givenName ?? "",
+    surname: u.surname ?? "",
+    jobTitle: u.jobTitle ?? "",
+    department: u.department ?? "",
+    companyName: u.companyName ?? "",
+    officeLocation: u.officeLocation ?? "",
+    employeeId: u.employeeId ?? "",
+    mobilePhone: u.mobilePhone ?? "",
+    businessPhones: Array.isArray(u.businessPhones) ? u.businessPhones : [],
+    streetAddress: u.streetAddress ?? "",
+    postalCode: u.postalCode ?? "",
+    city: u.city ?? "",
+    state: u.state ?? "",
+    country: u.country ?? "",
+    accountEnabled: u.accountEnabled === true
+  };
+}
+
+function cancelChanges() {
+  if (!loadedProperties?.user) return;
+
+  renderUser(loadedProperties.user);
+  isDirty = false;
+  updateFooter();
+}
+
+async function saveChanges() {
+  if (!loadedProperties?.user?.id) return;
+
+  const btn = document.getElementById("saveBtn");
+  btn.disabled = true;
+  btn.textContent = "Gemmer...";
+
+  try {
+    const payload = collectPayload();
+
+    const res = await fetch("/api/updateUserProperties", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error ?? "Ukendt fejl");
+    }
+
+    showToast("Egenskaber gemt ✓", "ok");
+
+    await selectPerson({
+      id: payload.id,
+      displayName: payload.displayName,
+      mail: loadedProperties.user.mail
+    });
+
+  } catch (err) {
+    showToast("Fejl: " + err.message, "err");
+    btn.disabled = false;
+  } finally {
+    btn.textContent = "Gem ændringer";
+  }
+}
+
+function toggleTile(header) {
+  const body = header.nextElementSibling;
+  const chevron = header.querySelector(".tile-chevron");
+  const isOpen = body.style.display !== "none";
+
+  body.style.display = isOpen ? "none" : "";
+  chevron.classList.toggle("open", !isOpen);
+}
+
+function setValue(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = value ?? "";
+}
+
+function val(id) {
+  return document.getElementById(id)?.value ?? "";
+}
+
+function initials(name) {
+  if (!name) return "?";
+
+  const parts = name.trim().split(" ").filter(Boolean);
+
+  return parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : parts[0]?.[0]?.toUpperCase() ?? "?";
+}
+
+function esc(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+
+  try {
+    return new Date(value).toLocaleString("da-DK");
+  } catch {
+    return value;
+  }
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById("toast");
+
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+
+  setTimeout(() => t.classList.remove("show"), 3500);
+}
+</script>
+</body>
+</html>
