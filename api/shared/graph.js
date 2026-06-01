@@ -85,4 +85,37 @@ function jsonResponse(status, body) {
   };
 }
 
-module.exports = { getGraphToken, graphGet, graphPost, graphDelete, jsonResponse };
+async function graphPatch(token, url, body) {
+
+  const res = await fetch(
+    `https://graph.microsoft.com/v1.0${url}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    }
+  );
+
+  if (!res.ok) {
+
+    const txt = await res.text();
+
+    throw new Error(
+      `Graph PATCH ${res.status}: ${txt}`
+    );
+  }
+
+  return true;
+}
+
+module.exports = {
+  getGraphToken,
+  graphGet,
+  graphPost,
+  graphDelete,
+  graphPatch,
+  jsonResponse
+};
