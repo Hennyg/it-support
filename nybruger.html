@@ -95,14 +95,45 @@
     .result-box.err { background: #fef2f2; border-color: #fecaca; }
     .result-box.err h3, .result-box.err p { color: #991b1b; }
 
+    /* Boarding modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
+    .modal-overlay.hidden { display: none; }
+    .modal { background: #fff; border-radius: 18px; padding: 28px; width: 100%; max-width: 540px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+    .modal h2 { margin: 0 0 8px; font-size: 1.1rem; }
+    .modal p { color: #6b7280; font-size: .88rem; margin: 0 0 16px; line-height: 1.5; }
+    .modal textarea { width: 100%; height: 180px; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: .85rem; font-family: monospace; resize: vertical; outline: none; }
+    .modal textarea:focus { border-color: #850c18; }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+    .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; }
+    .page-header-text h1 { margin: 0 0 6px; }
+    .page-header-text p { margin: 0; }
+
     .ge-count { font-size: .75rem; font-weight: 400; opacity: .8; margin-left: 6px; }
   </style>
 </head>
 <body>
 <div id="appContent">
   <div class="container">
-    <h1>Ny bruger</h1>
-    <p class="page-sub">Opret en ny Entra ID member med stamdata og gruppemedlemskaber.</p>
+    <div class="page-header">
+      <div class="page-header-text">
+        <h1>Ny bruger</h1>
+        <p class="page-sub">Opret en ny Entra ID member med stamdata og gruppemedlemskaber.</p>
+      </div>
+      <button class="btn secondary" onclick="openBoardingModal()" style="white-space:nowrap;">📋 Indsæt data fra Boarding app</button>
+    </div>
+
+    <!-- Boarding modal -->
+    <div class="modal-overlay hidden" id="boardingModal">
+      <div class="modal">
+        <h2>📋 Indsæt data fra Boarding app</h2>
+        <p>Kopiér teksten fra Boarding app og indsæt den herunder. Felterne udfyldes automatisk.</p>
+        <textarea id="boardingText" placeholder="Navn: Amanda Søndergaard Færgemand&#10;Kaldenavn: Amanda Færgemand&#10;Stilling: Økonomiassistent&#10;Fødselsdato: 15/06/1995&#10;..."></textarea>
+        <div class="modal-footer">
+          <button class="btn secondary" onclick="closeBoardingModal()">Annuller</button>
+          <button class="btn" onclick="parseBoardingData()">✓ Udfyld felter</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Stamdata -->
     <div class="section">
@@ -133,7 +164,7 @@
         <div class="form-group">
           <label>Adgangskode <span class="req">*</span></label>
           <input type="text" id="password" placeholder="Midlertidig adgangskode" autocomplete="off" />
-          <div class="field-hint">Brugeren skal skifte ved første login</div>
+          <div class="field-hint">Brug "Lcherrup&lt;ddmmåå&gt;" hvis fødselsdato kendes, ellers "LcherrupXXXXXX"</div>
           <div class="field-error" id="err-password">Adgangskode er påkrævet (min. 8 tegn)</div>
         </div>
         <div class="form-group">
@@ -151,7 +182,7 @@
         </div>
         <div class="form-group">
           <label>Virksomhed</label>
-          <input type="text" id="companyName" placeholder="Lely Center Herrup" autocomplete="off" />
+          <input type="text" id="companyName" placeholder="Lely Center Herrup" value="Lely Center Herrup" autocomplete="off" />
         </div>
         <div class="form-group">
           <label>Telefon</label>
@@ -520,6 +551,102 @@ function showToast(msg, type) {
   setTimeout(() => t.classList.remove("show"), 4000);
 }
 function esc(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// ── Boarding app import ───────────────────────────────────────────────────────
+function openBoardingModal() {
+  document.getElementById("boardingModal").classList.remove("hidden");
+  document.getElementById("boardingText").value = "";
+  setTimeout(() => document.getElementById("boardingText").focus(), 50);
+}
+
+function closeBoardingModal() {
+  document.getElementById("boardingModal").classList.add("hidden");
+}
+
+// Luk modal ved klik på overlay
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("boardingModal").addEventListener("click", function(e) {
+    if (e.target === this) closeBoardingModal();
+  });
+});
+
+function parseBoardingData() {
+  const text = document.getElementById("boardingText").value;
+  if (!text.trim()) return;
+
+  // Parser nøgle-værdi par
+  function getVal(key) {
+    const re = new RegExp("^" + key + "\s*:\s*(.+)$", "im");
+    const m = text.match(re);
+    return m ? m[1].trim() : "";
+  }
+
+  const navn       = getVal("Navn");
+  const kaldenavn  = getVal("Kaldenavn");
+  const stilling   = getVal("Stilling");
+  const foedselsdag = getVal("Fødselsdato");
+
+  // Kaldenavn opdeles til fornavn/efternavn
+  const vistnavn = kaldenavn || navn;
+  const parts = vistnavn.trim().split(/\s+/);
+  const firstName = parts[0] || "";
+  const lastName  = parts.slice(1).join(" ") || "";
+
+  // Brugernavn: første bogstav i fornavn + 2 første bogstaver i efternavn (store)
+  // Fjern æøå og erstat med ae/oe/aa
+  function normalize(s) {
+    return s.toLowerCase()
+      .replace(/æ/g, "ae").replace(/ø/g, "oe").replace(/å/g, "aa")
+      .replace(/[^a-z]/g, "");
+  }
+  const fnNorm = normalize(firstName);
+  const lnNorm = normalize(lastName);
+  const upnAlias = ((fnNorm[0] || "") + (lnNorm[0] || "") + (lnNorm[1] || "")).toUpperCase();
+  const upn = upnAlias ? upnAlias.toLowerCase() + "@lcherrup.dk" : "";
+
+  // Adgangskode: Lcherrup<ddmmåå> hvis fødselsdato, ellers Lcherrupxxxxxx
+  let password = "";
+  if (foedselsdag) {
+    // Format dd/mm/yyyy eller dd-mm-yyyy
+    const dateMatch = foedselsdag.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+    if (dateMatch) {
+      const dd = dateMatch[1].padStart(2, "0");
+      const mm = dateMatch[2].padStart(2, "0");
+      const yy = dateMatch[3].slice(-2);
+      password = "Lcherrup" + dd + mm + yy;
+    }
+  }
+  if (!password) {
+    const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+    password = "Lcherrup" + rand;
+  }
+
+  // Udfyld felter
+  function setField(id, val) {
+    if (!val) return;
+    const el = document.getElementById(id);
+    if (el) { el.value = val; el.dataset.manual = "1"; }
+  }
+
+  setField("firstName",   firstName);
+  setField("lastName",    lastName);
+  setField("displayName", vistnavn);
+  document.getElementById("displayName").dataset.manual = "1";
+
+  if (upn) setField("upn", upn);
+  setField("password", password);
+  setField("mailNickname", upnAlias.toLowerCase());
+  setField("jobTitle", stilling);
+
+  // Virksomhed altid Lely Center Herrup
+  document.getElementById("companyName").value = "Lely Center Herrup";
+
+  // Telefon blank
+  document.getElementById("phone").value = "";
+
+  closeBoardingModal();
+  showToast("✓ Felter udfyldt fra Boarding app", "ok");
+}
 </script>
 </body>
 </html>
