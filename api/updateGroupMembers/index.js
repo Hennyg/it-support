@@ -1,84 +1,36 @@
 // api/updateGroupMembers/index.js
 const { getGraphToken, graphPost, graphDelete, jsonResponse } = require("../shared/graph");
 
-// Hent Exchange Online token (kræver Exchange.ManageAsApp permission)
-async function getExchangeToken() {
-  const tenantId     = process.env.TENANT_ID;
-  const clientId     = process.env.CLIENT_ID;
-  const clientSecret = process.env.CLIENT_SECRET;
-
-  const res = await fetch(
-    `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type:    "client_credentials",
-        client_id:     clientId,
-        client_secret: clientSecret,
-        scope:         "https://outlook.office365.com/.default"
-      })
-    }
-  );
-  const data = await res.json();
-  if (!res.ok) throw new Error("Exchange token fejl: " + (data.error_description || data.error));
-  return data.access_token;
+async function graphBetaPost(token, path, body) {
+  const r = await fetch(`https://graph.microsoft.com/beta${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (r.status === 204 || r.status === 200) return {};
+  const txt = await r.text();
+  let data = {};
+  try { data = JSON.parse(txt); } catch {}
+  if (!r.ok) throw new Error(`Graph beta fejl ${r.status}: ${txt}`);
+  return data;
 }
 
-// Tilføj via Exchange Online REST API
-async function exchangeAddMember(exToken, groupEmail, memberEmail) {
-  const res = await fetch(
-    `https://outlook.office365.com/adminapi/beta/${process.env.TENANT_ID}/distributionGroup('${encodeURIComponent(groupEmail)}')/members/$ref`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${exToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        "@odata.id": `https://outlook.office365.com/adminapi/beta/${process.env.TENANT_ID}/user('${encodeURIComponent(memberEmail)}')`
-      })
-    }
-  );
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Exchange fejl ${res.status}: ${txt}`);
-  }
+async function graphBetaDelete(token, path) {
+  const r = await fetch(`https://graph.microsoft.com/beta${path}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (r.status === 204 || r.status === 200) return;
+  const txt = await r.text();
+  throw new Error(`Graph beta fejl ${r.status}: ${txt}`);
 }
 
-// Fjern via Exchange Online REST API
-async function exchangeRemoveMember(exToken, groupEmail, memberEmail) {
-  const res = await fetch(
-    `https://outlook.office365.com/adminapi/beta/${process.env.TENANT_ID}/distributionGroup('${encodeURIComponent(groupEmail)}')/members/$ref?id=https://outlook.office365.com/adminapi/beta/${process.env.TENANT_ID}/user('${encodeURIComponent(memberEmail)}')`,
-    {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${exToken}` }
-    }
-  );
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Exchange fejl ${res.status}: ${txt}`);
-  }
-}
-
-// Hent bruger email via Graph
-async function getUserEmail(token, userId) {
-  const res = await fetch(
-    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userId)}?$select=mail,userPrincipalName`,
+async function getGroupInfo(token, groupId) {
+  const r = await fetch(
+    `https://graph.microsoft.com/v1.0/groups/${encodeURIComponent(groupId)}?$select=mail,mailEnabled,groupTypes,securityEnabled`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  const data = await res.json();
-  return data.mail || data.userPrincipalName;
-}
-
-// Hent gruppe email via Graph
-async function getGroupEmail(token, groupId) {
-  const res = await fetch(
-    `https://graph.microsoft.com/v1.0/groups/${encodeURIComponent(groupId)}?$select=mail,mailEnabled,groupTypes`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-  const data = await res.json();
-  return { mail: data.mail, mailEnabled: data.mailEnabled, isUnified: data.groupTypes?.includes("Unified") };
+  return await r.json();
 }
 
 module.exports = async function (context, req) {
@@ -107,20 +59,18 @@ module.exports = async function (context, req) {
     const errors = [];
     let added = 0, removed = 0;
 
-    // Tjek gruppe type
-    const groupInfo = await getGroupEmail(token, groupId);
-    const isMailEnabled = groupInfo.mailEnabled && !groupInfo.isUnified;
+    const groupInfo = await getGroupInfo(token, groupId);
+    const isMailEnabled = groupInfo.mailEnabled && !groupInfo.groupTypes?.includes("Unified");
 
     // Tilføj medlemmer
     for (const userId of add) {
       try {
-        if (isMailEnabled && groupInfo.mail) {
-          // Mail-enabled: brug Exchange Online
-          const userEmail  = await getUserEmail(token, userId);
-          const exToken    = await getExchangeToken();
-          await exchangeAddMember(exToken, groupInfo.mail, userEmail);
+        if (isMailEnabled) {
+          // Mail-enabled security / distribution: brug Graph beta
+          await graphBetaPost(token, `/groups/${encodeURIComponent(groupId)}/members/$ref`, {
+            "@odata.id": `https://graph.microsoft.com/beta/directoryObjects/${userId}`
+          });
         } else {
-          // Security/M365: brug Graph
           await graphPost(token, `/groups/${encodeURIComponent(groupId)}/members/$ref`, {
             "@odata.id": `https://graph.microsoft.com/v1.0/directoryObjects/${userId}`
           });
@@ -134,10 +84,8 @@ module.exports = async function (context, req) {
     // Fjern medlemmer
     for (const userId of remove) {
       try {
-        if (isMailEnabled && groupInfo.mail) {
-          const userEmail = await getUserEmail(token, userId);
-          const exToken   = await getExchangeToken();
-          await exchangeRemoveMember(exToken, groupInfo.mail, userEmail);
+        if (isMailEnabled) {
+          await graphBetaDelete(token, `/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}/$ref`);
         } else {
           await graphDelete(token, `/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}/$ref`);
         }
