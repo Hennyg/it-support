@@ -1,7 +1,6 @@
 // api/updateGroupMembers/index.js
 const { getGraphToken, graphPost, graphDelete, jsonResponse } = require("../shared/graph");
 
-// Inline EXO token — undgår afhængighed af cachet version af shared/graph.js
 async function getExoToken() {
   const tenantId     = process.env.TENANT_ID;
   const clientId     = process.env.CLIENT_ID;
@@ -42,32 +41,39 @@ async function getUserEmail(token, userId) {
   return email;
 }
 
-async function exoAddMember(exoToken, tenantId, groupEmail, userEmail) {
+// Kalder EXO InvokeCommand — svarer til at køre en EXO PowerShell cmdlet via REST
+// X-AnchorMailbox skal pege på en mailboks i samme geo som gruppen — vi bruger groupEmail
+async function exoInvokeCommand(exoToken, tenantId, cmdletName, parameters, anchorMailbox) {
   const r = await fetch(
-    `https://outlook.office365.com/adminapi/beta/${encodeURIComponent(tenantId)}/JoinPrivateDistributionList`,
+    `https://outlook.office365.com/adminapi/beta/${encodeURIComponent(tenantId)}/InvokeCommand`,
     {
       method: "POST",
-      headers: { Authorization: `Bearer ${exoToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ groupSmtpAddress: groupEmail, userSmtpAddresses: [userEmail] })
+      headers: {
+        Authorization:        `Bearer ${exoToken}`,
+        "Content-Type":       "application/json",
+        "Accept":             "application/json",
+        "X-CmdletName":       cmdletName,
+        "X-ResponseFormat":   "json",
+        "X-ClientApplication":"ExoManagementModule",
+        "X-AnchorMailbox":    `SMTP:${anchorMailbox}`
+      },
+      body: JSON.stringify({
+        CmdletInput: {
+          CmdletName: cmdletName,
+          Parameters: parameters
+        }
+      })
     }
   );
-  if (r.status === 200 || r.status === 204) return;
-  const txt = await r.text();
-  throw new Error(`EXO tilføj fejl ${r.status}: ${txt}`);
-}
 
-async function exoRemoveMember(exoToken, tenantId, groupEmail, userEmail) {
-  const r = await fetch(
-    `https://outlook.office365.com/adminapi/beta/${encodeURIComponent(tenantId)}/LeavePrivateDistributionList`,
-    {
-      method: "POST",
-      headers: { Authorization: `Bearer ${exoToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ groupSmtpAddress: groupEmail, userSmtpAddresses: [userEmail] })
-    }
-  );
-  if (r.status === 200 || r.status === 204) return;
   const txt = await r.text();
-  throw new Error(`EXO fjern fejl ${r.status}: ${txt}`);
+  if (!r.ok) throw new Error(`EXO ${cmdletName} fejl ${r.status}: ${txt}`);
+
+  try {
+    return JSON.parse(txt);
+  } catch {
+    return { raw: txt };
+  }
 }
 
 module.exports = async function (context, req) {
@@ -105,7 +111,10 @@ module.exports = async function (context, req) {
       for (const userId of add) {
         try {
           const userEmail = await getUserEmail(token, userId);
-          await exoAddMember(exoToken, tenantId, groupEmail, userEmail);
+          await exoInvokeCommand(exoToken, tenantId, "Add-DistributionGroupMember", {
+            Identity: groupEmail,
+            Member:   userEmail
+          }, groupEmail);
           added++;
         } catch (err) {
           errors.push(`Tilføj fejl for ${userId}: ${err.message}`);
@@ -115,7 +124,11 @@ module.exports = async function (context, req) {
       for (const userId of remove) {
         try {
           const userEmail = await getUserEmail(token, userId);
-          await exoRemoveMember(exoToken, tenantId, groupEmail, userEmail);
+          await exoInvokeCommand(exoToken, tenantId, "Remove-DistributionGroupMember", {
+            Identity: groupEmail,
+            Member:   userEmail,
+            Confirm:  false
+          }, groupEmail);
           removed++;
         } catch (err) {
           errors.push(`Fjern fejl for ${userId}: ${err.message}`);
@@ -123,7 +136,7 @@ module.exports = async function (context, req) {
       }
 
     } else {
-      // Almindelige security groups og M365 groups
+      // Almindelige security groups og M365 groups — brug Graph v1.0
       for (const userId of add) {
         try {
           await graphPost(token, `/groups/${encodeURIComponent(groupId)}/members/$ref`, {
