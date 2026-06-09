@@ -134,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // ── Load ──────────────────────────────────────────────────────
 async function loadData() {
   try {
-    const res  = await fetch("/api/hardware/list");
+    const res  = await fetch("/api/hardwareList");
     const data = await res.json();
     allItems = data.items || [];
     renderList();
@@ -226,7 +226,7 @@ async function saveItem() {
   btn.textContent = "Gemmer...";
 
   try {
-    const res  = await fetch("/api/hardware/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const res  = await fetch("/api/hardwareSave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Ukendt fejl");
     document.getElementById("status").textContent = "Gemt ✓";
@@ -245,7 +245,7 @@ async function deleteItem() {
   if (!current?.id) return;
   if (!confirm("Slet dette udlån?")) return;
   try {
-    const res  = await fetch("/api/hardware/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: current.id }) });
+    const res  = await fetch("/api/hardwareDelete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: current.id }) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Ukendt fejl");
     current = null;
