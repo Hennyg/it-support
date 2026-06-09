@@ -4,5 +4,8 @@
   "description": "IT Support API functions",
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0"
   }
 }
