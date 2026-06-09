@@ -3,353 +3,99 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <title>Hardware udlån — IT Support</title>
-
   <link rel="stylesheet" href="/assets/navbar.css" />
-
   <meta name="herrup-app" content="it-support">
   <meta name="herrup-title" content="IT Support">
   <meta name="herrup-subtitle" content="Hardware udlån">
-
   <script src="/assets/navbar.js" defer></script>
   <script src="/assets/auth.js" defer></script>
-
   <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: #f3f4f6;
-      color: #111827;
-    }
-
-    #appContent {
-      display: none;
-    }
-
-    .container {
-      max-width: 1600px;
-      margin: 0 auto;
-      padding: 32px 20px;
-    }
-
-    .toolbar {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
-
-    .toolbar input,
-    .toolbar select {
-      padding: 10px 14px;
-      border: 1px solid #d1d5db;
-      border-radius: 10px;
-      font-size: .9rem;
-      background: #fff;
-    }
-
-    .toolbar input {
-      min-width: 280px;
-    }
-
-    .btn {
-      border: none;
-      border-radius: 10px;
-      padding: 10px 18px;
-      font-size: .9rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: .15s;
-    }
-
-    .btn-primary {
-      background: #850c18;
-      color: #fff;
-    }
-
-    .btn-primary:hover {
-      background: #6b0913;
-    }
-
-    .btn-secondary {
-      background: #fff;
-      border: 1px solid #d1d5db;
-      color: #374151;
-    }
-
-    .btn-secondary:hover {
-      background: #f9fafb;
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: 420px 1fr;
-      gap: 20px;
-      align-items: start;
-    }
-
-    .card {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,.05);
-    }
-
-    .card-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid #f3f4f6;
-      font-weight: 700;
-      font-size: 1rem;
-    }
-
-    .list {
-      max-height: calc(100vh - 250px);
-      overflow-y: auto;
-    }
-
-    .item {
-      padding: 14px 18px;
-      border-bottom: 1px solid #f3f4f6;
-      cursor: pointer;
-      transition: .12s;
-    }
-
-    .item:hover {
-      background: #f9fafb;
-    }
-
-    .item.active {
-      background: #fef3f2;
-      border-left: 4px solid #850c18;
-    }
-
-    .item-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 4px;
-    }
-
-    .item-name {
-      font-weight: 700;
-      font-size: .92rem;
-    }
-
-    .item-person {
-      font-size: .83rem;
-      color: #6b7280;
-    }
-
-    .badge {
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: .75rem;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    .badge.out {
-      background: #fef2f2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
-    }
-
-    .badge.home {
-      background: #f0fdf4;
-      color: #166534;
-      border: 1px solid #bbf7d0;
-    }
-
-    .editor {
-      padding: 24px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-    }
-
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .field.full {
-      grid-column: 1 / -1;
-    }
-
-    .field label {
-      font-size: .8rem;
-      font-weight: 700;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-    }
-
-    .field input,
-    .field textarea,
-    .field select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 10px;
-      font-size: .9rem;
-      background: #fff;
-      font-family: inherit;
-    }
-
-    .field textarea {
-      resize: vertical;
-      min-height: 120px;
-    }
-
-    .footer {
-      padding: 18px 24px;
-      border-top: 1px solid #f3f4f6;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      background: #f9fafb;
-    }
-
-    .status {
-      font-size: .85rem;
-      color: #6b7280;
-    }
-
-    .actions {
-      display: flex;
-      gap: 10px;
-    }
-
-    .empty {
-      padding: 40px;
-      text-align: center;
-      color: #9ca3af;
-    }
-
-    .loading {
-      padding: 40px;
-      text-align: center;
-      color: #6b7280;
-    }
-
-    @media (max-width: 1100px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-
-      .editor {
-        grid-template-columns: 1fr;
-      }
-    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; color: #111827; }
+    #appContent { display: none; }
+    .container { max-width: 1600px; margin: 0 auto; padding: 32px 20px; }
+    .toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .toolbar input, .toolbar select { padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 10px; font-size: .9rem; background: #fff; }
+    .toolbar input { min-width: 280px; }
+    .btn { border: none; border-radius: 10px; padding: 10px 18px; font-size: .9rem; font-weight: 600; cursor: pointer; transition: .15s; }
+    .btn-primary { background: #850c18; color: #fff; }
+    .btn-primary:hover { background: #6b0913; }
+    .btn-secondary { background: #fff; border: 1px solid #d1d5db; color: #374151; }
+    .btn-secondary:hover { background: #f9fafb; }
+    .layout { display: grid; grid-template-columns: 420px 1fr; gap: 20px; align-items: start; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .card-header { padding: 16px 20px; border-bottom: 1px solid #f3f4f6; font-weight: 700; font-size: 1rem; }
+    .list { max-height: calc(100vh - 250px); overflow-y: auto; }
+    .item { padding: 14px 18px; border-bottom: 1px solid #f3f4f6; cursor: pointer; transition: .12s; }
+    .item:hover { background: #f9fafb; }
+    .item.active { background: #fef3f2; border-left: 4px solid #850c18; }
+    .item-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 4px; }
+    .item-name { font-weight: 700; font-size: .92rem; }
+    .item-person { font-size: .83rem; color: #6b7280; }
+    .badge { padding: 4px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
+    .badge.out  { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge.home { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .editor { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { font-size: .8rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+    .field input, .field textarea, .field select { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: .9rem; background: #fff; font-family: inherit; }
+    .field textarea { resize: vertical; min-height: 120px; }
+    .footer { padding: 18px 24px; border-top: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #f9fafb; }
+    .status { font-size: .85rem; color: #6b7280; }
+    .actions { display: flex; gap: 10px; }
+    .empty { padding: 40px; text-align: center; color: #9ca3af; }
+    .loading { padding: 40px; text-align: center; color: #6b7280; }
+    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } .editor { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
 
 <div id="appContent">
-
   <div class="container">
-
     <div class="toolbar">
-      <input
-        type="search"
-        id="search"
-        placeholder="Søg hardware, person eller serienummer..."
-        oninput="renderList()"
-      >
-
+      <input type="search" id="search" placeholder="Søg hardware, person eller serienummer..." oninput="renderList()">
       <select id="filterAktiv" onchange="renderList()">
         <option value="">Alle</option>
         <option value="true">Udlånt</option>
         <option value="false">Returneret</option>
       </select>
-
-      <button class="btn btn-primary" onclick="newItem()">
-        + Nyt udlån
-      </button>
+      <button class="btn btn-primary" onclick="newItem()">+ Nyt udlån</button>
     </div>
 
     <div class="layout">
-
       <div class="card">
-        <div class="card-header">
-          Hardware
-        </div>
-
+        <div class="card-header">Hardware</div>
         <div class="list" id="list">
-          <div class="loading">
-            Henter hardware...
-          </div>
+          <div class="loading">Henter hardware...</div>
         </div>
       </div>
 
       <div class="card">
-
-        <div class="card-header" id="editorTitle">
-          Hardware detaljer
-        </div>
-
+        <div class="card-header" id="editorTitle">Hardware detaljer</div>
         <div class="editor">
-
           <div class="field">
             <label>Hardware</label>
             <input id="lch_hvad">
           </div>
-
           <div class="field" style="position:relative;">
             <label>Udlånt til</label>
-          
-            <input
-              id="lch_hvem"
-              type="search"
-              autocomplete="off"
-              placeholder="Søg person..."
-              oninput="searchUsers()"
-              onfocus="openUserDropdown()"
-            >
-          
-            <div
-              id="userDropdown"
-              style="
-                position:absolute;
-                top:100%;
-                left:0;
-                right:0;
-                background:#fff;
-                border:1px solid #d1d5db;
-                border-radius:12px;
-                box-shadow:0 8px 24px rgba(0,0,0,.12);
-                max-height:320px;
-                overflow-y:auto;
-                z-index:100;
-                display:none;
-              "
-            ></div>
+            <input id="lch_hvem" type="search" autocomplete="off" placeholder="Søg person..." oninput="searchUsers()" onfocus="openUserDropdown()">
+            <div id="userDropdown" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d1d5db;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:320px;overflow-y:auto;z-index:100;display:none;"></div>
           </div>
-
           <div class="field">
             <label>Udlånsdato</label>
             <input type="date" id="lch_when">
           </div>
-
           <div class="field">
             <label>Returdato</label>
             <input type="date" id="lch_retur">
           </div>
-
           <div class="field full">
             <label>Hvorfor</label>
             <textarea id="lch_hvorfor"></textarea>
           </div>
-
           <div class="field">
             <label>Status</label>
             <select id="lch_aktiv">
@@ -357,486 +103,208 @@
               <option value="false">Returneret</option>
             </select>
           </div>
-
         </div>
-
         <div class="footer">
-
-          <div class="status" id="status">
-            Klar
-          </div>
-
+          <div class="status" id="status">Klar</div>
           <div class="actions">
-            <button class="btn btn-secondary" onclick="deleteItem()">
-              Slet
-            </button>
-
-            <button class="btn btn-primary" onclick="saveItem()">
-              Gem
-            </button>
+            <button class="btn btn-secondary" onclick="deleteItem()">Slet</button>
+            <button class="btn btn-primary" onclick="saveItem()">Gem</button>
           </div>
-
         </div>
-
       </div>
-
     </div>
-
   </div>
-
 </div>
 
 <script>
-const ALLOWED_ROLES = [
-  "portal_admin",
-  "portal_it_support"
-];
+const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
 
 let allItems = [];
-let current = null;
+let current  = null;
 let allUsers = [];
 
-// ─────────────────────────────────────────────────────────────
-// Auth
-// ─────────────────────────────────────────────────────────────
-
+// ── Auth ──────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
   ITAuth.requireAuth(async ({ user }) => {
-    document
-      .getElementById("appContent")
-      .style
-      .display = "block";
-
-    await Promise.all([
-      loadData(),
-      loadUsers()
-]);
-
-})();
-
-// ─────────────────────────────────────────────────────────────
-// Load
-// ─────────────────────────────────────────────────────────────
-
-async function loadData() {
-
-  const res = await fetch("/api/hardware/list");
-  const data = await res.json();
-
-  allItems = data.items || [];
-
-  renderList();
-
-  if (allItems.length > 0) {
-    selectItem(allItems[0]);
-  }
-
+    document.getElementById("appContent").style.setProperty("display", "block", "important");
+    await Promise.all([loadData(), loadUsers()]);
   });
 });
 
-async function loadUsers() {
-
+// ── Load ──────────────────────────────────────────────────────
+async function loadData() {
   try {
-
-    const res = await fetch("/api/getUsers");
+    const res  = await fetch("/api/hardware/list");
     const data = await res.json();
-
-    allUsers = (data.users || [])
-      .filter(u => u.mailboxType === "user");
-
+    allItems = data.items || [];
+    renderList();
+    if (allItems.length > 0) selectItem(allItems[0]);
+  } catch (err) {
+    document.getElementById("list").innerHTML = '<div class="empty">Kunne ikke hente data: ' + err.message + '</div>';
   }
-  catch (err) {
-
-    console.error(err);
-
-  }
-
 }
 
-// ─────────────────────────────────────────────────────────────
-// Render
-// ─────────────────────────────────────────────────────────────
+async function loadUsers() {
+  try {
+    const res  = await fetch("/api/getUsers");
+    const data = await res.json();
+    allUsers = (data.users || []).filter(u => u.mailboxType === "user");
+  } catch (err) {
+    console.error("loadUsers fejl:", err);
+  }
+}
 
+// ── Render ────────────────────────────────────────────────────
 function renderList() {
-
-  const q = document
-    .getElementById("search")
-    .value
-    .toLowerCase();
-
-  const filterAktiv = document
-    .getElementById("filterAktiv")
-    .value;
+  const q           = document.getElementById("search").value.toLowerCase();
+  const filterAktiv = document.getElementById("filterAktiv").value;
 
   let items = allItems.filter(i => {
-
-    if (filterAktiv !== "") {
-      if (String(i.lch_aktiv) !== filterAktiv) {
-        return false;
-      }
-    }
-
-    const txt = [
-      i.lch_hvad,
-      i.lch_hvem,
-      i.lch_hvorfor
-    ]
-    .join(" ")
-    .toLowerCase();
-
+    if (filterAktiv !== "" && String(i.lch_aktiv) !== filterAktiv) return false;
+    const txt = [i.lch_hvad, i.lch_hvem, i.lch_hvorfor].join(" ").toLowerCase();
     return txt.includes(q);
-
   });
 
-  items.sort((a, b) => {
-    return (b.createdon || "").localeCompare(a.createdon || "");
-  });
+  items.sort((a, b) => (b.createdon || "").localeCompare(a.createdon || ""));
 
   const list = document.getElementById("list");
 
   if (items.length === 0) {
-    list.innerHTML = `
-      <div class="empty">
-        Ingen hardware fundet
-      </div>
-    `;
+    list.innerHTML = '<div class="empty">Ingen hardware fundet</div>';
     return;
   }
 
   list.innerHTML = items.map(i => `
-    <div
-      class="item ${current?.id === i.id ? "active" : ""}"
-      onclick="selectItemById('${i.id}')"
-    >
-
+    <div class="item ${current?.id === i.id ? "active" : ""}" onclick="selectItemById('${i.id}')">
       <div class="item-top">
-        <div class="item-name">
-          ${esc(i.lch_hvad)}
-        </div>
-
-        <div class="badge ${i.lch_aktiv ? "out" : "home"}">
-          ${i.lch_aktiv ? "Udlånt" : "Hjemme"}
-        </div>
+        <div class="item-name">${esc(i.lch_hvad)}</div>
+        <div class="badge ${i.lch_aktiv ? "out" : "home"}">${i.lch_aktiv ? "Udlånt" : "Hjemme"}</div>
       </div>
-
-      <div class="item-person">
-        ${esc(i.lch_hvem || "")}
-      </div>
-
+      <div class="item-person">${esc(i.lch_hvem || "")}</div>
     </div>
   `).join("");
-
 }
 
-// ─────────────────────────────────────────────────────────────
-// Select
-// ─────────────────────────────────────────────────────────────
-
+// ── Select ────────────────────────────────────────────────────
 function selectItemById(id) {
-
   const item = allItems.find(x => x.id === id);
-
-  if (!item) return;
-
-  selectItem(item);
-
+  if (item) selectItem(item);
 }
 
 function selectItem(item) {
-
   current = item;
-
   renderList();
-
-  document.getElementById("editorTitle").textContent =
-    item.lch_hvad || "Hardware detaljer";
-
-  document.getElementById("lch_hvad").value =
-    item.lch_hvad || "";
-
-  document.getElementById("lch_hvem").value =
-    item.lch_hvem || "";
-
-  document.getElementById("lch_hvorfor").value =
-    item.lch_hvorfor || "";
-
-  document.getElementById("lch_when").value =
-    formatDate(item.lch_when);
-
-  document.getElementById("lch_retur").value =
-    formatDate(item.lch_retur);
-
-  document.getElementById("lch_aktiv").value =
-    String(item.lch_aktiv);
-
+  document.getElementById("editorTitle").textContent       = item.lch_hvad || "Hardware detaljer";
+  document.getElementById("lch_hvad").value                = item.lch_hvad    || "";
+  document.getElementById("lch_hvem").value                = item.lch_hvem    || "";
+  document.getElementById("lch_hvorfor").value             = item.lch_hvorfor || "";
+  document.getElementById("lch_when").value                = formatDate(item.lch_when);
+  document.getElementById("lch_retur").value               = formatDate(item.lch_retur);
+  document.getElementById("lch_aktiv").value               = String(item.lch_aktiv);
 }
 
-// ─────────────────────────────────────────────────────────────
-// New
-// ─────────────────────────────────────────────────────────────
-
+// ── New ───────────────────────────────────────────────────────
 function newItem() {
-
-  current = {
-    id: null,
-    lch_hvad: "",
-    lch_hvem: "",
-    lch_hvorfor: "",
-    lch_when: today(),
-    lch_retur: plus30Days(),
-    lch_aktiv: true
-  };
-
+  current = { id: null, lch_hvad: "", lch_hvem: "", lch_hvorfor: "", lch_when: today(), lch_retur: plus30Days(), lch_aktiv: true };
   selectItem(current);
-
 }
 
-// ─────────────────────────────────────────────────────────────
-// Save
-// ─────────────────────────────────────────────────────────────
-
+// ── Save ──────────────────────────────────────────────────────
 async function saveItem() {
-
   const payload = {
-    id: current?.id || null,
-    lch_hvad: document.getElementById("lch_hvad").value,
-    lch_hvem: document.getElementById("lch_hvem").value,
+    id:          current?.id || null,
+    lch_hvad:    document.getElementById("lch_hvad").value,
+    lch_hvem:    document.getElementById("lch_hvem").value,
     lch_hvorfor: document.getElementById("lch_hvorfor").value,
-    lch_when: document.getElementById("lch_when").value,
-    lch_retur: document.getElementById("lch_retur").value,
-    lch_aktiv: document.getElementById("lch_aktiv").value === "true"
+    lch_when:    document.getElementById("lch_when").value,
+    lch_retur:   document.getElementById("lch_retur").value,
+    lch_aktiv:   document.getElementById("lch_aktiv").value === "true"
   };
 
   const btn = event.target;
-
   btn.disabled = true;
   btn.textContent = "Gemmer...";
 
   try {
-
-    const res = await fetch("/api/hardware/save", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-
+    const res  = await fetch("/api/hardware/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || "Ukendt fejl");
-    }
-
-    document.getElementById("status").textContent =
-      "Gemt ✓";
-
+    if (!res.ok) throw new Error(data.error || "Ukendt fejl");
+    document.getElementById("status").textContent = "Gemt ✓";
     await loadData();
-
-    if (data.id) {
-      selectItemById(data.id);
-    }
-
-  }
-  catch (err) {
-
-    document.getElementById("status").textContent =
-      "Fejl: " + err.message;
-
-  }
-  finally {
-
+    if (data.id) selectItemById(data.id);
+  } catch (err) {
+    document.getElementById("status").textContent = "Fejl: " + err.message;
+  } finally {
     btn.disabled = false;
     btn.textContent = "Gem";
-
   }
-
 }
 
-// ─────────────────────────────────────────────────────────────
-// Delete
-// ─────────────────────────────────────────────────────────────
-
+// ── Delete ────────────────────────────────────────────────────
 async function deleteItem() {
-
-  if (!current?.id) {
-    return;
-  }
-
-  if (!confirm("Slet dette udlån?")) {
-    return;
-  }
-
+  if (!current?.id) return;
+  if (!confirm("Slet dette udlån?")) return;
   try {
-
-    const res = await fetch("/api/hardware/delete", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        id: current.id
-      })
-    });
-
+    const res  = await fetch("/api/hardware/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: current.id }) });
     const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || "Ukendt fejl");
-    }
-
+    if (!res.ok) throw new Error(data.error || "Ukendt fejl");
     current = null;
-
     await loadData();
-
+  } catch (err) {
+    document.getElementById("status").textContent = "Fejl: " + err.message;
   }
-  catch (err) {
-
-    document.getElementById("status").textContent =
-      "Fejl: " + err.message;
-
-  }
-
 }
 
-// ─────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────
-
-function formatDate(v) {
-
-  if (!v) return "";
-
-  return String(v).substring(0, 10);
-
-}
-
-function esc(s) {
-
-  return String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-}
-
-  function searchUsers() {
-
-  const q = document
-    .getElementById("lch_hvem")
-    .value
-    .trim()
-    .toLowerCase();
-
+// ── Bruger-søgning ────────────────────────────────────────────
+function searchUsers() {
+  const q  = document.getElementById("lch_hvem").value.trim().toLowerCase();
   const dd = document.getElementById("userDropdown");
 
-  if (q.length < 2) {
-    dd.style.display = "none";
-    return;
-  }
+  if (q.length < 2) { dd.style.display = "none"; return; }
 
-  const matches = allUsers
-    .filter(u =>
-      u.displayName?.toLowerCase().includes(q) ||
-      u.mail?.toLowerCase().includes(q)
-    )
-    .slice(0, 25);
+  const matches = allUsers.filter(u =>
+    u.displayName?.toLowerCase().includes(q) || u.mail?.toLowerCase().includes(q)
+  ).slice(0, 25);
 
   if (matches.length === 0) {
-    dd.innerHTML = `
-      <div style="padding:12px;color:#9ca3af;">
-        Ingen resultater
-      </div>
-    `;
+    dd.innerHTML = '<div style="padding:12px;color:#9ca3af;">Ingen resultater</div>';
     dd.style.display = "block";
     return;
   }
 
   dd.innerHTML = matches.map(u => `
-    <div
-      onclick="selectUser('${escJs(u.displayName)}')"
-      style="
-        padding:10px 14px;
-        border-bottom:1px solid #f3f4f6;
-        cursor:pointer;
-      "
-      onmouseover="this.style.background='#f9fafb'"
-      onmouseout="this.style.background='#fff'"
-    >
-      <div style="font-weight:600;">
-        ${esc(u.displayName)}
-      </div>
-
-      <div style="font-size:.8rem;color:#6b7280;">
-        ${esc(u.mail || "")}
-      </div>
+    <div onclick="selectUser('${escJs(u.displayName)}')"
+         style="padding:10px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;"
+         onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='#fff'">
+      <div style="font-weight:600;">${esc(u.displayName)}</div>
+      <div style="font-size:.8rem;color:#6b7280;">${esc(u.mail || "")}</div>
     </div>
   `).join("");
 
   dd.style.display = "block";
-
 }
 
 function selectUser(name) {
-
   document.getElementById("lch_hvem").value = name;
-
   document.getElementById("userDropdown").style.display = "none";
-
 }
 
 function openUserDropdown() {
-
-  if (
-    document
-      .getElementById("lch_hvem")
-      .value
-      .trim()
-      .length >= 2
-  ) {
-    searchUsers();
-  }
-
+  if (document.getElementById("lch_hvem").value.trim().length >= 2) searchUsers();
 }
 
 document.addEventListener("click", e => {
-
-  if (!e.target.closest("#lch_hvem") &&
-      !e.target.closest("#userDropdown")) {
-
+  if (!e.target.closest("#lch_hvem") && !e.target.closest("#userDropdown")) {
     document.getElementById("userDropdown").style.display = "none";
-
   }
-
 });
 
-function escJs(str) {
-
-  return String(str || "")
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'");
-
-}
-
-function today() {
-
-  return new Date()
-    .toISOString()
-    .substring(0, 10);
-
-}
-
-function plus30Days() {
-
-  const d = new Date();
-
-  d.setDate(d.getDate() + 30);
-
-  return d
-    .toISOString()
-    .substring(0, 10);
-
-}  
+// ── Helpers ───────────────────────────────────────────────────
+function formatDate(v) { return v ? String(v).substring(0, 10) : ""; }
+function today()       { return new Date().toISOString().substring(0, 10); }
+function plus30Days()  { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().substring(0, 10); }
+function esc(s)        { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function escJs(s)      { return String(s || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 </script>
 
 </body>
