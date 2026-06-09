@@ -1,5 +1,5 @@
 // api/shared/graph.js
-// Delt hjælpefunktioner til Microsoft Graph API
+// Delt hjælpefunktioner til Microsoft Graph API og Exchange Online
 
 function requireEnv(name) {
   const v = process.env[name];
@@ -25,6 +25,28 @@ async function getGraphToken() {
 
   const data = await r.json();
   if (!r.ok || !data.access_token) throw new Error(`Token fejl: ${JSON.stringify(data)}`);
+  return data.access_token;
+}
+
+// Exchange Online token — kræver Exchange.ManageAsApp permission
+async function getExoToken() {
+  const tenantId     = requireEnv("TENANT_ID");
+  const clientId     = requireEnv("CLIENT_ID");
+  const clientSecret = requireEnv("CLIENT_SECRET");
+
+  const body = new URLSearchParams();
+  body.set("client_id",     clientId);
+  body.set("client_secret", clientSecret);
+  body.set("scope",         "https://outlook.office365.com/.default");
+  body.set("grant_type",    "client_credentials");
+
+  const r = await fetch(
+    `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
+    { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body.toString() }
+  );
+
+  const data = await r.json();
+  if (!r.ok || !data.access_token) throw new Error(`EXO token fejl: ${JSON.stringify(data)}`);
   return data.access_token;
 }
 
@@ -86,7 +108,6 @@ function jsonResponse(status, body) {
 }
 
 async function graphPatch(token, url, body) {
-
   const res = await fetch(
     `https://graph.microsoft.com/v1.0${url}`,
     {
@@ -100,12 +121,8 @@ async function graphPatch(token, url, body) {
   );
 
   if (!res.ok) {
-
     const txt = await res.text();
-
-    throw new Error(
-      `Graph PATCH ${res.status}: ${txt}`
-    );
+    throw new Error(`Graph PATCH ${res.status}: ${txt}`);
   }
 
   return true;
@@ -113,6 +130,7 @@ async function graphPatch(token, url, body) {
 
 module.exports = {
   getGraphToken,
+  getExoToken,
   graphGet,
   graphPost,
   graphDelete,
