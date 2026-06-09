@@ -1,94 +1,36 @@
-const { app } = require("@azure/functions");
+// api/hardware/delete/index.js
+const { jsonResponse } = require("../../shared/graph");
 
-app.http("hardware-delete", {
-    methods: ["POST"],
-    authLevel: "anonymous",
-    route: "hardware/delete",
-    handler: async (req, context) => {
+module.exports = async function (context, req) {
+  try {
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    if (!body.id) throw new Error("Mangler id");
 
-        try {
+    const tenantId     = process.env.TENANT_ID;
+    const clientId     = process.env.CLIENT_ID;
+    const clientSecret = process.env.CLIENT_SECRET;
+    const dataverseUrl = process.env.DATAVERSE_URL;
+    const entitySet    = "cr767_lch_hardwareudlaans";
 
-            const body = await req.json();
+    const tokenRes = await fetch(
+      `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, scope: `${dataverseUrl}/.default`, grant_type: "client_credentials" })
+      }
+    );
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) throw new Error("Kunne ikke hente token");
 
-            if (!body.id) {
-                throw new Error("Mangler id");
-            }
+    const delRes = await fetch(
+      `${dataverseUrl}/api/data/v9.2/${entitySet}(${body.id})`,
+      { method: "DELETE", headers: { Authorization: `Bearer ${tokenData.access_token}` } }
+    );
+    if (!delRes.ok) throw new Error(await delRes.text());
 
-            const tenantId     = process.env.TENANT_ID;
-            const clientId     = process.env.CLIENT_ID;
-            const clientSecret = process.env.CLIENT_SECRET;
-            const dataverseUrl = process.env.DATAVERSE_URL;
-
-            const entitySet = "cr767_lch_hardwareudlaans";
-
-            // ─────────────────────────────────────────────
-            // Token
-            // ─────────────────────────────────────────────
-
-            const tokenRes = await fetch(
-                `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    },
-                    body: new URLSearchParams({
-                        client_id: clientId,
-                        client_secret: clientSecret,
-                        scope: `${dataverseUrl}/.default`,
-                        grant_type: "client_credentials"
-                    })
-                }
-            );
-
-            const tokenData = await tokenRes.json();
-
-            if (!tokenData.access_token) {
-                throw new Error("Kunne ikke hente token");
-            }
-
-            // ─────────────────────────────────────────────
-            // Delete
-            // ─────────────────────────────────────────────
-
-            const delRes = await fetch(
-                `${dataverseUrl}/api/data/v9.2/${entitySet}(${body.id})`,
-                {
-                    method: "DELETE",
-                    headers: {
-                        Authorization: `Bearer ${tokenData.access_token}`
-                    }
-                }
-            );
-
-            if (!delRes.ok) {
-
-                const txt = await delRes.text();
-
-                throw new Error(txt);
-
-            }
-
-            return {
-                jsonBody: {
-                    ok: true
-                }
-            };
-
-        }
-        catch (err) {
-
-            context.error(err);
-
-            return {
-                status: 500,
-                jsonBody: {
-                    ok: false,
-                    error: err.message
-                }
-            };
-
-        }
-
-    }
-});
+    context.res = jsonResponse(200, { ok: true });
+  } catch (err) {
+    context.res = jsonResponse(500, { ok: false, error: err.message });
+  }
+};
