@@ -4,8 +4,8 @@ const { jsonResponse } = require("../shared/graph");
 module.exports = async function (context, req) {
   try {
     const tenantId     = process.env.TENANT_ID;
-    const clientId     = process.env.CLIENT_ID;
-    const clientSecret = process.env.CLIENT_SECRET;
+const clientId     = process.env.AZURE_CLIENT_ID;
+const clientSecret = process.env.AZURE_CLIENT_SECRET;
     const dataverseUrl = process.env.DATAVERSE_URL;
     const entitySet    = "cr767_lch_hardwareudlaans";
 
