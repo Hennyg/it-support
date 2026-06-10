@@ -1,6 +1,8 @@
 // api/updateGroupMembers/index.js
 const { getGraphToken, graphPost, graphDelete, jsonResponse } = require("../shared/graph");
 
+const AGENT = "http://localhost:5199";
+
 async function getGroupInfo(token, groupId) {
   const r = await fetch(
     `https://graph.microsoft.com/v1.0/groups/${encodeURIComponent(groupId)}?$select=mail,mailEnabled,groupTypes,securityEnabled`,
@@ -20,25 +22,73 @@ async function getUserEmail(token, userId) {
   return email;
 }
 
-async function callAutomationWebhook(groupEmail, addEmails, removeEmails) {
-  const webhookUrl = process.env.EXO_WEBHOOK_URL;
-  if (!webhookUrl) throw new Error("EXO_WEBHOOK_URL er ikke konfigureret");
-
-  const r = await fetch(webhookUrl, {
+async function runPs(script) {
+  const res = await fetch(`${AGENT}/api/run-ps`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      groupEmail,
-      addUsers:    addEmails,
-      removeUsers: removeEmails
-    })
+    body: JSON.stringify({ script })
   });
+  if (!res.ok) throw new Error(`Agent svarede ${res.status}`);
+  return await res.json();
+}
 
-  if (!r.ok) throw new Error(`Webhook fejl ${r.status}: ${await r.text()}`);
+async function updateViaAgent(groupEmail, addEmails, removeEmails) {
+  const appId     = process.env.CLIENT_ID;
+  const tenantId  = process.env.TENANT_ID;
+  const thumbprint = process.env.EXO_CERT_THUMBPRINT;
 
-  // Azure Automation webhook returnerer 202 og kører asynkront
-  // Vi returnerer OK — jobbet kører i baggrunden
-  return true;
+  // Byg add/remove arrays som PS-strenge
+  const addPs    = addEmails.map(e => `"${e}"`).join(",");
+  const removePs = removeEmails.map(e => `"${e}"`).join(",");
+
+  const script = `
+$ErrorActionPreference = 'Stop'
+try {
+  Connect-ExchangeOnline -AppId "${appId}" -CertificateThumbprint "${thumbprint}" -Organization "${tenantId}" -ShowBanner:$false
+  $added = 0; $removed = 0; $errors = @()
+
+  foreach ($email in @(${addPs.length > 0 ? addPs : ''})) {
+    try {
+      Add-DistributionGroupMember -Identity "${groupEmail}" -Member $email -BypassSecurityGroupManagerCheck -ErrorAction Stop
+      $added++
+    } catch {
+      $errors += "Tilfoej fejl for $($email): $($_.Exception.Message)"
+    }
+  }
+
+  foreach ($email in @(${removePs.length > 0 ? removePs : ''})) {
+    try {
+      Remove-DistributionGroupMember -Identity "${groupEmail}" -Member $email -BypassSecurityGroupManagerCheck -Confirm:$false -ErrorAction Stop
+      $removed++
+    } catch {
+      $errors += "Fjern fejl for $($email): $($_.Exception.Message)"
+    }
+  }
+
+  Disconnect-ExchangeOnline -Confirm:$false
+  Write-Output "RESULT:added=$added,removed=$removed,errors=$($errors -join '|')"
+} catch {
+  Write-Output "FATAL:$($_.Exception.Message)"
+}
+`.trim();
+
+  const data = await runPs(script);
+  const output = (data.output || "").trim();
+
+  if (output.includes("FATAL:")) {
+    throw new Error(output.replace("FATAL:", ""));
+  }
+
+  const resultLine = output.split("\n").find(l => l.startsWith("RESULT:"));
+  if (!resultLine) throw new Error("Intet resultat fra agent: " + output);
+
+  const parts  = resultLine.replace("RESULT:", "").split(",");
+  const added  = parseInt(parts.find(p => p.startsWith("added="))?.split("=")[1] || "0");
+  const removed = parseInt(parts.find(p => p.startsWith("removed="))?.split("=")[1] || "0");
+  const errStr = parts.find(p => p.startsWith("errors="))?.split("=").slice(1).join("=") || "";
+  const errors = errStr ? errStr.split("|").filter(Boolean) : [];
+
+  return { added, removed, errors };
 }
 
 module.exports = async function (context, req) {
@@ -51,7 +101,6 @@ module.exports = async function (context, req) {
   }
 
   const { groupId, add = [], remove = [] } = body ?? {};
-
   if (!groupId) { context.res = jsonResponse(400, { error: "Mangler groupId" }); return; }
   if (add.length === 0 && remove.length === 0) { context.res = jsonResponse(200, { message: "Ingen ændringer" }); return; }
 
@@ -70,56 +119,39 @@ module.exports = async function (context, req) {
         return;
       }
 
-      // Slå alle bruger-emails op parallelt
-      const addEmails    = [];
-      const removeEmails = [];
-
+      const addEmails = [], removeEmails = [];
       for (const userId of add) {
-        try {
-          addEmails.push(await getUserEmail(token, userId));
-        } catch (err) {
-          errors.push(`Email-opslag fejl for ${userId}: ${err.message}`);
-        }
+        try { addEmails.push(await getUserEmail(token, userId)); }
+        catch (err) { errors.push(`Email-opslag fejl for ${userId}: ${err.message}`); }
       }
-
       for (const userId of remove) {
-        try {
-          removeEmails.push(await getUserEmail(token, userId));
-        } catch (err) {
-          errors.push(`Email-opslag fejl for ${userId}: ${err.message}`);
-        }
+        try { removeEmails.push(await getUserEmail(token, userId)); }
+        catch (err) { errors.push(`Email-opslag fejl for ${userId}: ${err.message}`); }
       }
 
-      if (addEmails.length > 0 || removeEmails.length > 0) {
-        try {
-          await callAutomationWebhook(groupEmail, addEmails, removeEmails);
-          added   = addEmails.length;
-          removed = removeEmails.length;
-        } catch (err) {
-          errors.push(`Webhook fejl: ${err.message}`);
-        }
+      try {
+        const result = await updateViaAgent(groupEmail, addEmails, removeEmails);
+        added   = result.added;
+        removed = result.removed;
+        errors.push(...result.errors);
+      } catch (err) {
+        errors.push(`Agent fejl: ${err.message}`);
       }
 
     } else {
-      // Almindelige security groups og M365 groups — brug Graph v1.0
       for (const userId of add) {
         try {
           await graphPost(token, `/groups/${encodeURIComponent(groupId)}/members/$ref`, {
             "@odata.id": `https://graph.microsoft.com/v1.0/directoryObjects/${userId}`
           });
           added++;
-        } catch (err) {
-          errors.push(`Tilføj fejl for ${userId}: ${err.message}`);
-        }
+        } catch (err) { errors.push(`Tilføj fejl for ${userId}: ${err.message}`); }
       }
-
       for (const userId of remove) {
         try {
           await graphDelete(token, `/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}/$ref`);
           removed++;
-        } catch (err) {
-          errors.push(`Fjern fejl for ${userId}: ${err.message}`);
-        }
+        } catch (err) { errors.push(`Fjern fejl for ${userId}: ${err.message}`); }
       }
     }
 
