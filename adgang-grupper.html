@@ -413,24 +413,25 @@ async function saveViaAgent(groupEmail, addEmails, removeEmails) {
   const removePs = removeEmails.map(e => `"${e}"`).join(",");
 
   const script = `
-$ErrorActionPreference = 'Stop'
-try {
-  Connect-ExchangeOnline -AppId "${APP_ID}" -CertificateThumbprint "${CERT_THUMB}" -Organization "${ORG}" -ShowBanner:$false
-  Import-Module ExchangeOnlineManagement -Force -ErrorAction SilentlyContinue
+$job = Start-Job -ScriptBlock {
+  param($appId, $pfxPath, $pfxPwd, $org, $groupEmail, $addUsers, $removeUsers)
+  Import-Module ExchangeOnlineManagement -ErrorAction Stop
+  $pwd = ConvertTo-SecureString -String $pfxPwd -Force -AsPlainText
+  Connect-ExchangeOnline -AppId $appId -CertificateFilePath $pfxPath -CertificatePassword $pwd -Organization $org -ShowBanner:$false
   $added = 0; $removed = 0; $errors = @()
-  foreach ($email in @(${addPs || '""'})) {
+  foreach ($email in $addUsers) {
     if (-not $email) { continue }
     try {
-      Add-DistributionGroupMember -Identity "${groupEmail}" -Member $email -BypassSecurityGroupManagerCheck -ErrorAction Stop
+      Add-DistributionGroupMember -Identity $groupEmail -Member $email -BypassSecurityGroupManagerCheck -ErrorAction Stop
       $added++
     } catch {
       $errors += "Fejl for $($email): $($_.Exception.Message)"
     }
   }
-  foreach ($email in @(${removePs || '""'})) {
+  foreach ($email in $removeUsers) {
     if (-not $email) { continue }
     try {
-      Remove-DistributionGroupMember -Identity "${groupEmail}" -Member $email -BypassSecurityGroupManagerCheck -Confirm:$false -ErrorAction Stop
+      Remove-DistributionGroupMember -Identity $groupEmail -Member $email -BypassSecurityGroupManagerCheck -Confirm:$false -ErrorAction Stop
       $removed++
     } catch {
       $errors += "Fejl for $($email): $($_.Exception.Message)"
@@ -438,9 +439,11 @@ try {
   }
   Disconnect-ExchangeOnline -Confirm:$false
   Write-Output "RESULT:added=$added,removed=$removed,errors=$($errors -join '|')"
-} catch {
-  Write-Output "FATAL:$($_.Exception.Message)"
-}`.trim();
+} -ArgumentList "${APP_ID}", "C:\\Program Files\\ITSupportAgent\\herrup-exo.pfx", "Herrup2026!", "${ORG}", "${groupEmail}", @(${addPs || '""'}), @(${removePs || '""'})
+Wait-Job $job -Timeout 60 | Out-Null
+$out = Receive-Job $job
+Remove-Job $job -Force
+Write-Output $out`.trim();
 
   const data = await runPs(script);
   const output = (data.output || "").trim();
