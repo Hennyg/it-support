@@ -65,10 +65,11 @@
     .filter-checks { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 2px; }
     .filter-check { display: flex; align-items: center; gap: 5px; font-size: .78rem; color: #374151; cursor: pointer; user-select: none; }
     .filter-check input[type=checkbox] { accent-color: #850c18; width: 13px; height: 13px; cursor: pointer; }
+    .btn-refresh { padding: 4px 10px; background: #fff; border: 1px solid #d1d5db; border-radius: 6px; font-size: .75rem; cursor: pointer; color: #374151; white-space: nowrap; font-weight: 600; }
+    .btn-refresh:hover { background: #f3f4f6; }
     .async-info { display: none; font-size: .82rem; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 14px; margin: 12px 20px; }
     .async-info.visible { display: flex; align-items: center; gap: 10px; }
-    .btn-refresh { padding: 4px 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; font-size: .78rem; cursor: pointer; color: #374151; white-space: nowrap; margin-left: auto; flex-shrink: 0; }
-    .btn-refresh:hover { background: #f3f4f6; }
+    .async-info .btn-refresh { margin-left: auto; flex-shrink: 0; }
     .editor-footer { padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .changes-info { font-size: .85rem; color: #6b7280; }
     .changes-info strong { color: #111827; }
@@ -144,7 +145,7 @@
           </div>
         </div>
         <div class="async-info" id="asyncInfo">
-          ⏳ Ændringer til denne gruppetype behandles i baggrunden og kan tage op til 30 sekunder.
+          ⏳ Ændringer er sendt — tjek om de er trådt i kraft.
           <button class="btn-refresh" onclick="refreshMembers()">↻ Opdater medlemmer</button>
         </div>
         <div class="editor-footer">
@@ -160,11 +161,16 @@
 </div>
 <div class="toast" id="toast"></div>
 <script>
-const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
+const AGENT = "http://localhost:5199";
+const APP_ID    = "368f6374-a1c8-4091-b92d-b0c517a851fe";
+const CERT_THUMB = "67F955D36ADCE50A407505F2C09785C4EC50EECE";
+const ORG       = "lcherrup.dk";
+
 const CATEGORIES = [
   { id: "portal", label: "Portal", icon: "🔐", prefix: "portal_" },
   { id: "alle",   label: "Alle",   icon: "👥", prefix: "Alle" },
 ];
+
 let allGroups = [], allUsers = [], currentGroup = null, activeCategory = null;
 let workingMembers = [], originalMembers = [];
 let selectedMembers = new Set(), selectedUsers = new Set();
@@ -250,11 +256,8 @@ async function selectGroup(group) {
   document.getElementById("editorTileTitle").textContent = `Medlemmer — ${group.displayName}`;
   editorTile.querySelector(".tile-body").style.display = "";
   editorTile.querySelector(".tile-chevron").classList.add("open");
-
-  // Skjul async-info og vis/skjul opdater-knap baseret på gruppetype
   document.getElementById("asyncInfo").classList.remove("visible");
   document.getElementById("refreshBtn").style.display = isMailGroup(group) ? "" : "none";
-
   setTimeout(() => editorTile.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   renderStamdata(group);
   await loadMembers(group);
@@ -374,35 +377,144 @@ function updateFooter() {
   const toAdd = workingMembers.filter(m => !origIds.has(m.id));
   const toRem = originalMembers.filter(m => !workIds.has(m.id));
   const info = document.getElementById("changesInfo");
-  if (toAdd.length === 0 && toRem.length === 0) { info.innerHTML = "Ingen ændringer"; document.getElementById("saveBtn").disabled = true; }
-  else { const parts = []; if (toAdd.length > 0) parts.push(`<strong>+${toAdd.length}</strong> tilføjes`); if (toRem.length > 0) parts.push(`<strong>-${toRem.length}</strong> fjernes`); info.innerHTML = parts.join(" · "); document.getElementById("saveBtn").disabled = false; }
+  if (toAdd.length === 0 && toRem.length === 0) {
+    info.innerHTML = "Ingen ændringer";
+    document.getElementById("saveBtn").disabled = true;
+  } else {
+    const parts = [];
+    if (toAdd.length > 0) parts.push(`<strong>+${toAdd.length}</strong> tilføjes`);
+    if (toRem.length > 0) parts.push(`<strong>-${toRem.length}</strong> fjernes`);
+    info.innerHTML = parts.join(" · ");
+    document.getElementById("saveBtn").disabled = false;
+  }
 }
 
-function cancelChanges() { workingMembers = [...originalMembers]; selectedMembers.clear(); selectedUsers.clear(); document.getElementById("selectAll").checked = false; document.getElementById("asyncInfo").classList.remove("visible"); renderMembers(); renderUsers(); updateFooter(); }
+function cancelChanges() {
+  workingMembers = [...originalMembers];
+  selectedMembers.clear(); selectedUsers.clear();
+  document.getElementById("selectAll").checked = false;
+  document.getElementById("asyncInfo").classList.remove("visible");
+  renderMembers(); renderUsers(); updateFooter();
+}
 
+// ── EXO via agent ──────────────────────────────────────────────
+async function runPs(script) {
+  const res = await fetch(`${AGENT}/api/run-ps`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ script })
+  });
+  if (!res.ok) throw new Error(`Agent svarede ${res.status}`);
+  return await res.json();
+}
+
+async function saveViaAgent(groupEmail, addEmails, removeEmails) {
+  const addPs    = addEmails.map(e => `"${e}"`).join(",");
+  const removePs = removeEmails.map(e => `"${e}"`).join(",");
+
+  const script = `
+$ErrorActionPreference = 'Stop'
+try {
+  Connect-ExchangeOnline -AppId "${APP_ID}" -CertificateThumbprint "${CERT_THUMB}" -Organization "${ORG}" -ShowBanner:$false
+  $added = 0; $removed = 0; $errors = @()
+  foreach ($email in @(${addPs || '""'})) {
+    if (-not $email) { continue }
+    try {
+      Add-DistributionGroupMember -Identity "${groupEmail}" -Member $email -BypassSecurityGroupManagerCheck -ErrorAction Stop
+      $added++
+    } catch {
+      $errors += "Fejl for $($email): $($_.Exception.Message)"
+    }
+  }
+  foreach ($email in @(${removePs || '""'})) {
+    if (-not $email) { continue }
+    try {
+      Remove-DistributionGroupMember -Identity "${groupEmail}" -Member $email -BypassSecurityGroupManagerCheck -Confirm:$false -ErrorAction Stop
+      $removed++
+    } catch {
+      $errors += "Fejl for $($email): $($_.Exception.Message)"
+    }
+  }
+  Disconnect-ExchangeOnline -Confirm:$false
+  Write-Output "RESULT:added=$added,removed=$removed,errors=$($errors -join '|')"
+} catch {
+  Write-Output "FATAL:$($_.Exception.Message)"
+}`.trim();
+
+  const data = await runPs(script);
+  const output = (data.output || "").trim();
+
+  if (output.includes("FATAL:")) throw new Error(output.replace(/.*FATAL:/, "").trim());
+
+  const resultLine = output.split("\n").find(l => l.startsWith("RESULT:"));
+  if (!resultLine) throw new Error("Intet resultat fra agent: " + output);
+
+  const parts   = resultLine.replace("RESULT:", "").split(",");
+  const added   = parseInt(parts.find(p => p.startsWith("added="))?.split("=")[1]   || "0");
+  const removed = parseInt(parts.find(p => p.startsWith("removed="))?.split("=")[1] || "0");
+  const errStr  = parts.find(p => p.startsWith("errors="))?.split("=").slice(1).join("=") || "";
+  const errors  = errStr ? errStr.split("|").filter(Boolean) : [];
+  return { added, removed, errors };
+}
+
+// ── Graph (normale grupper) ────────────────────────────────────
+async function saveViaGraph(groupId, toAdd, toRem) {
+  const res = await fetch("/api/updateGroupMembers", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ groupId, add: toAdd, remove: toRem })
+  });
+  return await res.json();
+}
+
+// ── Gem ───────────────────────────────────────────────────────
 async function saveChanges() {
   const origIds = new Set(originalMembers.map(m => m.id));
   const workIds = new Set(workingMembers.map(m => m.id));
-  const toAdd = workingMembers.filter(m => !origIds.has(m.id)).map(m => m.id);
-  const toRem = originalMembers.filter(m => !workIds.has(m.id)).map(m => m.id);
+  const toAdd = workingMembers.filter(m => !origIds.has(m.id));
+  const toRem = originalMembers.filter(m => !workIds.has(m.id));
   if (toAdd.length === 0 && toRem.length === 0) return;
+
   const btn = document.getElementById("saveBtn");
   btn.disabled = true; btn.textContent = "Gemmer...";
-  try {
-    const res = await fetch("/api/updateGroupMembers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ groupId: currentGroup.id, add: toAdd, remove: toRem }) });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Ukendt fejl");
-    originalMembers = [...workingMembers];
-    updateMemberCount(currentGroup.id, originalMembers.length);
-    updateFooter();
-    showToast("Ændringer gemt ✓", "ok");
 
-    // Vis forsinkelse-info for mail-enabled grupper
+  try {
     if (isMailGroup(currentGroup)) {
-      document.getElementById("asyncInfo").classList.add("visible");
+      // Mail-enabled gruppe → agent
+      const groupEmail  = currentGroup.mail;
+      const addEmails   = toAdd.map(u => u.mail || u.userPrincipalName).filter(Boolean);
+      const removeEmails = toRem.map(u => u.mail || u.userPrincipalName).filter(Boolean);
+      const result = await saveViaAgent(groupEmail, addEmails, removeEmails);
+
+      if (result.errors.length > 0) {
+        showToast("Delvist gennemført — se konsol", "err");
+        console.warn("EXO fejl:", result.errors);
+      } else {
+        showToast(`Gemt ✓ (+${result.added} / -${result.removed})`, "ok");
+      }
+      originalMembers = [...workingMembers];
+      updateMemberCount(currentGroup.id, originalMembers.length);
+      updateFooter();
+
+    } else {
+      // Normal gruppe → Graph via Azure Function
+      const data = await saveViaGraph(
+        currentGroup.id,
+        toAdd.map(m => m.id),
+        toRem.map(m => m.id)
+      );
+      if (data.error) throw new Error(data.error);
+      originalMembers = [...workingMembers];
+      updateMemberCount(currentGroup.id, originalMembers.length);
+      updateFooter();
+      showToast("Ændringer gemt ✓", "ok");
     }
-  } catch (err) { showToast("Fejl: " + err.message, "err"); }
-  finally { btn.textContent = "Gem ændringer"; btn.disabled = false; }
+  } catch (err) {
+    showToast("Fejl: " + err.message, "err");
+  } finally {
+    btn.textContent = "Gem ændringer";
+    btn.disabled = false;
+  }
 }
 
 function initials(name) { if (!name) return "?"; const parts = name.trim().split(" "); return parts.length >= 2 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : name[0].toUpperCase(); }
