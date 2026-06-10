@@ -416,6 +416,7 @@ async function saveViaAgent(groupEmail, addEmails, removeEmails) {
 $ErrorActionPreference = 'Stop'
 try {
   Connect-ExchangeOnline -AppId "${APP_ID}" -CertificateThumbprint "${CERT_THUMB}" -Organization "${ORG}" -ShowBanner:$false
+  Import-Module ExchangeOnlineManagement -Force -ErrorAction SilentlyContinue
   $added = 0; $removed = 0; $errors = @()
   foreach ($email in @(${addPs || '""'})) {
     if (-not $email) { continue }
@@ -446,7 +447,7 @@ try {
 
   if (output.includes("FATAL:")) throw new Error(output.replace(/.*FATAL:/, "").trim());
 
-  const resultLine = output.split("\n").find(l => l.startsWith("RESULT:"));
+  const resultLine = output.split(/\r?\n/).find(l => l.trim().startsWith("RESULT:"));
   if (!resultLine) throw new Error("Intet resultat fra agent: " + output);
 
   const parts   = resultLine.replace("RESULT:", "").split(",");
