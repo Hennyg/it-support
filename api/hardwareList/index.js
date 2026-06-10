@@ -42,14 +42,4 @@ const clientSecret = process.env.AZURE_CLIENT_SECRET;
   } catch (err) {
     context.res = jsonResponse(500, { ok: false, error: err.message });
   }
-
-  const dataverseUrl = process.env.DV_URL;
-console.log("DV_URL:", dataverseUrl);
-console.log("CLIENT_ID:", process.env.AZURE_CLIENT_ID ? "sat" : "MANGLER");
-console.log("CLIENT_SECRET:", process.env.AZURE_CLIENT_SECRET ? "sat" : "MANGLER");
-console.log("TENANT_ID:", process.env.TENANT_ID ? "sat" : "MANGLER");
-
-const tokenRes = await fetch(...);
-const tokenData = await tokenRes.json();
-console.log("Token response:", JSON.stringify(tokenData));
 };
