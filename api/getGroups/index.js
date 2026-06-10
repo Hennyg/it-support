@@ -11,7 +11,7 @@ module.exports = async function (context, req) {
 
     const data = await graphGet(
       token,
-      `/groups?$filter=${filter}&$select=id,displayName,mail,description,createdDateTime&$top=999`
+      `/groups?$filter=${filter}&$select=id,displayName,mail,description,createdDateTime,mailEnabled,groupTypes,securityEnabled&$top=999`
     );
 
     const groups = (data.value ?? [])
@@ -20,7 +20,10 @@ module.exports = async function (context, req) {
         displayName:     g.displayName,
         mail:            g.mail,
         description:     g.description,
-        createdDateTime: g.createdDateTime
+        createdDateTime: g.createdDateTime,
+        mailEnabled:     g.mailEnabled,
+        groupTypes:      g.groupTypes,
+        securityEnabled: g.securityEnabled
       }))
       .sort((a, b) => a.displayName?.localeCompare(b.displayName, "da"));
 
