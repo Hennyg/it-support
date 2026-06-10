@@ -1,27 +1,6 @@
 // api/updateGroupMembers/index.js
 const { getGraphToken, graphPost, graphDelete, jsonResponse } = require("../shared/graph");
 
-async function getExoToken() {
-  const tenantId     = process.env.TENANT_ID;
-  const clientId     = process.env.CLIENT_ID;
-  const clientSecret = process.env.CLIENT_SECRET;
-  if (!tenantId || !clientId || !clientSecret) throw new Error("Mangler TENANT_ID, CLIENT_ID eller CLIENT_SECRET");
-
-  const body = new URLSearchParams();
-  body.set("client_id",     clientId);
-  body.set("client_secret", clientSecret);
-  body.set("scope",         "https://outlook.office365.com/.default");
-  body.set("grant_type",    "client_credentials");
-
-  const r = await fetch(
-    `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
-    { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body.toString() }
-  );
-  const data = await r.json();
-  if (!r.ok || !data.access_token) throw new Error(`EXO token fejl: ${JSON.stringify(data)}`);
-  return data.access_token;
-}
-
 async function getGroupInfo(token, groupId) {
   const r = await fetch(
     `https://graph.microsoft.com/v1.0/groups/${encodeURIComponent(groupId)}?$select=mail,mailEnabled,groupTypes,securityEnabled`,
@@ -41,39 +20,25 @@ async function getUserEmail(token, userId) {
   return email;
 }
 
-// Kalder EXO InvokeCommand — svarer til at køre en EXO PowerShell cmdlet via REST
-// X-AnchorMailbox skal pege på en mailboks i samme geo som gruppen — vi bruger groupEmail
-async function exoInvokeCommand(exoToken, tenantId, cmdletName, parameters, anchorMailbox) {
-  const r = await fetch(
-    `https://outlook.office365.com/adminapi/beta/${encodeURIComponent(tenantId)}/InvokeCommand`,
-    {
-      method: "POST",
-      headers: {
-        Authorization:        `Bearer ${exoToken}`,
-        "Content-Type":       "application/json",
-        "Accept":             "application/json",
-        "X-CmdletName":       cmdletName,
-        "X-ResponseFormat":   "json",
-        "X-ClientApplication":"ExoManagementModule",
-        "X-AnchorMailbox":    `SMTP:${anchorMailbox}`
-      },
-      body: JSON.stringify({
-        CmdletInput: {
-          CmdletName: cmdletName,
-          Parameters: parameters
-        }
-      })
-    }
-  );
+async function callAutomationWebhook(groupEmail, addEmails, removeEmails) {
+  const webhookUrl = process.env.EXO_WEBHOOK_URL;
+  if (!webhookUrl) throw new Error("EXO_WEBHOOK_URL er ikke konfigureret");
 
-  const txt = await r.text();
-  if (!r.ok) throw new Error(`EXO ${cmdletName} fejl ${r.status}: ${txt}`);
+  const r = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      groupEmail,
+      addUsers:    addEmails,
+      removeUsers: removeEmails
+    })
+  });
 
-  try {
-    return JSON.parse(txt);
-  } catch {
-    return { raw: txt };
-  }
+  if (!r.ok) throw new Error(`Webhook fejl ${r.status}: ${await r.text()}`);
+
+  // Azure Automation webhook returnerer 202 og kører asynkront
+  // Vi returnerer OK — jobbet kører i baggrunden
+  return true;
 }
 
 module.exports = async function (context, req) {
@@ -101,37 +66,37 @@ module.exports = async function (context, req) {
     if (isMailGroup) {
       const groupEmail = groupInfo.mail;
       if (!groupEmail) {
-        context.res = jsonResponse(400, { error: "Gruppen har ingen e-mailadresse — kan ikke opdatere via EXO." });
+        context.res = jsonResponse(400, { error: "Gruppen har ingen e-mailadresse." });
         return;
       }
 
-      const tenantId = process.env.TENANT_ID;
-      const exoToken = await getExoToken();
+      // Slå alle bruger-emails op parallelt
+      const addEmails    = [];
+      const removeEmails = [];
 
       for (const userId of add) {
         try {
-          const userEmail = await getUserEmail(token, userId);
-          await exoInvokeCommand(exoToken, tenantId, "Add-DistributionGroupMember", {
-            Identity: groupEmail,
-            Member:   userEmail
-          }, groupEmail);
-          added++;
+          addEmails.push(await getUserEmail(token, userId));
         } catch (err) {
-          errors.push(`Tilføj fejl for ${userId}: ${err.message}`);
+          errors.push(`Email-opslag fejl for ${userId}: ${err.message}`);
         }
       }
 
       for (const userId of remove) {
         try {
-          const userEmail = await getUserEmail(token, userId);
-          await exoInvokeCommand(exoToken, tenantId, "Remove-DistributionGroupMember", {
-            Identity: groupEmail,
-            Member:   userEmail,
-            Confirm:  false
-          }, groupEmail);
-          removed++;
+          removeEmails.push(await getUserEmail(token, userId));
         } catch (err) {
-          errors.push(`Fjern fejl for ${userId}: ${err.message}`);
+          errors.push(`Email-opslag fejl for ${userId}: ${err.message}`);
+        }
+      }
+
+      if (addEmails.length > 0 || removeEmails.length > 0) {
+        try {
+          await callAutomationWebhook(groupEmail, addEmails, removeEmails);
+          added   = addEmails.length;
+          removed = removeEmails.length;
+        } catch (err) {
+          errors.push(`Webhook fejl: ${err.message}`);
         }
       }
 
