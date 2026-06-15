@@ -63,6 +63,8 @@
     .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .75rem; font-weight: 600; }
     .badge.error   { background: #fef2f2; color: #991b1b; }
     .badge.warning { background: #fffbeb; color: #92400e; }
+    .badge.slow    { background: #fff7ed; color: #c2410c; }
+    .badge.ok      { background: #f0fdf4; color: #166534; }
 
     /* Software søgning */
     .search-box { width: 100%; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: .9rem; margin-bottom: 12px; outline: none; }
@@ -86,6 +88,55 @@
     .copy-btn { padding: 10px 20px; background: #850c18; color: #fff; border: none; border-radius: 10px; font-size: .9rem; font-weight: 600; cursor: pointer; }
     .copy-btn:hover { background: #6b0913; }
     code.install-cmd { display: block; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; font-size: .85rem; text-align: left; margin: 12px 0; color: #1e293b; }
+
+    /* ── Startup tab ── */
+    .startup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 700px) { .startup-grid { grid-template-columns: 1fr; } }
+
+    /* Tidslinje */
+    .timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+    .timeline::before { content: ""; position: absolute; left: 18px; top: 0; bottom: 0; width: 2px; background: #e5e7eb; }
+    .tl-item { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; position: relative; }
+    .tl-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; flex-shrink: 0; margin-top: 3px; z-index: 1; margin-left: 13px; }
+    .tl-dot.green { background: #22c55e; box-shadow: 0 0 0 3px #dcfce7; }
+    .tl-dot.blue  { background: #3b82f6; box-shadow: 0 0 0 3px #dbeafe; }
+    .tl-dot.amber { background: #f59e0b; box-shadow: 0 0 0 3px #fef3c7; }
+    .tl-dot.red   { background: #ef4444; box-shadow: 0 0 0 3px #fee2e2; }
+    .tl-content { flex: 1; }
+    .tl-label { font-size: .85rem; font-weight: 600; color: #111827; }
+    .tl-time  { font-size: .78rem; color: #6b7280; }
+    .tl-delta { font-size: .78rem; font-weight: 600; }
+    .tl-delta.fast { color: #16a34a; }
+    .tl-delta.slow { color: #d97706; }
+    .tl-delta.very-slow { color: #dc2626; }
+
+    /* Startup programmer tabel */
+    .startup-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+    .startup-table th { background: #f8fafc; padding: 8px 12px; text-align: left; font-weight: 600; color: #374151; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+    .startup-table td { padding: 8px 12px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+    .startup-table tr:hover td { background: #fafafa; }
+    .startup-table tr.highlight td { background: #fff7ed; }
+    .impact-bar { height: 6px; border-radius: 3px; min-width: 4px; }
+    .impact-bar.high   { background: #ef4444; }
+    .impact-bar.medium { background: #f59e0b; }
+    .impact-bar.low    { background: #22c55e; }
+
+    /* Forklarings-boks */
+    .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 12px 16px; font-size: .82rem; color: #1e40af; margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start; }
+    .info-box-icon { font-size: 1.1rem; flex-shrink: 0; }
+
+    /* Spinner */
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #850c18; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-msg { color: #6b7280; font-size: .88rem; padding: 20px 0; }
+
+    /* AI analyse */
+    .ai-box { background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 16px 20px; margin-top: 16px; }
+    .ai-box-title { font-size: .85rem; font-weight: 700; color: #7c3aed; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+    .ai-box-body { font-size: .88rem; color: #374151; line-height: 1.6; white-space: pre-wrap; }
+    .btn-ai { padding: 8px 18px; background: #7c3aed; color: #fff; border: none; border-radius: 10px; font-size: .85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+    .btn-ai:hover { background: #6d28d9; }
+    .btn-ai:disabled { opacity: .5; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -118,6 +169,7 @@
         <div class="tab active" onclick="showTab('hardware')">🖥️ Hardware</div>
         <div class="tab" onclick="showTab('software')">📦 Software</div>
         <div class="tab" onclick="showTab('eventlog')">⚠️ Event Log</div>
+        <div class="tab" onclick="showTab('startup')">🚀 Opstartstid</div>
       </div>
 
       <!-- ── HARDWARE TAB ── -->
@@ -166,6 +218,105 @@
         </div>
       </div>
 
+      <!-- ── STARTUP TAB ── -->
+      <div id="tab-startup" style="display:none;">
+        <div class="info-box">
+          <div class="info-box-icon">ℹ️</div>
+          <div>Data hentes fra Windows event log (ID 100 i <em>Microsoft-Windows-Diagnostics-Performance</em>) og registreringsdatabasen. Analyserer seneste opstart og alle autostart-programmer.</div>
+        </div>
+
+        <div id="startupLoading" class="loading-msg">
+          <span class="spinner"></span>Henter opstartsdata...
+        </div>
+
+        <div id="startupContent" style="display:none;">
+
+          <!-- Øverst: sammenfatnings-kort -->
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <div class="card-icon">⏱️</div>
+              <div class="card-title" id="startupSummaryTitle">Seneste opstart</div>
+            </div>
+            <div class="card-body">
+              <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:12px;" id="startupMetrics">
+                <!-- udfyldes af JS -->
+              </div>
+            </div>
+          </div>
+
+          <div class="startup-grid">
+
+            <!-- Tidslinje -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-icon">📅</div>
+                <div class="card-title">Boot-tidslinje</div>
+              </div>
+              <div class="card-body">
+                <ul class="timeline" id="startupTimeline"></ul>
+              </div>
+            </div>
+
+            <!-- Autostart programmer -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-icon">📋</div>
+                <div class="card-title">Autostart-programmer</div>
+              </div>
+              <div class="card-body" style="padding:0;">
+                <div style="overflow-x:auto;">
+                  <table class="startup-table">
+                    <thead>
+                      <tr>
+                        <th>Program</th>
+                        <th>Forsinkelse</th>
+                        <th>Belastning</th>
+                      </tr>
+                    </thead>
+                    <tbody id="startupPrograms"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Boot-events fra event log -->
+          <div class="card" style="margin-top:20px;">
+            <div class="card-header">
+              <div class="card-icon">🔍</div>
+              <div class="card-title">Seneste boot-events (Diagnostics-Performance)</div>
+            </div>
+            <div class="card-body" style="overflow-x:auto;">
+              <table class="event-table">
+                <thead>
+                  <tr>
+                    <th>Tidspunkt</th>
+                    <th>Hændelse</th>
+                    <th>Varighed</th>
+                    <th>Besked</th>
+                  </tr>
+                </thead>
+                <tbody id="startupEvents"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- AI analyse -->
+          <div class="ai-box" id="aiBox" style="display:none;">
+            <div class="ai-box-title">✨ AI-analyse</div>
+            <div class="ai-box-body" id="aiAnalysisText"></div>
+          </div>
+          <div style="margin-top:16px;">
+            <button class="btn-ai" id="btnAiAnalyse" onclick="runAiAnalysis()">
+              ✨ Analysér opstart med AI
+            </button>
+          </div>
+
+        </div><!-- /startupContent -->
+        <div id="startupError" style="display:none; color:#991b1b; font-size:.88rem; padding:12px 0;"></div>
+      </div><!-- /tab-startup -->
+
     </div><!-- /agentContent -->
   </div>
 </div>
@@ -174,6 +325,7 @@
 const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
 const AGENT = "http://localhost:5199";
 let allSoftware = [];
+let startupRawData = null; // gemmer rå data til AI-analyse
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
@@ -210,15 +362,16 @@ function setStatus(type, text) {
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 function showTab(name) {
-  ["hardware","software","eventlog"].forEach(t => {
+  ["hardware","software","eventlog","startup"].forEach(t => {
     document.getElementById(`tab-${t}`).style.display = t === name ? "" : "none";
   });
   document.querySelectorAll(".tab").forEach((el, i) => {
-    el.classList.toggle("active", ["hardware","software","eventlog"][i] === name);
+    el.classList.toggle("active", ["hardware","software","eventlog","startup"][i] === name);
   });
 
   if (name === "software" && allSoftware.length === 0) loadSoftware();
   if (name === "eventlog" && document.getElementById("eventBody").childElementCount === 0) loadEventLog();
+  if (name === "startup" && startupRawData === null) loadStartup();
 }
 
 // ── Hardware ─────────────────────────────────────────────────────────────────
@@ -367,6 +520,393 @@ async function loadEventLog() {
       <td style="max-width:400px;word-break:break-word">${esc(e.message)}</td>
     </tr>
   `).join("");
+}
+
+// ── Startup ───────────────────────────────────────────────────────────────────
+async function loadStartup() {
+  const loadingEl = document.getElementById("startupLoading");
+  const contentEl = document.getElementById("startupContent");
+  const errorEl   = document.getElementById("startupError");
+
+  loadingEl.style.display = "";
+  contentEl.style.display = "none";
+  errorEl.style.display   = "none";
+
+  try {
+    const data = await runPs(PS_STARTUP);
+    const json = JSON.parse(data.output.trim());
+    startupRawData = json;
+    renderStartup(json);
+    loadingEl.style.display = "none";
+    contentEl.style.display = "";
+  } catch (e) {
+    loadingEl.style.display = "none";
+    errorEl.style.display = "";
+    errorEl.textContent = "Kunne ikke hente opstartsdata: " + e.message;
+  }
+}
+
+// PowerShell-script der returnerer JSON med opstartsdata
+const PS_STARTUP = `
+$ErrorActionPreference = 'SilentlyContinue'
+$result = @{}
+
+# ── 1. Boot-performance events (Diagnostics-Performance, Event ID 100 = boot, 101 = app delay) ──
+$bootEvents = @()
+try {
+  $evts = Get-WinEvent -LogName 'Microsoft-Windows-Diagnostics-Performance/Operational' -MaxEvents 50 -ErrorAction Stop |
+    Where-Object { $_.Id -in @(100,101,102,103) }
+  foreach ($e in $evts) {
+    $xml = [xml]$e.ToXml()
+    $ns  = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
+    $ns.AddNamespace('ns','http://schemas.microsoft.com/win/2004/08/events/event')
+    $bootMs = $xml.SelectSingleNode('//ns:BootTime',$ns).'#text'
+    $appName = $xml.SelectSingleNode('//ns:AppName',$ns).'#text'
+    $bootEvents += @{
+      id       = $e.Id
+      time     = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
+      message  = $e.Message -replace '\s+',' '
+      bootMs   = if ($bootMs) { [int]$bootMs } else { 0 }
+      appName  = if ($appName) { $appName } else { '' }
+    }
+  }
+} catch {}
+$result.bootEvents = $bootEvents
+
+# ── 2. Systemstart-tidspunkt og varighed fra WMI ──
+try {
+  $os = Get-CimInstance Win32_OperatingSystem
+  $result.lastBoot = $os.LastBootUpTime.ToString('yyyy-MM-dd HH:mm:ss')
+  $result.bootDurationSec = [int](($os.LocalDateTime - $os.LastBootUpTime).TotalSeconds)
+} catch {
+  $result.lastBoot = ''
+  $result.bootDurationSec = 0
+}
+
+# ── 3. Autostart-programmer fra registreringsdatabasen ──
+$startupItems = @()
+$regPaths = @(
+  'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run',
+  'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce',
+  'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run',
+  'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce'
+)
+foreach ($path in $regPaths) {
+  if (Test-Path $path) {
+    $props = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
+    if ($props) {
+      $props.PSObject.Properties | Where-Object { $_.Name -notlike 'PS*' } | ForEach-Object {
+        $startupItems += @{ name = $_.Name; command = $_.Value; hive = $path -replace 'HK.M:\\','HKLM:' -replace 'HK.U:\\','HKCU:' }
+      }
+    }
+  }
+}
+$result.startupItems = $startupItems
+
+# ── 4. Startup-programmer fra Task Scheduler (logon-triggers) ──
+try {
+  $tasks = Get-ScheduledTask -ErrorAction Stop | Where-Object {
+    $_.Triggers | Where-Object { $_ -is [Microsoft.Management.Infrastructure.CimInstance] -and $_.CimClass.CimClassName -eq 'MSFT_TaskLogonTrigger' }
+  } | Select-Object -First 20
+  $result.scheduledStartup = @($tasks | ForEach-Object { @{ name = $_.TaskName; path = $_.TaskPath; state = $_.State.ToString() } })
+} catch {
+  $result.scheduledStartup = @()
+}
+
+# ── 5. Teams-specifik info ──
+$teamsInfo = @{}
+try {
+  $teamsProc = Get-Process -Name 'ms-teams','Teams' -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($teamsProc) {
+    $teamsInfo.running   = $true
+    $teamsInfo.pid       = $teamsProc.Id
+    $teamsInfo.startTime = $teamsProc.StartTime.ToString('yyyy-MM-dd HH:mm:ss')
+    $teamsInfo.workingSetMb = [math]::Round($teamsProc.WorkingSet64 / 1MB, 1)
+  } else {
+    $teamsInfo.running = $false
+  }
+} catch { $teamsInfo.running = $false }
+$result.teams = $teamsInfo
+
+# ── 6. Startup impact fra WMI (Windows 8+) ──
+$wmiStartup = @()
+try {
+  $items = Get-CimInstance -ClassName Win32_StartupCommand -ErrorAction Stop
+  foreach ($i in $items) {
+    $wmiStartup += @{ name = $i.Name; command = $i.Command; location = $i.Location; user = $i.User }
+  }
+} catch {}
+$result.wmiStartup = $wmiStartup
+
+$result | ConvertTo-Json -Depth 5 -Compress
+`.trim();
+
+function renderStartup(d) {
+  renderStartupMetrics(d);
+  renderStartupTimeline(d);
+  renderStartupPrograms(d);
+  renderStartupEvents(d);
+}
+
+function renderStartupMetrics(d) {
+  const el = document.getElementById("startupMetrics");
+  const bootSec = d.bootDurationSec || 0;
+  const bootMin = Math.floor(bootSec / 60);
+  const bootRemSec = bootSec % 60;
+  const bootLabel = bootMin > 0 ? `${bootMin} min ${bootRemSec} sek` : `${bootSec} sek`;
+  const bootClass = bootSec > 300 ? "crit" : bootSec > 120 ? "warn" : "ok";
+
+  // Teams start
+  let teamsStr = "—";
+  if (d.teams && d.teams.running && d.teams.startTime && d.lastBoot) {
+    try {
+      const boot = new Date(d.lastBoot.replace(" ","T"));
+      const teamsStart = new Date(d.teams.startTime.replace(" ","T"));
+      const diffSec = Math.round((teamsStart - boot) / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffS   = diffSec % 60;
+      teamsStr = diffMin > 0 ? `${diffMin} min ${diffS} sek efter boot` : `${diffSec} sek efter boot`;
+    } catch {}
+  } else if (d.teams && !d.teams.running) {
+    teamsStr = "Ikke kørende";
+  }
+
+  const startupCount = (d.startupItems || []).length + (d.wmiStartup || []).length;
+
+  el.innerHTML = `
+    <div style="text-align:center;padding:12px;">
+      <div style="font-size:1.8rem;font-weight:700;color:${bootClass==='crit'?'#dc2626':bootClass==='warn'?'#d97706':'#16a34a'}">${bootLabel}</div>
+      <div style="font-size:.8rem;color:#6b7280;margin-top:4px;">Boot-varighed</div>
+    </div>
+    <div style="text-align:center;padding:12px;border-left:1px solid #f3f4f6;">
+      <div style="font-size:1rem;font-weight:700;color:#111827">${esc(d.lastBoot || '—')}</div>
+      <div style="font-size:.8rem;color:#6b7280;margin-top:4px;">Seneste opstart</div>
+    </div>
+    <div style="text-align:center;padding:12px;border-left:1px solid #f3f4f6;">
+      <div style="font-size:1.5rem;font-weight:700;color:#111827">${startupCount}</div>
+      <div style="font-size:.8rem;color:#6b7280;margin-top:4px;">Autostart-programmer</div>
+    </div>
+    <div style="text-align:center;padding:12px;border-left:1px solid #f3f4f6;">
+      <div style="font-size:.95rem;font-weight:600;color:${d.teams&&d.teams.running?'#111827':'#9ca3af'}">${esc(teamsStr)}</div>
+      <div style="font-size:.8rem;color:#6b7280;margin-top:4px;">Teams opstartstid</div>
+    </div>
+  `;
+
+  // Opdater titel
+  document.getElementById("startupSummaryTitle").textContent =
+    `Seneste opstart — ${d.lastBoot || '?'}`;
+}
+
+function renderStartupTimeline(d) {
+  const ul = document.getElementById("startupTimeline");
+  const boot = d.lastBoot ? new Date(d.lastBoot.replace(" ","T")) : null;
+
+  const events100 = (d.bootEvents || []).filter(e => e.id === 100);
+  const bootMs = events100.length > 0 ? events100[0].bootMs : 0;
+
+  const phases = [
+    { label: "PC tændt / POST", delta: null, dot: "blue" },
+    { label: "Windows kernel starter", delta: null, dot: "blue" },
+    { label: "Windows klar (desktop)", delta: bootMs ? fmtMs(bootMs) : (d.bootDurationSec ? fmtSec(Math.round(d.bootDurationSec * 0.4)) : "—"), dot: bootMs > 30000 ? "amber" : "green", speed: bootMs > 60000 ? "very-slow" : bootMs > 30000 ? "slow" : "fast" },
+    { label: "Autostart-programmer kører", delta: d.bootDurationSec ? fmtSec(Math.round(d.bootDurationSec * 0.55)) : "—", dot: "amber", speed: "slow" },
+    { label: "PC fuldt klar", delta: d.bootDurationSec ? fmtSec(d.bootDurationSec) : "—", dot: d.bootDurationSec > 300 ? "red" : d.bootDurationSec > 120 ? "amber" : "green", speed: d.bootDurationSec > 300 ? "very-slow" : d.bootDurationSec > 120 ? "slow" : "fast" },
+  ];
+
+  if (d.teams && d.teams.running && d.teams.startTime && boot) {
+    try {
+      const ts = new Date(d.teams.startTime.replace(" ","T"));
+      const diffSec = Math.round((ts - boot) / 1000);
+      phases.push({ label: "Teams fuldt startet", delta: fmtSec(diffSec), dot: diffSec > 480 ? "red" : diffSec > 120 ? "amber" : "green", speed: diffSec > 480 ? "very-slow" : diffSec > 120 ? "slow" : "fast" });
+    } catch {}
+  }
+
+  ul.innerHTML = phases.map(p => `
+    <li class="tl-item">
+      <div class="tl-dot ${p.dot}"></div>
+      <div class="tl-content">
+        <div class="tl-label">${esc(p.label)}</div>
+        ${p.delta ? `<div class="tl-delta ${p.speed || ''}">${esc(p.delta)}</div>` : ''}
+      </div>
+    </li>
+  `).join("");
+}
+
+function renderStartupPrograms(d) {
+  const tbody = document.getElementById("startupPrograms");
+  // Kombiner reg-baserede og WMI startup-items
+  const items = [
+    ...(d.startupItems || []).map(i => ({ name: i.name, cmd: i.command, source: i.hive })),
+    ...(d.wmiStartup || []).map(i => ({ name: i.name, cmd: i.command, source: i.location })),
+  ];
+
+  // Fjern dubletter på navn
+  const seen = new Set();
+  const unique = items.filter(i => { const k = i.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+
+  // Sortér: Teams øverst, derefter alfabetisk
+  unique.sort((a, b) => {
+    const aT = /teams/i.test(a.name) ? 0 : 1;
+    const bT = /teams/i.test(b.name) ? 0 : 1;
+    return aT - bT || a.name.localeCompare(b.name);
+  });
+
+  if (unique.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" style="padding:16px;text-align:center;color:#9ca3af;">Ingen autostart-programmer fundet</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = unique.map(item => {
+    const isTeams = /teams/i.test(item.name);
+    const impact = isTeams ? "high" : guessImpact(item.cmd);
+    const impactLabel = { high: "Høj", medium: "Middel", low: "Lav" }[impact];
+    const barWidth = { high: "100%", medium: "55%", low: "25%" }[impact];
+    return `
+      <tr class="${isTeams ? 'highlight' : ''}">
+        <td>
+          <div style="font-weight:600;font-size:.83rem">${esc(item.name)}</div>
+          <div style="font-size:.72rem;color:#9ca3af;word-break:break-all">${esc((item.cmd||'').substring(0,80))}${(item.cmd||'').length>80?'…':''}</div>
+        </td>
+        <td style="white-space:nowrap">
+          <span class="badge ${impact === 'high' ? 'error' : impact === 'medium' ? 'warning' : 'ok'}">${impactLabel}</span>
+        </td>
+        <td style="min-width:60px">
+          <div class="impact-bar ${impact}" style="width:${barWidth}"></div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function guessImpact(cmd) {
+  if (!cmd) return "low";
+  const c = cmd.toLowerCase();
+  if (/teams|onedrive|outlook|dropbox|googledrive|zoom|webex|slack/i.test(c)) return "high";
+  if (/office|adobe|java|update|agent|antivir|defender|security/i.test(c)) return "medium";
+  return "low";
+}
+
+function renderStartupEvents(d) {
+  const tbody = document.getElementById("startupEvents");
+  const events = (d.bootEvents || []).slice(0, 20);
+
+  if (events.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="padding:16px;text-align:center;color:#9ca3af;">Ingen boot-events fundet</td></tr>`;
+    return;
+  }
+
+  const eventNames = {
+    100: "Boot afsluttet",
+    101: "App-forsinkelse",
+    102: "Tjeneste-forsinkelse",
+    103: "Driverinitialisering",
+  };
+
+  tbody.innerHTML = events.map(e => {
+    const name = eventNames[e.id] || `Event ${e.id}`;
+    const isSlow = e.bootMs > 30000;
+    const durStr = e.bootMs > 0 ? fmtMs(e.bootMs) : "—";
+    const appTag = e.appName ? ` <span style="font-size:.75rem;color:#6b7280">(${esc(e.appName)})</span>` : "";
+    return `
+      <tr>
+        <td style="white-space:nowrap">${esc(e.time)}</td>
+        <td>${esc(name)}${appTag}</td>
+        <td><span class="badge ${isSlow ? 'slow' : 'ok'}">${durStr}</span></td>
+        <td style="max-width:360px;word-break:break-word;font-size:.78rem">${esc((e.message||'').substring(0,200))}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+// ── AI analyse ───────────────────────────────────────────────────────────────
+async function runAiAnalysis() {
+  if (!startupRawData) return;
+  const btn = document.getElementById("btnAiAnalyse");
+  const box = document.getElementById("aiBox");
+  const txt = document.getElementById("aiAnalysisText");
+
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Analyserer...`;
+  box.style.display = "none";
+
+  try {
+    const summary = buildStartupSummaryForAI(startupRawData);
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        system: "Du er en erfaren IT-supporter. Du modtager opstartsdata fra en Windows-PC og skal give en kort, konkret analyse på dansk af hvorfor PC'en starter langsomt og hvad der kan gøres. Vær specifik og handlingsorienteret. Brug max 300 ord.",
+        messages: [{ role: "user", content: summary }]
+      })
+    });
+
+    const data = await response.json();
+    const answer = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+
+    txt.textContent = answer;
+    box.style.display = "";
+  } catch (e) {
+    txt.textContent = "Kunne ikke hente AI-analyse: " + e.message;
+    box.style.display = "";
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `✨ Analysér opstart med AI`;
+  }
+}
+
+function buildStartupSummaryForAI(d) {
+  const lines = [];
+  lines.push(`Boot-varighed: ${d.bootDurationSec} sekunder (${Math.round(d.bootDurationSec/60)} min)`);
+  lines.push(`Seneste opstart: ${d.lastBoot}`);
+
+  if (d.teams) {
+    lines.push(`Teams kørende: ${d.teams.running ? 'ja' : 'nej'}`);
+    if (d.teams.running && d.teams.startTime && d.lastBoot) {
+      try {
+        const diff = Math.round((new Date(d.teams.startTime.replace(" ","T")) - new Date(d.lastBoot.replace(" ","T"))) / 1000);
+        lines.push(`Teams startede ${diff} sekunder efter boot`);
+        if (d.teams.workingSetMb) lines.push(`Teams RAM-forbrug: ${d.teams.workingSetMb} MB`);
+      } catch {}
+    }
+  }
+
+  lines.push(`\nAutostart-programmer (${(d.startupItems||[]).length} fra registry, ${(d.wmiStartup||[]).length} fra WMI):`);
+  const allStart = [...(d.startupItems||[]), ...(d.wmiStartup||[])];
+  allStart.slice(0,15).forEach(i => lines.push(`  - ${i.name}: ${(i.command||'').substring(0,80)}`));
+
+  if ((d.bootEvents||[]).length > 0) {
+    lines.push(`\nBoot-events fra Diagnostics-Performance:`);
+    d.bootEvents.slice(0,5).forEach(e => lines.push(`  - ID ${e.id} @ ${e.time}: ${e.bootMs}ms${e.appName?' ('+e.appName+')':''}`));
+  }
+
+  return lines.join("\n");
+}
+
+// ── Hjælpefunktioner ─────────────────────────────────────────────────────────
+function fmtMs(ms) {
+  if (ms >= 60000) {
+    const m = Math.floor(ms/60000);
+    const s = Math.round((ms%60000)/1000);
+    return `${m} min ${s} sek`;
+  }
+  if (ms >= 1000) return `${(ms/1000).toFixed(1)} sek`;
+  return `${ms} ms`;
+}
+function fmtSec(s) {
+  if (s >= 60) { const m = Math.floor(s/60); return `${m} min ${s%60} sek`; }
+  return `${s} sek`;
+}
+
+async function runPs(script) {
+  const res = await fetch(`${AGENT}/api/run-ps`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ script })
+  });
+  if (!res.ok) throw new Error(`Agent svarede ${res.status}`);
+  return await res.json();
 }
 
 function esc(s) {
