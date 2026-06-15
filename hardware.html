@@ -551,46 +551,59 @@ const PS_STARTUP = `
 $ErrorActionPreference = 'SilentlyContinue'
 $result = @{}
 
-# ── 0. Hent seneste boot-tidspunkt først (bruges til filtrering) ──
+# ── 0. Hent PRÆCIST boot-tidspunkt fra System event ID 12 (kernel start) ──
+# Event ID 12 i System-loggen skrives af kernel ved hver rigtig opstart og
+# påvirkes IKKE af Fast Startup / hybrid sleep som Win32_OperatingSystem gør.
 $lastBootTime = $null
 try {
-  $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
-  $lastBootTime = $os.LastBootUpTime
-  $result.lastBoot = $lastBootTime.ToString('yyyy-MM-dd HH:mm:ss')
-  $result.bootDurationSec = [int](($os.LocalDateTime - $lastBootTime).TotalSeconds)
-} catch {
-  $result.lastBoot = ''
-  $result.bootDurationSec = 0
+  $kernelEvent = Get-WinEvent -LogName System -ErrorAction Stop |
+    Where-Object { $_.Id -eq 12 -and $_.ProviderName -eq 'Microsoft-Windows-Kernel-General' } |
+    Select-Object -First 1
+  if ($kernelEvent) {
+    $lastBootTime = $kernelEvent.TimeCreated
+  }
+} catch {}
+
+# Fallback til WMI hvis event ikke findes
+if (-not $lastBootTime) {
+  try {
+    $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+    $lastBootTime = $os.LastBootUpTime
+  } catch {}
 }
+
+$result.lastBoot = if ($lastBootTime) { $lastBootTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
 
 # ── 1. Boot-performance events — kun fra SENESTE boot ──
 $bootEvents = @()
+$bootDurationMs = 0
 try {
-  $evts = Get-WinEvent -LogName 'Microsoft-Windows-Diagnostics-Performance/Operational' -MaxEvents 200 -ErrorAction Stop |
-    Where-Object { $_.Id -in @(100,101,102,103) }
+  # Hent seneste Event 100 (boot afsluttet) for at finde boot-varighed og tidspunkt
+  $evt100 = Get-WinEvent -LogName 'Microsoft-Windows-Diagnostics-Performance/Operational' -ErrorAction Stop |
+    Where-Object { $_.Id -eq 100 } |
+    Select-Object -First 1
 
-  # Filtrer til kun events efter seneste boot (med 5 min buffer bagud)
-  if ($lastBootTime) {
-    $cutoff = $lastBootTime.AddMinutes(-5)
-    $evts = $evts | Where-Object { $_.TimeCreated -ge $cutoff }
+  if ($evt100) {
+    # Boot-varighed i ms ligger i Properties[0] for Event 100
+    try { $bootDurationMs = [int]$evt100.Properties[0].Value } catch {}
+    # Brug evt100's tidspunkt som reference for seneste boot hvis kernel-event manglede
+    if (-not $lastBootTime) { $lastBootTime = $evt100.TimeCreated }
   }
 
+  # Hent alle relevante events fra Diagnostics-Performance efter seneste boot
+  $cutoff = if ($lastBootTime) { $lastBootTime.AddMinutes(-2) } else { (Get-Date).AddHours(-24) }
+  $evts = Get-WinEvent -LogName 'Microsoft-Windows-Diagnostics-Performance/Operational' -MaxEvents 300 -ErrorAction Stop |
+    Where-Object { $_.Id -in @(100,101,102,103) -and $_.TimeCreated -ge $cutoff }
+
   foreach ($e in $evts) {
-    # Brug Properties-arrayet direkte — undgår namespace-problemer med XML
-    # Event 100 (Boot): Properties[0]=BootTime ms, Properties[3]=MainPathBootTime ms
-    # Event 101/102/103 (App/Service delay): Properties[0]=AppName, Properties[2]=Duration ms
     $bootMs  = 0
     $appName = ''
     try {
       if ($e.Id -eq 100) {
-        # BootTime ligger i Properties[0] (total boot i ms)
         $bootMs = [int]$e.Properties[0].Value
       } elseif ($e.Id -in @(101,102,103)) {
         $appName = [string]$e.Properties[0].Value
-        # Duration/delay i ms ligger i Properties[2]
-        if ($e.Properties.Count -ge 3) {
-          $bootMs = [int]$e.Properties[2].Value
-        }
+        if ($e.Properties.Count -ge 3) { $bootMs = [int]$e.Properties[2].Value }
       }
     } catch {}
 
@@ -604,6 +617,9 @@ try {
   }
 } catch {}
 $result.bootEvents = $bootEvents
+
+# Boot-varighed: brug ms fra Event 100, konverter til sekunder
+$result.bootDurationSec = if ($bootDurationMs -gt 0) { [int]($bootDurationMs / 1000) } else { 0 }
 
 # ── 2. Autostart-programmer fra registreringsdatabasen ──
 $startupItems = @()
