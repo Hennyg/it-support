@@ -315,6 +315,18 @@
 
         </div><!-- /startupContent -->
         <div id="startupError" style="display:none; color:#991b1b; font-size:.88rem; padding:12px 0;"></div>
+
+        <!-- Vises hvis logger ikke er installeret endnu -->
+        <div id="startupInstallBox" style="display:none;">
+          <div class="no-agent-box" style="border-color:#e9d5ff; background:#faf5ff;">
+            <h2 style="color:#7c3aed;">🚀 Startup-logger ikke installeret</h2>
+            <p style="color:#6b7280;">For at få præcise boot-data logget automatisk ved opstart skal startup-loggeren installeres. Den opretter en Windows Scheduled Task der kører ved hver opstart og gemmer data til <code>C:\ProgramData\ITSupportAgent\startup-log.json</code>.</p>
+            <p style="color:#6b7280;">Installationen tager ca. 10 sekunder og kræver ingen genstart.</p>
+            <button class="copy-btn" id="btnInstallLogger" onclick="installStartupLogger()" style="background:#7c3aed;">
+              ✨ Installer startup-logger nu
+            </button>
+          </div>
+        </div>
       </div><!-- /tab-startup -->
 
     </div><!-- /agentContent -->
@@ -523,26 +535,153 @@ async function loadEventLog() {
 }
 
 // ── Startup ───────────────────────────────────────────────────────────────────
+const LOG_FILE = 'C:\\ProgramData\\ITSupportAgent\\startup-log.json';
+
+// PS-script der kun læser den gemte log-fil
+const PS_READ_LOG = `
+$f = '${LOG_FILE.replace(/\\/g,'\\\\')}'
+if (Test-Path $f) {
+  Get-Content $f -Raw -Encoding UTF8
+} else {
+  '{"_notFound":true}'
+}
+`.trim();
+
+// PS-script der installerer startup-loggeren
+const PS_INSTALL = `
+$ErrorActionPreference = 'Stop'
+$logDir    = 'C:\\ProgramData\\ITSupportAgent'
+$logFile   = "$logDir\\startup-log.json"
+$scriptDir = 'C:\\Program Files\\ITSupportAgent'
+$logScript = "$scriptDir\\Write-StartupLog.ps1"
+$taskName  = 'ITSupportAgent-StartupLogger'
+
+New-Item -ItemType Directory -Force -Path $logDir    | Out-Null
+New-Item -ItemType Directory -Force -Path $scriptDir | Out-Null
+
+@'
+Start-Sleep -Seconds 90
+$ErrorActionPreference = 'SilentlyContinue'
+$logFile = 'C:\\ProgramData\\ITSupportAgent\\startup-log.json'
+$result  = @{}
+$lastBootTime = $null
+try {
+  $kernelEvent = Get-WinEvent -LogName System -ErrorAction Stop |
+    Where-Object { $\\_.Id -eq 12 -and $\\_.ProviderName -eq 'Microsoft-Windows-Kernel-General' } |
+    Select-Object -First 1
+  if ($kernelEvent) { $lastBootTime = $kernelEvent.TimeCreated }
+} catch {}
+if (-not $lastBootTime) { try { $lastBootTime = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime } catch {} }
+$result.lastBoot   = if ($lastBootTime) { $lastBootTime.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+$result.loggedAt   = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
+$bootDurationMs = 0
+$bootEvents = @()
+try {
+  $cutoff = if ($lastBootTime) { $lastBootTime.AddMinutes(-2) } else { (Get-Date).AddHours(-3) }
+  $evts = Get-WinEvent -LogName 'Microsoft-Windows-Diagnostics-Performance/Operational' -MaxEvents 300 -ErrorAction Stop |
+    Where-Object { $\\_.Id -in @(100,101,102,103) -and $\\_.TimeCreated -ge $cutoff }
+  foreach ($e in $evts) {
+    $bootMs = 0; $appName = ''
+    try {
+      if ($e.Id -eq 100) { $bootMs = [int]$e.Properties[0].Value; $bootDurationMs = $bootMs }
+      elseif ($e.Id -in @(101,102,103)) {
+        $appName = [string]$e.Properties[0].Value
+        if ($e.Properties.Count -ge 3) { $bootMs = [int]$e.Properties[2].Value }
+      }
+    } catch {}
+    $bootEvents += @{ id=$e.Id; time=$e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss'); message=($e.Message -replace '\\s+',' '); bootMs=$bootMs; appName=$appName }
+  }
+} catch {}
+$result.bootEvents      = $bootEvents
+$result.bootDurationSec = if ($bootDurationMs -gt 0) { [int]($bootDurationMs/1000) } else { 0 }
+$startupItems = @()
+foreach ($path in @('HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run','HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run')) {
+  if (Test-Path $path) {
+    $props = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
+    if ($props) { $props.PSObject.Properties | Where-Object { $\\_.Name -notlike 'PS*' } | ForEach-Object { $startupItems += @{ name=$\\_.Name; command=$\\_.Value; hive=$path } } }
+  }
+}
+$result.startupItems = $startupItems
+$wmiStartup = @()
+try { $items = Get-CimInstance -ClassName Win32_StartupCommand -ErrorAction Stop; foreach ($i in $items) { $wmiStartup += @{ name=$i.Name; command=$i.Command; location=$i.Location; user=$i.User } } } catch {}
+$result.wmiStartup = $wmiStartup
+$teamsInfo = @{ running=$false }
+try { $p = Get-Process -Name 'ms-teams','Teams' -ErrorAction SilentlyContinue | Select-Object -First 1; if ($p) { $teamsInfo = @{ running=$true; pid=$p.Id; startTime=$p.StartTime.ToString('yyyy-MM-dd HH:mm:ss'); workingSetMb=[math]::Round($p.WorkingSet64/1MB,1) } } } catch {}
+$result.teams = $teamsInfo
+$result | ConvertTo-Json -Depth 5 -Compress | Set-Content -Path $logFile -Encoding UTF8 -Force
+'@ | Set-Content -Path $logScript -Encoding UTF8 -Force
+
+$action    = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File \`"$logScript\`""
+$trigger   = New-ScheduledTaskTrigger -AtStartup
+$settings  = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -StartWhenAvailable -RunOnlyIfNetworkAvailable:\$false
+$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+Unregister-ScheduledTask -TaskName $taskName -Confirm:\$false -ErrorAction SilentlyContinue
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description 'IT Support Agent startup logger' | Out-Null
+Start-Job -ScriptBlock { & 'C:\\Program Files\\ITSupportAgent\\Write-StartupLog.ps1' } | Out-Null
+"OK"
+`.trim();
+
 async function loadStartup() {
   const loadingEl = document.getElementById("startupLoading");
   const contentEl = document.getElementById("startupContent");
   const errorEl   = document.getElementById("startupError");
+  const installEl = document.getElementById("startupInstallBox");
 
   loadingEl.style.display = "";
   contentEl.style.display = "none";
   errorEl.style.display   = "none";
+  installEl.style.display = "none";
 
   try {
-    const data = await runPs(PS_STARTUP);
-    const json = JSON.parse(data.output.trim());
-    startupRawData = json;
-    renderStartup(json);
+    // Forsøg at læse logfilen
+    const readData = await runPs(PS_READ_LOG);
+    const readJson = JSON.parse(readData.output.trim());
+
+    if (readJson._notFound) {
+      // Logger ikke installeret endnu
+      loadingEl.style.display = "none";
+      installEl.style.display = "";
+      return;
+    }
+
+    startupRawData = readJson;
+    renderStartup(readJson, true /* fromLog */);
     loadingEl.style.display = "none";
     contentEl.style.display = "";
+
   } catch (e) {
-    loadingEl.style.display = "none";
-    errorEl.style.display = "";
-    errorEl.textContent = "Kunne ikke hente opstartsdata: " + e.message;
+    // Fallback: kør live PS-script
+    try {
+      const data = await runPs(PS_STARTUP);
+      const json = JSON.parse(data.output.trim());
+      startupRawData = json;
+      renderStartup(json, false /* live */);
+      loadingEl.style.display = "none";
+      contentEl.style.display = "";
+    } catch (e2) {
+      loadingEl.style.display = "none";
+      errorEl.style.display = "";
+      errorEl.textContent = "Kunne ikke hente opstartsdata: " + e2.message;
+    }
+  }
+}
+
+async function installStartupLogger() {
+  const btn = document.getElementById("btnInstallLogger");
+  btn.disabled = true;
+  btn.textContent = "Installerer...";
+  try {
+    const data = await runPs(PS_INSTALL);
+    if ((data.output || "").includes("OK")) {
+      btn.textContent = "✅ Installeret — indlæser data...";
+      setTimeout(() => loadStartup(), 3000);
+    } else {
+      btn.textContent = "Fejl — prøv igen";
+      btn.disabled = false;
+    }
+  } catch {
+    btn.textContent = "Fejl — prøv igen";
+    btn.disabled = false;
   }
 }
 
@@ -679,14 +818,14 @@ $result.wmiStartup = $wmiStartup
 $result | ConvertTo-Json -Depth 5 -Compress
 `.trim();
 
-function renderStartup(d) {
-  renderStartupMetrics(d);
+function renderStartup(d, fromLog) {
+  renderStartupMetrics(d, fromLog);
   renderStartupTimeline(d);
   renderStartupPrograms(d);
   renderStartupEvents(d);
 }
 
-function renderStartupMetrics(d) {
+function renderStartupMetrics(d, fromLog) {
   const el = document.getElementById("startupMetrics");
   const bootSec = d.bootDurationSec || 0;
   const bootMin = Math.floor(bootSec / 60);
@@ -730,9 +869,12 @@ function renderStartupMetrics(d) {
     </div>
   `;
 
-  // Opdater titel
-  document.getElementById("startupSummaryTitle").textContent =
-    `Seneste opstart — ${d.lastBoot || '?'}`;
+  // Opdater titel med kilde-info
+  const sourceTag = fromLog
+    ? `<span style="font-size:.78rem;font-weight:400;color:#7c3aed;margin-left:8px;">📋 Logget ${d.loggedAt ? 'kl. ' + d.loggedAt.split(' ')[1] : ''}</span>`
+    : `<span style="font-size:.78rem;font-weight:400;color:#6b7280;margin-left:8px;">⚡ Live data</span>`;
+  document.getElementById("startupSummaryTitle").innerHTML =
+    `Seneste opstart — ${d.lastBoot || '?'}${sourceTag}`;
 }
 
 function renderStartupTimeline(d) {
