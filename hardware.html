@@ -551,39 +551,61 @@ const PS_STARTUP = `
 $ErrorActionPreference = 'SilentlyContinue'
 $result = @{}
 
-# ── 1. Boot-performance events (Diagnostics-Performance, Event ID 100 = boot, 101 = app delay) ──
-$bootEvents = @()
+# ── 0. Hent seneste boot-tidspunkt først (bruges til filtrering) ──
+$lastBootTime = $null
 try {
-  $evts = Get-WinEvent -LogName 'Microsoft-Windows-Diagnostics-Performance/Operational' -MaxEvents 50 -ErrorAction Stop |
-    Where-Object { $_.Id -in @(100,101,102,103) }
-  foreach ($e in $evts) {
-    $xml = [xml]$e.ToXml()
-    $ns  = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
-    $ns.AddNamespace('ns','http://schemas.microsoft.com/win/2004/08/events/event')
-    $bootMs = $xml.SelectSingleNode('//ns:BootTime',$ns).'#text'
-    $appName = $xml.SelectSingleNode('//ns:AppName',$ns).'#text'
-    $bootEvents += @{
-      id       = $e.Id
-      time     = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
-      message  = $e.Message -replace '\s+',' '
-      bootMs   = if ($bootMs) { [int]$bootMs } else { 0 }
-      appName  = if ($appName) { $appName } else { '' }
-    }
-  }
-} catch {}
-$result.bootEvents = $bootEvents
-
-# ── 2. Systemstart-tidspunkt og varighed fra WMI ──
-try {
-  $os = Get-CimInstance Win32_OperatingSystem
-  $result.lastBoot = $os.LastBootUpTime.ToString('yyyy-MM-dd HH:mm:ss')
-  $result.bootDurationSec = [int](($os.LocalDateTime - $os.LastBootUpTime).TotalSeconds)
+  $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+  $lastBootTime = $os.LastBootUpTime
+  $result.lastBoot = $lastBootTime.ToString('yyyy-MM-dd HH:mm:ss')
+  $result.bootDurationSec = [int](($os.LocalDateTime - $lastBootTime).TotalSeconds)
 } catch {
   $result.lastBoot = ''
   $result.bootDurationSec = 0
 }
 
-# ── 3. Autostart-programmer fra registreringsdatabasen ──
+# ── 1. Boot-performance events — kun fra SENESTE boot ──
+$bootEvents = @()
+try {
+  $evts = Get-WinEvent -LogName 'Microsoft-Windows-Diagnostics-Performance/Operational' -MaxEvents 200 -ErrorAction Stop |
+    Where-Object { $_.Id -in @(100,101,102,103) }
+
+  # Filtrer til kun events efter seneste boot (med 5 min buffer bagud)
+  if ($lastBootTime) {
+    $cutoff = $lastBootTime.AddMinutes(-5)
+    $evts = $evts | Where-Object { $_.TimeCreated -ge $cutoff }
+  }
+
+  foreach ($e in $evts) {
+    # Brug Properties-arrayet direkte — undgår namespace-problemer med XML
+    # Event 100 (Boot): Properties[0]=BootTime ms, Properties[3]=MainPathBootTime ms
+    # Event 101/102/103 (App/Service delay): Properties[0]=AppName, Properties[2]=Duration ms
+    $bootMs  = 0
+    $appName = ''
+    try {
+      if ($e.Id -eq 100) {
+        # BootTime ligger i Properties[0] (total boot i ms)
+        $bootMs = [int]$e.Properties[0].Value
+      } elseif ($e.Id -in @(101,102,103)) {
+        $appName = [string]$e.Properties[0].Value
+        # Duration/delay i ms ligger i Properties[2]
+        if ($e.Properties.Count -ge 3) {
+          $bootMs = [int]$e.Properties[2].Value
+        }
+      }
+    } catch {}
+
+    $bootEvents += @{
+      id       = $e.Id
+      time     = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
+      message  = $e.Message -replace '\s+',' '
+      bootMs   = $bootMs
+      appName  = $appName
+    }
+  }
+} catch {}
+$result.bootEvents = $bootEvents
+
+# ── 2. Autostart-programmer fra registreringsdatabasen ──
 $startupItems = @()
 $regPaths = @(
   'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run',
@@ -603,7 +625,7 @@ foreach ($path in $regPaths) {
 }
 $result.startupItems = $startupItems
 
-# ── 4. Startup-programmer fra Task Scheduler (logon-triggers) ──
+# ── 3. Startup-programmer fra Task Scheduler (logon-triggers) ──
 try {
   $tasks = Get-ScheduledTask -ErrorAction Stop | Where-Object {
     $_.Triggers | Where-Object { $_ -is [Microsoft.Management.Infrastructure.CimInstance] -and $_.CimClass.CimClassName -eq 'MSFT_TaskLogonTrigger' }
@@ -613,7 +635,7 @@ try {
   $result.scheduledStartup = @()
 }
 
-# ── 5. Teams-specifik info ──
+# ── 4. Teams-specifik info ──
 $teamsInfo = @{}
 try {
   $teamsProc = Get-Process -Name 'ms-teams','Teams' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -628,7 +650,7 @@ try {
 } catch { $teamsInfo.running = $false }
 $result.teams = $teamsInfo
 
-# ── 6. Startup impact fra WMI (Windows 8+) ──
+# ── 5. Startup impact fra WMI (Windows 8+) ──
 $wmiStartup = @()
 try {
   $items = Get-CimInstance -ClassName Win32_StartupCommand -ErrorAction Stop
