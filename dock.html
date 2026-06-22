@@ -470,29 +470,20 @@ function row(label, value, rawHtml) {
 }
 
 // Grafik-driver med download-link
-// Win32_VideoController er langt mere paaliidelig end Win32_PnPSignedDriver til GPU-detektion
-var PS_CHECK_DRIVERS = [
-  "$gpus = Get-WmiObject Win32_VideoController",
-  "foreach ($g in $gpus) {",
-  "  $dateStr = ''",
-  "  try { $dateStr = [Management.ManagementDateTimeConverter]::ToDateTime($g.DriverDate).ToString('dd-MM-yyyy') } catch {}",
-  "  Write-Output ('DRIVER|' + $g.Name + '|' + $g.AdapterCompatibility + '|' + $g.DriverVersion + '|' + $dateStr)",
-  "}"
-].join("\n");
-
-function getDriverDownloadLink(deviceName, provider) {
-  var n = String(deviceName || "").toLowerCase();
-  var p = String(provider   || "").toLowerCase();
-  if (p.indexOf("intel") !== -1 || n.indexOf("intel") !== -1) {
-    if (n.indexOf("arc") !== -1 || n.indexOf("iris xe") !== -1 || n.indexOf("iris(r) xe") !== -1)
-      return { url: "https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html", label: "Intel Arc / Iris Xe driver" };
-    if (n.indexOf("uhd") !== -1 || n.indexOf("hd graphics") !== -1)
-      return { url: "https://www.intel.com/content/www/us/en/download/19598/intel-graphics-driver-for-windows-10-11.html", label: "Intel UHD/HD Graphics driver" };
+// Henter GPU-data fra /api/hardware (samme endpoint som hardware.html — virker altid).
+// Viser kun den GPU der driver docken: Intel iGPU kører altid USB-C/Thunderbolt-udgangen.
+// Hvis ingen Intel-GPU findes (single-GPU PC), vises den eneste GPU.
+function getDriverDownloadLink(name) {
+  var n = String(name || "").toLowerCase();
+  if (n.indexOf("arc") !== -1 || n.indexOf("iris xe") !== -1 || n.indexOf("iris(r) xe") !== -1)
+    return { url: "https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html", label: "Intel Arc / Iris Xe driver" };
+  if (n.indexOf("intel") !== -1 && (n.indexOf("uhd") !== -1 || n.indexOf("hd graphics") !== -1))
+    return { url: "https://www.intel.com/content/www/us/en/download/19598/intel-graphics-driver-for-windows-10-11.html", label: "Intel UHD/HD Graphics driver" };
+  if (n.indexOf("intel") !== -1)
     return { url: "https://www.intel.com/content/www/us/en/support/detect.html", label: "Intel Driver Assistant" };
-  }
-  if (p.indexOf("nvidia") !== -1 || n.indexOf("geforce") !== -1 || n.indexOf("quadro") !== -1)
+  if (n.indexOf("nvidia") !== -1 || n.indexOf("geforce") !== -1 || n.indexOf("quadro") !== -1)
     return { url: "https://www.nvidia.com/Download/Find.aspx", label: "NVIDIA driver download" };
-  if (p.indexOf("advanced micro") !== -1 || p.indexOf("amd") !== -1 || n.indexOf("radeon") !== -1)
+  if (n.indexOf("amd") !== -1 || n.indexOf("radeon") !== -1)
     return { url: "https://www.amd.com/en/support/download/drivers.html", label: "AMD Radeon driver download" };
   return null;
 }
@@ -501,28 +492,52 @@ async function loadDriverStatus() {
   var el = document.getElementById("driverBody");
   el.innerHTML = '<div class="loading-ph"><div class="spinner"></div> Henter driver-info...</div>';
   try {
-    var res  = await fetch(AGENT + "/api/run-ps", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script: PS_CHECK_DRIVERS }) });
-    var data = await res.json();
-    var lines = (data.output || "").split("\n").filter(function(l) { return l.trim().startsWith("DRIVER|"); });
-    if (!lines.length) { el.innerHTML = '<p style="color:#6b7280;font-size:.9rem;margin:0">Ingen skærmdriver fundet.</p>'; return; }
+    var hw   = await fetch(AGENT + "/api/hardware").then(function(r) { return r.json(); });
+    var gpus = hw.gpus ?? [];
+
+    if (!gpus.length) {
+      el.innerHTML = '<p style="color:#6b7280;font-size:.9rem;margin:0">Ingen grafikkort fundet.</p>';
+      return;
+    }
+
+    // Filtrer til dock-GPU: Intel iGPU driver altid USB-C/Thunderbolt udgangen.
+    // Har PC'en kun ét GPU vises det uanset mærke.
+    var dockGpus = gpus.filter(function(g) {
+      return String(g.name || "").toLowerCase().indexOf("intel") !== -1;
+    });
+    if (!dockGpus.length) dockGpus = gpus; // enkelt-GPU PC: vis hvad der er
+
     var html = "";
-    lines.forEach(function(line) {
-      var p = line.split("|");
-      var name = p[1]||"-", provider = p[2]||"-", version = p[3]||"-", date = (p[4]||"-").trim();
-      var badgeCls = "warn", badgeLabel = esc(provider);
-      if (provider.indexOf("Intel") !== -1)   { badgeCls = "ok";   badgeLabel = "Intel"; }
-      else if (provider === "Microsoft")       { badgeCls = "warn"; badgeLabel = "Microsoft (generisk)"; }
-      else if (provider.indexOf("NVIDIA") !== -1)       { badgeCls = "ok"; badgeLabel = "NVIDIA"; }
-      else if (provider.indexOf("Advanced Micro") !== -1 || provider.indexOf("AMD") !== -1) { badgeCls = "ok"; badgeLabel = "AMD"; }
-      var link = getDriverDownloadLink(name, provider);
-      var linkHtml = link ? '<a class="driver-link" href="' + link.url + '" target="_blank">&#8681; ' + link.label + '</a>' : '';
+    dockGpus.forEach(function(gpu) {
+      var name    = gpu.name         || "-";
+      var version = gpu.driverVersion || "-";
+      var date    = gpu.driverDate    || "-";
+      var n       = name.toLowerCase();
+
+      var badgeCls = "ok", badgeLabel = "Intel";
+      if      (n.indexOf("nvidia") !== -1) { badgeLabel = "NVIDIA"; }
+      else if (n.indexOf("amd") !== -1 || n.indexOf("radeon") !== -1) { badgeLabel = "AMD"; }
+      else if (n.indexOf("microsoft") !== -1) { badgeCls = "warn"; badgeLabel = "Microsoft (generisk)"; }
+
+      var link     = getDriverDownloadLink(name);
+      var linkHtml = link
+        ? '<a class="driver-link" href="' + link.url + '" target="_blank">&#8681; ' + link.label + '</a>'
+        : '';
+
       html += '<div class="driver-item">' +
         '<div class="driver-name">' + esc(name) + '</div>' +
-        '<div class="driver-meta"><span class="badge ' + badgeCls + '">' + badgeLabel + '</span><span class="driver-version">v' + esc(version) + '</span><span class="driver-date">' + esc(date) + '</span>' + linkHtml + '</div>' +
+        '<div class="driver-meta">' +
+          '<span class="badge ' + badgeCls + '">' + badgeLabel + '</span>' +
+          '<span class="driver-version">v' + esc(version) + '</span>' +
+          '<span class="driver-date">' + esc(date) + '</span>' +
+          linkHtml +
+        '</div>' +
         '</div>';
     });
     el.innerHTML = html;
-  } catch (e) { el.innerHTML = '<p style="color:#991b1b;font-size:.9rem;margin:0">Fejl: ' + esc(e.message) + '</p>'; }
+  } catch (e) {
+    el.innerHTML = '<p style="color:#991b1b;font-size:.9rem;margin:0">Fejl: ' + esc(e.message) + '</p>';
+  }
 }
 
 // Guide — tiles uden numre
