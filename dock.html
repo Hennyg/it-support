@@ -475,12 +475,15 @@ function row(label, value, rawHtml) {
 // Hvis ingen Intel-GPU findes (single-GPU PC), vises den eneste GPU.
 function getDriverDownloadLink(name) {
   var n = String(name || "").toLowerCase();
+  // Intel Arc (A-serie) og Iris Xe Graphics (11. gen+)
   if (n.indexOf("arc") !== -1 || n.indexOf("iris xe") !== -1 || n.indexOf("iris(r) xe") !== -1)
     return { url: "https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html", label: "Intel Arc / Iris Xe driver" };
+  // Intel UHD / HD Graphics (6.-10. gen Core) — DCH driver
   if (n.indexOf("intel") !== -1 && (n.indexOf("uhd") !== -1 || n.indexOf("hd graphics") !== -1))
-    return { url: "https://www.intel.com/content/www/us/en/download/19598/intel-graphics-driver-for-windows-10-11.html", label: "Intel UHD/HD Graphics driver" };
+    return { url: "https://www.intel.com/content/www/us/en/download/776137/intel-7th-10th-gen-processor-graphics-windows.html", label: "Intel UHD/HD Graphics driver" };
+  // Generisk Intel: brug Driver & Support Assistant som auto-detekterer
   if (n.indexOf("intel") !== -1)
-    return { url: "https://www.intel.com/content/www/us/en/support/detect.html", label: "Intel Driver Assistant" };
+    return { url: "https://www.intel.com/content/www/us/en/support/detect.html", label: "Intel Driver Assistant (auto-detektion)" };
   if (n.indexOf("nvidia") !== -1 || n.indexOf("geforce") !== -1 || n.indexOf("quadro") !== -1)
     return { url: "https://www.nvidia.com/Download/Find.aspx", label: "NVIDIA driver download" };
   if (n.indexOf("amd") !== -1 || n.indexOf("radeon") !== -1)
