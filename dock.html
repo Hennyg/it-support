@@ -209,13 +209,24 @@
         </div>
       </div>
 
+      <!-- Trin 4 -->
+      <div class="step">
+        <div class="step-left"><div class="step-num">4</div></div>
+        <div class="step-body">
+          <div class="step-emoji">&#128256;</div>
+          <p class="step-title">Genstart computeren</p>
+          <p class="step-desc">Genstart computeren helt og tilslut docken igen bagefter.</p>
+          <p class="step-hint">En genstart nulstiller alle drivere og USB-controllere fra bunden.</p>
+        </div>
+      </div>
+
     </div><!-- /steps -->
 
     <div class="help-box">
       <div class="help-icon">&#128222;</div>
       <div class="help-text">
         <strong>Virker det stadig ikke?</strong><br>
-        Kontakt IT-support &#8212; vi kan hurtigt finde ud af hvad problemet er.
+        Kontakt IT-support p&#229; <strong>22 57 60 99</strong> &#8212; vi kan hurtigt finde ud af hvad problemet er.
       </div>
     </div>
 
@@ -475,20 +486,21 @@ function row(label, value, rawHtml) {
 // Hvis ingen Intel-GPU findes (single-GPU PC), vises den eneste GPU.
 function getDriverDownloadLink(name) {
   var n = String(name || "").toLowerCase();
-  // Intel Arc (A-serie) og Iris Xe Graphics (11. gen+)
   if (n.indexOf("arc") !== -1 || n.indexOf("iris xe") !== -1 || n.indexOf("iris(r) xe") !== -1)
-    return { url: "https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html", label: "Intel Arc / Iris Xe driver" };
-  // Intel UHD / HD Graphics (6.-10. gen Core) — DCH driver
-  if (n.indexOf("intel") !== -1 && (n.indexOf("uhd") !== -1 || n.indexOf("hd graphics") !== -1))
-    return { url: "https://www.intel.com/content/www/us/en/download/776137/intel-7th-10th-gen-processor-graphics-windows.html", label: "Intel UHD/HD Graphics driver" };
-  // Generisk Intel: brug Driver & Support Assistant som auto-detekterer
+    return { url: "https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html", label: "Intel Arc / Iris Xe driver", gen: "11. gen Intel Core+" };
   if (n.indexOf("intel") !== -1)
-    return { url: "https://www.intel.com/content/www/us/en/support/detect.html", label: "Intel Driver Assistant (auto-detektion)" };
-  if (n.indexOf("nvidia") !== -1 || n.indexOf("geforce") !== -1 || n.indexOf("quadro") !== -1)
-    return { url: "https://www.nvidia.com/Download/Find.aspx", label: "NVIDIA driver download" };
+    return { url: "https://www.intel.com/content/www/us/en/support/detect.html", label: "Intel Driver Assistant (auto-detektion)", gen: "Alle Intel generationer" };
+  if (n.indexOf("nvidia") !== -1 || n.indexOf("geforce") !== -1 || n.indexOf("quadro") !== -1 || n.indexOf("rtx") !== -1)
+    return { url: "https://www.nvidia.com/Download/Find.aspx", label: "NVIDIA driver download", gen: null };
   if (n.indexOf("amd") !== -1 || n.indexOf("radeon") !== -1)
-    return { url: "https://www.amd.com/en/support/download/drivers.html", label: "AMD Radeon driver download" };
+    return { url: "https://www.amd.com/en/support/download/drivers.html", label: "AMD Radeon driver download", gen: null };
   return null;
+}
+
+// Returnerer "31.0.101" fra "31.0.101.2137" — bruges til at matche Intel-sidens version
+function driverFamily(version) {
+  var parts = String(version || "").split(".");
+  return parts.length >= 3 ? parts.slice(0, 3).join(".") : version;
 }
 
 async function loadDriverStatus() {
@@ -523,17 +535,29 @@ async function loadDriverStatus() {
       else if (n.indexOf("microsoft") !== -1) { badgeCls = "warn"; badgeLabel = "Microsoft (generisk)"; }
 
       var link     = getDriverDownloadLink(name);
+      var family   = driverFamily(version); // fx "31.0.101" — matcher Intel-sidens version-prefix
+
+      var genHtml  = (link && link.gen)
+        ? '<span style="font-size:.75rem;color:#6b7280;margin-top:2px;">&#128100; ' + esc(link.gen) + '</span>'
+        : '';
+      var famHtml  = family && family !== "-"
+        ? '<span style="font-size:.75rem;color:#9ca3af;" title="Sammenlign dette prefix med versionen paa Intel-siden">Familie: ' + esc(family) + '.xxxx</span>'
+        : '';
       var linkHtml = link
         ? '<a class="driver-link" href="' + link.url + '" target="_blank">&#8681; ' + link.label + '</a>'
         : '';
 
-      html += '<div class="driver-item">' +
-        '<div class="driver-name">' + esc(name) + '</div>' +
-        '<div class="driver-meta">' +
-          '<span class="badge ' + badgeCls + '">' + badgeLabel + '</span>' +
-          '<span class="driver-version">v' + esc(version) + '</span>' +
-          '<span class="driver-date">' + esc(date) + '</span>' +
-          linkHtml +
+      html += '<div class="driver-item" style="flex-direction:column;align-items:flex-start;gap:6px;">' +
+        '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;width:100%;">' +
+          '<div class="driver-name">' + esc(name) + '</div>' +
+          '<div class="driver-meta">' +
+            '<span class="badge ' + badgeCls + '">' + badgeLabel + '</span>' +
+            '<span class="driver-version">v' + esc(version) + '</span>' +
+            '<span class="driver-date">' + esc(date) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;">' +
+          famHtml + genHtml + linkHtml +
         '</div>' +
         '</div>';
     });
