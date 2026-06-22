@@ -3,93 +3,136 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dock Diagnostik — IT Support</title>
+  <title>Dock problem — IT Support</title>
   <link rel="stylesheet" href="/assets/navbar.css" />
   <meta name="herrup-app" content="it-support">
   <meta name="herrup-title" content="IT Support">
-  <meta name="herrup-subtitle" content="Dock Diagnostik">
+  <meta name="herrup-subtitle" content="Dock problem">
   <script src="/assets/navbar.js" defer></script>
-  <script src="/assets/auth.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; color: #111827; }
-    .container { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
-    .back-link { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 20px; font-size: .9rem; font-weight: 600; color: #850c18; text-decoration: none; }
+    .container { max-width: 760px; margin: 0 auto; padding: 32px 20px; }
+    .back-link { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 28px; font-size: .9rem; font-weight: 600; color: #850c18; text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
 
-    .agent-status { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: 12px; margin-bottom: 24px; font-size: .95rem; font-weight: 600; }
-    .agent-status.ok      { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
-    .agent-status.error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
-    .agent-status.loading { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
-    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .dot.green { background: #22c55e; }
-    .dot.red   { background: #ef4444; }
-    .dot.gray  { background: #94a3b8; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+    /* Page header */
+    .page-intro { margin-bottom: 32px; }
+    .page-intro h1 { margin: 0 0 8px; font-size: 1.5rem; color: #111827; }
+    .page-intro p  { margin: 0; font-size: 1rem; color: #6b7280; }
 
-    .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
-    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
-    .card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #f3f4f6; gap: 10px; }
-    .card-header-left { display: flex; align-items: center; gap: 10px; }
-    .card-icon  { font-size: 1.4rem; }
-    .card-title { font-size: 1rem; font-weight: 700; color: #111827; }
-    .card-body  { padding: 16px 20px; }
+    /* Steps */
+    .steps { display: flex; flex-direction: column; gap: 0; }
 
-    .row { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid #f9fafb; gap: 12px; }
-    .row:last-child { border-bottom: none; }
-    .row-label { font-size: .85rem; color: #6b7280; flex-shrink: 0; }
-    .row-value { font-size: .9rem; color: #111827; font-weight: 500; text-align: right; word-break: break-word; }
-    .row-value.ok  { color: #166534; }
-    .row-value.warn { color: #92400e; }
+    .step { display: flex; gap: 20px; position: relative; }
+    .step:not(:last-child)::before {
+      content: "";
+      position: absolute;
+      left: 23px;
+      top: 56px;
+      bottom: -8px;
+      width: 2px;
+      background: #e5e7eb;
+      z-index: 0;
+    }
 
-    .fix-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: .85rem; font-weight: 600; cursor: pointer; border: none; transition: background .15s; }
-    .fix-btn.primary   { background: #850c18; color: #fff; }
-    .fix-btn.primary:hover { background: #6b0913; }
-    .fix-btn.secondary { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
-    .fix-btn.secondary:hover { background: #e5e7eb; }
-    .fix-btn.success   { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; cursor: default; }
-    .fix-btn.running   { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; cursor: default; }
-    .fix-btn:disabled  { opacity: .6; cursor: not-allowed; }
-    .fix-btn a { color: inherit; text-decoration: none; }
-    .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+    .step-left { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; z-index: 1; }
+    .step-num {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: #850c18; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; font-weight: 700;
+      box-shadow: 0 2px 8px rgba(133,12,24,.25);
+      flex-shrink: 0;
+    }
+    .step-num.done { background: #16a34a; box-shadow: 0 2px 8px rgba(22,163,74,.25); }
+
+    .step-body {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    }
+
+    .step-emoji { font-size: 1.6rem; margin-bottom: 8px; }
+    .step-title { font-size: 1.05rem; font-weight: 700; color: #111827; margin: 0 0 8px; }
+    .step-desc  { font-size: .95rem; color: #374151; line-height: 1.6; margin: 0 0 6px; }
+    .step-hint  { font-size: .83rem; color: #9ca3af; margin: 0; }
+
+    .wait-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #fffbeb; border: 1px solid #fcd34d; color: #92400e;
+      border-radius: 999px; padding: 4px 14px;
+      font-size: .88rem; font-weight: 700;
+      margin: 10px 0;
+    }
+
+    /* Agent action area */
+    .agent-area { margin-top: 14px; }
+    .action-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 22px; border-radius: 10px; border: none;
+      background: #850c18; color: #fff;
+      font-size: .95rem; font-weight: 600; cursor: pointer;
+      transition: background .15s;
+    }
+    .action-btn:hover    { background: #6b0913; }
+    .action-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .action-btn.running  { background: #1d4ed8; }
+    .action-btn.success  { background: #16a34a; cursor: default; }
+
+    .agent-warn { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; font-size: .88rem; color: #991b1b; }
+
+    .script-output {
+      display: none; margin-top: 12px;
+      padding: 12px 14px; background: #1e293b; color: #e2e8f0;
+      border-radius: 10px; font-family: "Consolas", monospace;
+      font-size: .8rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+      max-height: 200px; overflow-y: auto;
+    }
+
+    .loading-ph { display: flex; align-items: center; gap: 10px; color: #9ca3af; font-size: .88rem; }
+    .spinner { width: 16px; height: 16px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .script-output { margin-top: 12px; padding: 12px 14px; background: #1e293b; color: #e2e8f0; border-radius: 10px; font-family: "Consolas", monospace; font-size: .8rem; line-height: 1.6; max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; display: none; }
-    .script-output.visible { display: block; }
+    /* Not solved? */
+    .help-box {
+      display: flex; align-items: center; gap: 16px;
+      background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 14px;
+      padding: 20px 24px; margin-top: 8px;
+    }
+    .help-icon { font-size: 2rem; flex-shrink: 0; }
+    .help-text { font-size: .95rem; color: #374151; line-height: 1.5; }
+    .help-text strong { color: #111827; }
 
+    /* Driver info section */
+    .driver-section {
+      margin-top: 32px;
+      background: #fff; border: 1px solid #e5e7eb;
+      border-radius: 16px; overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,.05);
+    }
+    .driver-section-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 20px; border-bottom: 1px solid #f3f4f6;
+      font-size: .95rem; font-weight: 700; color: #374151;
+    }
+    .driver-list { padding: 14px 20px; display: flex; flex-direction: column; gap: 10px; }
+    .driver-item { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; }
+    .driver-name { font-size: .88rem; font-weight: 600; color: #111827; flex: 1; min-width: 160px; }
+    .driver-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .driver-version { font-size: .78rem; color: #6b7280; }
+    .driver-date    { font-size: .78rem; color: #9ca3af; }
     .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; }
-    .badge.ok    { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-    .badge.warn  { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
-    .badge.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge.ok   { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .badge.warn { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+    .badge.info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 
-    .device-list { display: flex; flex-direction: column; gap: 8px; }
-    .device-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; background: #f8fafc; border: 1px solid #e5e7eb; }
-    .device-icon { font-size: 1.2rem; flex-shrink: 0; }
-    .device-info { flex: 1; min-width: 0; }
-    .device-name { font-size: .88rem; font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .device-detail { font-size: .78rem; color: #6b7280; }
-
-    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
-    .problem-section { margin-bottom: 20px; }
-    .problem-section:last-child { margin-bottom: 0; }
-    .problem-title { font-size: .9rem; font-weight: 700; color: #374151; margin-bottom: 8px; }
-    .loading-ph { display: flex; align-items: center; gap: 10px; color: #9ca3af; font-size: .9rem; padding: 16px 0; }
-
-    .no-agent-box { background: #fff; border: 1px solid #fecaca; border-radius: 16px; padding: 32px; text-align: center; }
-    .no-agent-box h2 { color: #991b1b; margin: 0 0 12px; }
-    .no-agent-box p  { color: #6b7280; margin: 0 0 8px; line-height: 1.6; }
-
-    /* Popup */
-    .popup-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9998; align-items: center; justify-content: center; }
-    .popup-overlay.open { display: flex; }
-    .popup-box { background: #fff; border-radius: 20px; padding: 36px 32px; max-width: 440px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,.2); text-align: center; }
-    .popup-icon  { font-size: 3rem; margin-bottom: 12px; }
-    .popup-title { margin: 0 0 16px; font-size: 1.3rem; color: #111827; }
-    .popup-body  { margin: 0 0 24px; font-size: .95rem; color: #374151; line-height: 1.6; text-align: left; }
-    .popup-close { padding: 10px 28px; background: #850c18; color: #fff; border: none; border-radius: 10px; font-size: .95rem; font-weight: 600; cursor: pointer; }
-    .popup-close:hover { background: #6b0913; }
-
-    #toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 12px; font-size: .9rem; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.15); z-index: 9999; display: none; transition: opacity .3s; }
+    /* Toast */
+    #toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 12px; font-size: .9rem; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.15); z-index: 9999; display: none; }
     #toast.ok    { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
     #toast.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
   </style>
@@ -101,761 +144,262 @@
 
     <a href="/index.html" class="back-link">← Tilbage til IT Support</a>
 
-    <div class="agent-status loading" id="agentStatus">
-      <div class="dot gray" id="agentDot"></div>
-      <span id="agentStatusText">Forbinder til IT Support Agent...</span>
+    <div class="page-intro">
+      <h1>🖥️ Dock virker ikke?</h1>
+      <p>Følg disse trin i rækkefølge — løser de fleste dock-problemer.</p>
     </div>
 
-    <div id="noAgent" style="display:none;">
-      <div class="no-agent-box">
-        <h2>🔌 IT Support Agent ikke fundet</h2>
-        <p>IT Support Agent er ikke installeret eller kørende på denne PC.</p>
-        <p style="font-size:.85rem;color:#9ca3af;">Forventer agent på <code>http://localhost:5199</code></p>
-      </div>
-    </div>
+    <div class="steps">
 
-    <div id="agentContent" style="display:none;">
-
-      <!-- Dock-info tile -->
-      <div class="card" style="margin-bottom:20px;" id="dockInfoCard">
-        <div class="card-header">
-          <div class="card-header-left">
-            <div class="card-icon">🖥️</div>
-            <div class="card-title">Tilsluttet dock</div>
-          </div>
-          <button class="fix-btn secondary" onclick="loadDockInfo()">↺ Opdater</button>
+      <!-- ── Trin 1 ───────────────────────────────────────────────── -->
+      <div class="step">
+        <div class="step-left">
+          <div class="step-num">1</div>
         </div>
-        <div class="card-body" id="dockInfoBody">
-          <div class="loading-ph"><div class="spinner"></div> Henter dock-info...</div>
+        <div class="step-body">
+          <div class="step-emoji">🔌</div>
+          <p class="step-title">Tag USB-C kablet ud af computeren</p>
+          <p class="step-desc">Fjern USB-C kablet fra computeren og vent, sæt det derefter i igen.</p>
+          <div class="wait-chip">⏱ Vent 20 sekunder</div>
+          <p class="step-hint">Computeren genregistrerer docken når kablet sættes i igen.</p>
         </div>
       </div>
 
-      <!-- Dock-enheder + DisplayLink -->
-      <div class="grid2" style="margin-bottom:20px;">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-header-left">
-              <div class="card-icon">🔌</div>
-              <div class="card-title">Tilkoblede dock-enheder (USB)</div>
+      <!-- ── Trin 2 ───────────────────────────────────────────────── -->
+      <div class="step">
+        <div class="step-left">
+          <div class="step-num">2</div>
+        </div>
+        <div class="step-body">
+          <div class="step-emoji">🔋</div>
+          <p class="step-title">Fjern alle kabler fra docken</p>
+          <p class="step-desc">Tag <strong>USB-C kablet</strong> og <strong>strømkablet</strong> ud af docken. Vent, og sæt begge kabler i igen.</p>
+          <div class="wait-chip">⏱ Vent 10 sekunder</div>
+          <p class="step-hint">Dette nulstiller dockens interne elektronik fuldstændigt.</p>
+        </div>
+      </div>
+
+      <!-- ── Trin 3 ───────────────────────────────────────────────── -->
+      <div class="step">
+        <div class="step-left">
+          <div class="step-num">3</div>
+        </div>
+        <div class="step-body">
+          <div class="step-emoji">🔄</div>
+          <p class="step-title">Genstart USB-C controller</p>
+          <p class="step-desc">Lad computeren nulstille den interne USB-C controller. Tilslut kablet igen bagefter.</p>
+
+          <div class="agent-area">
+
+            <div id="agentLoading">
+              <div class="loading-ph"><div class="spinner"></div> Tjekker IT Support Agent...</div>
             </div>
-            <button class="fix-btn secondary" onclick="loadDockDevices()">↺ Opdater</button>
-          </div>
-          <div class="card-body"><div id="dockDeviceList"><div class="loading-ph"><div class="spinner"></div> Henter enheder...</div></div></div>
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <div class="card-header-left">
-              <div class="card-icon">🖥️</div>
-              <div class="card-title">DisplayLink & Skærme</div>
+
+            <div id="agentOk" style="display:none;">
+              <button class="action-btn" id="restartBtn" onclick="restartUsbController(this)">
+                🔄 Genstart USB-C controller
+              </button>
+              <div class="script-output" id="restartOutput"></div>
             </div>
-          </div>
-          <div class="card-body"><div id="displayLinkStatus"><div class="loading-ph"><div class="spinner"></div> Henter skærminfo...</div></div></div>
-        </div>
-      </div>
 
-      <!-- Trin-for-trin fejlfindingsguide -->
-      <div class="card" style="margin-bottom:20px;">
-        <div class="card-header">
-          <div class="card-header-left">
-            <div class="card-icon">🛠️</div>
-            <div class="card-title">Fejlfinding — prøv disse trin i rækkefølge</div>
-          </div>
-        </div>
-        <div class="card-body" id="guideBody">
-          <!-- Renderes af JS baseret på dock-type -->
-          <div class="loading-ph"><div class="spinner"></div> Henter guide...</div>
-        </div>
-      </div>
-
-            <!-- Opdateringer -->
-      <div class="card" style="margin-bottom:20px;">
-        <div class="card-header">
-          <div class="card-header-left">
-            <div class="card-icon">📦</div>
-            <div class="card-title">Driver & Firmware opdateringer</div>
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="grid2" style="gap:16px;">
-            <div>
-              <div class="problem-title">DisplayLink driver</div>
-              <p style="font-size:.85rem;color:#6b7280;margin:0 0 10px;">Vigtigste driver til i-Tec docks med USB-skærme. Klik for at tjekke version og installere hvis nødvendigt.</p>
-              <div class="actions">
-                <button class="fix-btn primary" onclick="installDisplayLink(this)">📦 Installer DisplayLink</button>
-                <button class="fix-btn secondary" onclick="checkDLVersionOnly()">📋 Tjek installeret version</button>
+            <div id="agentMissing" style="display:none;">
+              <div class="agent-warn">
+                🔌 IT Support Agent ikke fundet — kontakt IT-support for hjælp til dette trin.
               </div>
             </div>
-            <div>
-              <div class="problem-title">i-Tec firmware / software</div>
-              <p style="font-size:.85rem;color:#6b7280;margin:0 0 10px;">Nogle i-Tec modeller har opdaterbart firmware.</p>
-              <div class="actions">
-                <a class="fix-btn primary" href="https://i-tec.pro/en/software" target="_blank">⬇️ i-Tec software & firmware</a>
-                <a class="fix-btn secondary" href="https://i-tec.pro/en/support" target="_blank">📄 i-Tec support</a>
-              </div>
-            </div>
+
           </div>
         </div>
       </div>
 
-      <!-- Event log -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-header-left">
-            <div class="card-icon">📋</div>
-            <div class="card-title">Dock-relaterede event log hændelser</div>
-          </div>
-          <button class="fix-btn secondary" onclick="loadDockEvents()">↺ Opdater</button>
-        </div>
-        <div class="card-body" style="overflow-x:auto;">
-          <div id="dockEvents"><div class="loading-ph"><div class="spinner"></div> Henter events...</div></div>
-        </div>
+    </div><!-- /steps -->
+
+    <!-- Virker det stadig ikke? -->
+    <div class="help-box">
+      <div class="help-icon">📞</div>
+      <div class="help-text">
+        <strong>Virker det stadig ikke?</strong><br>
+        Kontakt IT-support — vi kan hurtigt finde ud af hvad problemet er.
       </div>
-
-    </div><!-- /agentContent -->
-  </div>
-</div>
-
-<!-- DisplayLink popup -->
-<div class="popup-overlay" id="dlPopup">
-  <div class="popup-box">
-    <div class="popup-icon" id="dlPopupIcon"></div>
-    <h2 class="popup-title" id="dlPopupTitle"></h2>
-    <div class="popup-body" id="dlPopupBody"></div>
-    <div id="dlPopupActions">
-      <button class="popup-close" onclick="closePopup()">Luk</button>
     </div>
+
+    <!-- Grafik-driver info — vises kun når agenten er tilsluttet -->
+    <div class="driver-section" id="driverSection" style="display:none;">
+      <div class="driver-section-header">
+        🖥️ Grafik-driver status
+      </div>
+      <div class="driver-list" id="driverList">
+        <div class="loading-ph"><div class="spinner"></div> Henter driver-info...</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <div id="toast"></div>
 
 <script>
-const ALLOWED_ROLES = ["portal_admin", "portal_it_support"];
 const AGENT = "http://localhost:5199";
-const DISPLAYLINK_URL = "https://allekanbruge.blob.core.windows.net/displaylink/DisplayLink-installer.exe";
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded", () => {
-  ITAuth.requireAuth(({ user }) => {
-    document.getElementById("appContent").style.display = "";
-    initAgent();
-  });
+// ── Auth — kræver kun login, ikke specifik rolle ──────────────────────────────
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    const r = await fetch("/.auth/me", { headers: { Accept: "application/json" } });
+    const data = r.ok ? await r.json() : null;
+    if (!data?.clientPrincipal?.userDetails) {
+      window.location.href = "/.auth/login/aad?post_login_redirect_uri=/dock.html";
+      return;
+    }
+  } catch {
+    // Fortsæt — auth fejl bør ikke blokere siden
+  }
+  document.getElementById("appContent").style.display = "";
+  checkAgent();
 });
 
-// ── Agent ─────────────────────────────────────────────────────────────────────
-async function initAgent() {
+// ── Agent-tjek ────────────────────────────────────────────────────────────────
+async function checkAgent() {
   try {
     const ping = await fetch(AGENT + "/api/ping", { signal: AbortSignal.timeout(3000) });
     if (!ping.ok) throw new Error();
-    setStatus("ok", "IT Support Agent forbundet");
-    document.getElementById("agentContent").style.display = "";
-    loadDockInfo();
-    loadDockDevices();
-    loadDisplayLink();
-    loadDockEvents();
+    document.getElementById("agentLoading").style.display = "none";
+    document.getElementById("agentOk").style.display = "";
+    loadDriverStatus();
   } catch {
-    setStatus("error", "IT Support Agent ikke fundet på localhost:5199");
-    document.getElementById("noAgent").style.display = "";
+    document.getElementById("agentLoading").style.display = "none";
+    document.getElementById("agentMissing").style.display = "";
   }
 }
 
-function setStatus(type, text) {
-  document.getElementById("agentStatus").className = "agent-status " + type;
-  document.getElementById("agentDot").className = "dot " + (type === "ok" ? "green" : type === "error" ? "red" : "gray");
-  document.getElementById("agentStatusText").textContent = text;
-}
-
-// ── Dock info ─────────────────────────────────────────────────────────────────
-async function loadDockInfo() {
-  var el = document.getElementById("dockInfoBody");
-  el.innerHTML = '<div class="loading-ph"><div class="spinner"></div> Henter dock-info...</div>';
-  try {
-    var d = await fetch(AGENT + "/api/dock/info").then(r => r.json());
-
-    if (!d.connected) {
-      el.innerHTML =
-        '<p style="color:#6b7280;font-size:.9rem;margin:0">⚠️ Ingen dock fundet. Er docken tilsluttet?</p>';
-      renderGuide('generic');
-      return;
-    }
-
-    var html = "";
-
-    // ── Fælles info ──
-    html += row("Model", d.model || "–");
-    html += row("Dock type", d.dockType === "lenovo" ? "Lenovo ThinkPad" : d.dockType === "displaylink" ? "i-Tec / DisplayLink" : "Ukendt");
-    html += row("PID", "VID_" + esc(d.vid) + " / PID_" + esc(d.pid));
-
-    var btns = "";
-
-    // ── Lenovo-specifik ──
-    if (d.dockType === "lenovo") {
-      var dmVer     = d.dockManagerVersion || "Ikke fundet";
-      var dmMissing = dmVer === "Ikke fundet";
-      var svcOk     = d.serviceRunning === true;
-      var svcTxt    = d.serviceStatus  || "–";
-
-      html += row("Dock Manager version",
-        dmMissing
-          ? "<span class='row-value warn'>Ikke installeret</span>"
-          : "<span class='row-value ok'>" + esc(dmVer) + "</span>",
-        true);
-
-      if (!dmMissing) {
-        html += row("Dock Manager service",
-          (svcOk
-            ? "<span class='badge ok'>Kører</span>"
-            : "<span class='badge error'>Stoppet</span>") + " " + esc(svcTxt),
-          true);
-      }
-
-      // Knapper – kun relevante
-      btns += '<a class="fix-btn primary" href="' + esc(d.updateUrl) + '" target="_blank">🔄 Opdater Dock Manager</a>';
-      if (!dmMissing && !svcOk) {
-        btns += '<button class="fix-btn secondary" onclick="runFix(&quot;restart_dock_service&quot;, this)">&#9654; Start Dock Manager service</button>';
-      }
-      btns += '<button class="fix-btn secondary" onclick="openDockManager()">🖥️ Åbn Dock Manager</button>';
-      btns += '<a class="fix-btn secondary" href="' + esc(d.supportUrl) + '" target="_blank">📄 Lenovo Dock support</a>';
-    }
-
-    // ── DisplayLink/i-Tec-specifik ──
-    if (d.dockType === "displaylink") {
-      var dlVer       = d.displayLinkVersion   || "Ikke installeret";
-      var dlInstalled = d.displayLinkInstalled  === true;
-
-      html += row("DisplayLink driver",
-        dlInstalled
-          ? "<span class='row-value ok'>" + esc(dlVer) + "</span>"
-          : "<span class='row-value warn'>Ikke installeret</span>",
-        true);
-
-      btns += '<button class="fix-btn primary" onclick="installDisplayLink(this)">📦 ' + (dlInstalled ? "Opdater" : "Installer") + ' DisplayLink</button>';
-      btns += '<button class="fix-btn secondary" onclick="checkDLVersionOnly()">📋 Tjek version</button>';
-      btns += '<a class="fix-btn secondary" href="' + esc(d.supportUrl) + '" target="_blank">📄 i-Tec support</a>';
-    }
-
-    if (btns) {
-      html += '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">' + btns + '</div>';
-    }
-
-    el.innerHTML = html;
-    window._dockManagerVersion = d.dockManagerVersion || null;
-    renderGuide(d.dockType || 'generic');
-  } catch (e) {
-    el.innerHTML = '<p style="color:#991b1b;font-size:.9rem;margin:0">Fejl: ' + esc(e.message) + '</p>';
-  }
-}
-
-async function openDockManager() {
-  await fetch(AGENT + "/api/run-ps", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ script: "Start-Process 'C:\\Program Files\\Lenovo\\Dock Manager\\dockmgr.exe' -ErrorAction SilentlyContinue" })
-  }).catch(() => {});
-  showToast("Dock Manager åbnes...", "ok");
-}
-
-function row(label, value, rawHtml) {
-  var val = rawHtml ? value : esc(value);
-  return '<div class="row"><span class="row-label">' + label + '</span><span class="row-value">' + val + '</span></div>';
-}
-
-
-// ── Trin-for-trin guide ──────────────────────────────────────────────────────
-var GUIDES = {
-  lenovo: [
-    {
-      title: "Trin 1 — Genstart Dock Manager service",
-      desc:  "Mange dock-problemer løses ved at genstarte Dock Manager. Start her.",
-      btns:  [
-        { label: "▶ Genstart Dock Manager service", id: "restart_dock_service", primary: true },
-      ]
-    },
-    {
-      title: "Trin 2 — Opdater Dock Manager",
-      desc:  (window._dockManagerVersion ? "Installeret version: " + window._dockManagerVersion + ". " : "") + "Tjek om der er en nyere version tilgængelig fra Lenovo.",
-      btns:  [
-        { label: "🔄 Opdater Dock Manager", href: "https://support.lenovo.com/dk/da/solutions/ht037099", primary: true },
-      ]
-    },
-    {
-      title: "Trin 3 — Deaktiver USB strømstyring",
-      desc:  "Windows slukker USB-porte for at spare strøm. Det afbryder docken. Deaktiver dette.",
-      btns:  [
-        { label: "⚡ Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true },
-      ]
-    },
-    {
-      title: "Trin 4 — Nulstil USB Hub",
-      desc:  "Docken genkendes ikke? Nulstil USB-hubben så Windows opdager den igen.",
-      btns:  [
-        { label: "🔁 Nulstil USB Hub", id: "reset_usb_hub", primary: true },
-        { label: "🔍 Scan for hardware-ændringer", id: "scan_hardware_changes", primary: false },
-      ]
-    },
-    {
-      title: "Trin 5 — Tjek netværk via dock",
-      desc:  "Ethernet via dock virker ikke? Tjek om netværksadapteren er genkendt.",
-      btns:  [
-        { label: "🌐 Tjek dock netværksadapter", id: "check_dock_network", primary: true },
-      ]
-    },
-    {
-      title: "Trin 6 — Kontakt Lenovo support",
-      desc:  "Intet har virket? Se Lenovos support-side for din dock-model.",
-      btns:  [
-        { label: "📄 Lenovo Dock support", href: "https://support.lenovo.com/dk/da/solutions/pd500265", primary: false },
-      ]
-    },
-  ],
-  displaylink: [
-    {
-      title: "Trin 1 — Installer / opdater DisplayLink driver",
-      desc:  "Skærm blinker eller virker ikke? DisplayLink driveren er den vigtigste. Start her.",
-      btns:  [
-        { label: "📦 Installer / opdater DisplayLink", fn: "installDisplayLink(this)", primary: true },
-      ]
-    },
-    {
-      title: "Trin 2 — Deaktiver USB strømstyring",
-      desc:  "Windows slukker USB-porte for at spare strøm. Det afbryder docken.",
-      btns:  [
-        { label: "⚡ Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true },
-      ]
-    },
-    {
-      title: "Trin 3 — Genstart DisplayLink service",
-      desc:  "Skærm stadig sort? Genstart DisplayLink-tjenesten.",
-      btns:  [
-        { label: "🔄 Genstart DisplayLink service", id: "restart_displaylink", primary: true },
-      ]
-    },
-    {
-      title: "Trin 4 — Nulstil USB Hub",
-      desc:  "Dock genkendes ikke? Nulstil USB-hubben.",
-      btns:  [
-        { label: "🔁 Nulstil USB Hub", id: "reset_usb_hub", primary: true },
-        { label: "🔍 Scan for hardware-ændringer", id: "scan_hardware_changes", primary: false },
-      ]
-    },
-    {
-      title: "Trin 5 — Tjek netværk via dock",
-      desc:  "Ethernet virker ikke? Tjek om netværksadapteren er genkendt.",
-      btns:  [
-        { label: "🌐 Tjek dock netværksadapter", id: "check_dock_network", primary: true },
-      ]
-    },
-    {
-      title: "Trin 6 — i-Tec support",
-      desc:  "Intet har virket? Se i-Tec support og firmware.",
-      btns:  [
-        { label: "📄 i-Tec support", href: "https://i-tec.pro/en/support", primary: false },
-        { label: "⬇️ i-Tec firmware", href: "https://i-tec.pro/en/software", primary: false },
-      ]
-    },
-  ],
-  generic: [
-    {
-      title: "Trin 1 — Deaktiver USB strømstyring",
-      desc:  "Windows slukker USB-porte for at spare strøm. Deaktiver dette.",
-      btns:  [{ label: "⚡ Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true }]
-    },
-    {
-      title: "Trin 2 — Nulstil USB Hub",
-      desc:  "Dock genkendes ikke? Nulstil USB-hubben.",
-      btns:  [
-        { label: "🔁 Nulstil USB Hub", id: "reset_usb_hub", primary: true },
-        { label: "🔍 Scan for hardware-ændringer", id: "scan_hardware_changes", primary: false },
-      ]
-    },
-    {
-      title: "Trin 3 — Tjek driver",
-      desc:  "Tjek om alle dock-enheder har korrekt driver.",
-      btns:  [{ label: "🔎 Tjek dock driver", id: "check_itec_driver", primary: true }]
-    },
-  ]
-};
-
-function renderGuide(dockType) {
-  var steps = GUIDES[dockType] || GUIDES.generic;
-  var el    = document.getElementById("guideBody");
-  if (!el) return;
-
-  el.innerHTML = steps.map(function(step, i) {
-    var btnHtml = step.btns.map(function(b) {
-      if (b.href) {
-        return '<a class="fix-btn ' + (b.primary ? 'primary' : 'secondary') + '" href="' + esc(b.href) + '" target="_blank">' + b.label + '</a>';
-      } else if (b.fn) {
-        return '<button class="fix-btn ' + (b.primary ? 'primary' : 'secondary') + '" onclick="' + b.fn + '">' + b.label + '</button>';
-      } else {
-        return '<button class="fix-btn ' + (b.primary ? 'primary' : 'secondary') + '" onclick="runFix(&quot;' + b.id + '&quot;, this)">' + b.label + '</button>' +
-               '<div class="script-output" id="out_' + b.id + '_guide"></div>';
-      }
-    }).join('');
-
-    var isLast = i === steps.length - 1;
-    return '<div style="display:flex;gap:16px;padding:14px 0;' + (isLast ? '' : 'border-bottom:1px solid #f3f4f6') + '">' +
-      '<div style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:' + (i === 0 ? '#850c18' : '#e5e7eb') + ';color:' + (i === 0 ? '#fff' : '#374151') + ';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem">' + (i+1) + '</div>' +
-      '<div style="flex:1">' +
-        '<div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:4px">' + esc(step.title.replace('Trin ' + (i+1) + ' — ', '')) + '</div>' +
-        '<div style="font-size:.85rem;color:#6b7280;margin-bottom:10px">' + esc(step.desc) + '</div>' +
-        '<div style="display:flex;flex-wrap:wrap;gap:8px">' + btnHtml + '</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-}
-
-// ── Dock-enheder ──────────────────────────────────────────────────────────────
-async function loadDockDevices() {
-  const el = document.getElementById("dockDeviceList");
-  el.innerHTML = '<div class="loading-ph"><div class="spinner"></div> Henter enheder...</div>';
-  try {
-    const data = await fetch(AGENT + "/api/dock/devices").then(r => r.json());
-    const devices = data.devices ?? [];
-    if (!devices.length) {
-      el.innerHTML = '<p style="color:#6b7280;font-size:.9rem;margin:0">Ingen dock-enheder fundet. Er docken tilsluttet?</p>';
-      return;
-    }
-    el.innerHTML = '<div class="device-list">' + devices.map(function(d) {
-      return '<div class="device-item">' +
-        '<div class="device-icon">' + getDeviceIcon(d.type) + '</div>' +
-        '<div class="device-info">' +
-          '<div class="device-name">' + esc(d.name) + '</div>' +
-          '<div class="device-detail">' + esc(d.deviceId || "") + (d.status ? " · " + esc(d.status) : "") + '</div>' +
-        '</div>' +
-        '<span class="badge ' + (d.ok ? "ok" : "error") + '">' + (d.ok ? "OK" : "Fejl") + '</span>' +
-      '</div>';
-    }).join("") + '</div>';
-  } catch (e) {
-    el.innerHTML = '<p style="color:#991b1b;font-size:.9rem;margin:0">Fejl: ' + esc(e.message) + '</p>';
-  }
-}
-
-function getDeviceIcon(type) {
-  var t = String(type || "").toLowerCase();
-  if (t.includes("display") || t.includes("monitor")) return "🖥️";
-  if (t.includes("network") || t.includes("ethernet")) return "🌐";
-  if (t.includes("audio") || t.includes("sound"))      return "🔊";
-  if (t.includes("hub"))                               return "🔌";
-  if (t.includes("storage") || t.includes("disk"))    return "💾";
-  return "🔌";
-}
-
-// ── DisplayLink status ────────────────────────────────────────────────────────
-async function loadDisplayLink() {
-  var el = document.getElementById("displayLinkStatus");
-  try {
-    // Hent hardware info og DisplayLink version parallelt
-    var [hw, dlVersion] = await Promise.all([
-      fetch(AGENT + "/api/hardware").then(r => r.json()),
-      checkDisplayLinkVersion()
-    ]);
-    var monitors  = hw.monitors ?? [];
-    var installed = dlVersion !== "ikke installeret" && dlVersion !== "ukendt" && dlVersion !== "fejl ved tjek";
-    var html = "";
-
-    // DisplayLink version fra registry (mere pålidelig end GPU-liste)
-    if (installed) {
-      html += '<div class="row"><span class="row-label">DisplayLink driver</span><span class="row-value ok">' + esc(dlVersion) + '</span></div>';
-    } else {
-      html += '<div class="row"><span class="row-label">DisplayLink driver</span><span class="row-value warn" style="display:flex;align-items:center;gap:8px">Ikke installeret <button class="fix-btn primary" style="padding:4px 10px;font-size:.78rem" onclick="installDisplayLink(this)">📦 Installer</button></span></div>';
-    }
-
-    html += '<div class="row"><span class="row-label">Antal skærme</span><span class="row-value">' + monitors.length + '</span></div>';
-    monitors.forEach(function(m, i) {
-      html += '<div class="row"><span class="row-label">Skærm ' + (i+1) + '</span><span class="row-value">' + esc(m.resolution) + ' — ' + esc(m.name) + '</span></div>';
-    });
-    el.innerHTML = html;
-  } catch (e) {
-    el.innerHTML = '<p style="color:#991b1b;font-size:.9rem;margin:0">Fejl: ' + esc(e.message) + '</p>';
-  }
-}
-
-// ── Dock events ───────────────────────────────────────────────────────────────
-async function loadDockEvents() {
-  var el = document.getElementById("dockEvents");
-  el.innerHTML = '<div class="loading-ph"><div class="spinner"></div> Henter events...</div>';
-  try {
-    var data = await fetch(AGENT + "/api/dock/events").then(r => r.json());
-    var events = data.events ?? [];
-    if (!events.length) {
-      el.innerHTML = '<p style="color:#6b7280;font-size:.9rem;margin:0">Ingen dock-relaterede hændelser fundet.</p>';
-      return;
-    }
-    var rows = events.map(function(e) {
-      return "<tr>" +
-        "<td style='padding:7px 12px;border-bottom:1px solid #f3f4f6;white-space:nowrap'>" + esc(e.time) + "</td>" +
-        "<td style='padding:7px 12px;border-bottom:1px solid #f3f4f6'><span class='badge " + (e.level === "Error" ? "error" : "warn") + "'>" + esc(e.level) + "</span></td>" +
-        "<td style='padding:7px 12px;border-bottom:1px solid #f3f4f6'>" + esc(e.source) + "</td>" +
-        "<td style='padding:7px 12px;border-bottom:1px solid #f3f4f6'>" + e.eventId + "</td>" +
-        "<td style='padding:7px 12px;border-bottom:1px solid #f3f4f6;max-width:400px;word-break:break-word'>" + esc(e.message) + "</td>" +
-        "</tr>";
-    }).join("");
-    el.innerHTML = "<table style='width:100%;border-collapse:collapse;font-size:.82rem;'>" +
-      "<thead><tr style='background:#f8fafc'>" +
-        "<th style='padding:8px 12px;text-align:left;border-bottom:2px solid #e5e7eb;color:#374151;font-weight:600'>Tidspunkt</th>" +
-        "<th style='padding:8px 12px;text-align:left;border-bottom:2px solid #e5e7eb;color:#374151;font-weight:600'>Niveau</th>" +
-        "<th style='padding:8px 12px;text-align:left;border-bottom:2px solid #e5e7eb;color:#374151;font-weight:600'>Kilde</th>" +
-        "<th style='padding:8px 12px;text-align:left;border-bottom:2px solid #e5e7eb;color:#374151;font-weight:600'>ID</th>" +
-        "<th style='padding:8px 12px;text-align:left;border-bottom:2px solid #e5e7eb;color:#374151;font-weight:600'>Besked</th>" +
-      "</tr></thead><tbody>" + rows + "</tbody></table>";
-  } catch (e) {
-    el.innerHTML = '<p style="color:#991b1b;font-size:.9rem;margin:0">Fejl: ' + esc(e.message) + '</p>';
-  }
-}
-
-// ── Fix-scripts ───────────────────────────────────────────────────────────────
-var FIX_SCRIPTS = {
-  disable_usb_selective_suspend: [
-    "$plan = powercfg /getactivescheme | Select-String -Pattern '([0-9a-f-]{36})' | ForEach-Object { $_.Matches[0].Value }",
-    "powercfg /setacvalueindex $plan 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0",
-    "powercfg /setdcvalueindex $plan 2a737441-1930-4402-8d77-b2bebba308a3 48e6b7a6-50f5-4782-a5d4-53bb8f07e226 0",
-    "powercfg /setactive $plan",
-    "Write-Host 'USB Selective Suspend deaktiveret. Genstart PC for fuld effekt.'"
-  ].join("\n"),
-
-  restart_displaylink: [
-    "$svc = Get-Service | Where-Object { $_.Name -like '*DisplayLink*' -or $_.DisplayName -like '*DisplayLink*' }",
-    "if ($svc) { $svc | Restart-Service -Force; Write-Host 'DisplayLink service genstartet:' $svc.Name }",
-    "else { Write-Host 'DisplayLink service ikke fundet. Er driver installeret?' }"
-  ].join("\n"),
-
-  reset_usb_hub: [
-    "$hubs = Get-PnpDevice | Where-Object { $_.FriendlyName -like '*USB Hub*' -or $_.FriendlyName -like '*USB Root Hub*' }",
-    "Write-Host 'Fandt' $hubs.Count 'USB hub(s)'",
-    "foreach ($hub in $hubs) {",
-    "  Write-Host 'Nulstiller:' $hub.FriendlyName",
-    "  Disable-PnpDevice -InstanceId $hub.InstanceId -Confirm:$false -ErrorAction SilentlyContinue",
-    "  Start-Sleep -Milliseconds 500",
-    "  Enable-PnpDevice -InstanceId $hub.InstanceId -Confirm:$false -ErrorAction SilentlyContinue",
-    "}",
-    "Write-Host 'Faerdig. Vent 5 sekunder og tjek om dock er genkendt.'"
-  ].join("\n"),
-
-  scan_hardware_changes: [
-    "pnputil /scan-devices",
-    "Write-Host 'Hardware-scanning fuldfoert.'"
-  ].join("\n"),
-
-  check_itec_driver: [
-    "Write-Host '=== i-Tec / Dock relaterede enheder ==='",
-    "Get-PnpDevice | Where-Object { $_.FriendlyName -like '*i-tec*' -or $_.FriendlyName -like '*docking*' -or $_.FriendlyName -like '*dock*' } | Select-Object Status, FriendlyName | Format-Table -AutoSize",
-    "Write-Host '=== USB Enheder med fejl ==='",
-    "Get-PnpDevice | Where-Object { ($_.Class -eq 'USB' -or $_.Class -eq 'Net') -and $_.Status -ne 'OK' } | Select-Object Status, FriendlyName | Format-Table -AutoSize",
-    "Write-Host '=== DisplayLink relaterede enheder ==='",
-    "Get-PnpDevice | Where-Object { $_.FriendlyName -like '*DisplayLink*' -or $_.FriendlyName -like '*DL-*' } | Select-Object Status, FriendlyName | Format-Table -AutoSize"
-  ].join("\n"),
-
-  check_dock_network: [
-    "Write-Host '=== Netvaerksadaptere via dock ==='",
-    "Get-NetAdapter | Where-Object { $_.InterfaceDescription -like '*USB*' -or $_.InterfaceDescription -like '*Realtek*' -or $_.InterfaceDescription -like '*ASIX*' } | Select-Object Name, Status, LinkSpeed, InterfaceDescription | Format-Table -AutoSize",
-    "Write-Host '=== Alle netvaerksadaptere ==='",
-    "Get-NetAdapter | Select-Object Name, Status, LinkSpeed | Format-Table -AutoSize"
-  ].join("\n"),
-
-  reinstall_usb_controllers: [
-    "$usb = Get-PnpDevice | Where-Object { $_.Class -eq 'USB' -and $_.Status -ne 'OK' }",
-    "if ($usb.Count -eq 0) { Write-Host 'Ingen USB enheder med fejl fundet.' }",
-    "else { foreach ($dev in $usb) { Write-Host 'Geninstallerer:' $dev.FriendlyName; pnputil /remove-device $dev.InstanceId 2>$null } }"
-  ].join("\n"),
-
-  check_battery_status: [
-    "$batt = Get-WmiObject -Class Win32_Battery",
-    "if ($batt) {",
-    "  $txt = switch ($batt.BatteryStatus) { 1{'Aflader (paa batteri)'} 2{'Oplader (AC)'} 3{'Fuldt opladet'} 6{'Oplader'} default{'Ukendt'} }",
-    "  Write-Host 'Status:   ' $txt",
-    "  Write-Host 'Kapacitet:' $batt.EstimatedChargeRemaining '%'",
-    "} else { Write-Host 'Ingen batteri fundet.' }"
-  ].join("\n"),
-
-  restart_dock_service: [
-    "$svc = Get-Service | Where-Object { $_.Name -like '*dock*' -or $_.DisplayName -like '*dock*' } | Select-Object -First 1",
-    "if ($svc) { Start-Service $svc.Name -ErrorAction SilentlyContinue; Write-Host 'Dock Manager service startet:' $svc.Name }",
-    "else { Write-Host 'Dock Manager service ikke fundet.' }"
-  ].join('\n'),
-
-  check_power_plan: [
-    "Write-Host '=== Aktiv stroemplaan ==='",
-    "powercfg /getactivescheme",
-    "Write-Host '=== USB Selective Suspend ==='",
-    "powercfg /query scheme_current sub_usb 48e6b7a6-50f5-4782-a5d4-53bb8f07e226"
-  ].join("\n")
-};
-
-async function runFix(fixId, btn) {
-  var script = FIX_SCRIPTS[fixId];
-  if (!script) return;
-  var outEl = document.getElementById("out_" + fixId);
-  var origHTML = btn.innerHTML;
-
-  btn.innerHTML = '<div class="spinner"></div> Kører...';
-  btn.className = "fix-btn running";
-  btn.disabled = true;
-  if (outEl) { outEl.classList.add("visible"); outEl.textContent = "Kører script..."; }
-
-  try {
-    var res  = await fetch(AGENT + "/api/run-ps", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script: script }) });
-    var data = await res.json();
-    if (outEl) outEl.textContent = data.output || data.error || "Intet output";
-    btn.innerHTML = "✅ Udført";
-    btn.className = "fix-btn success";
-    showToast("Script kørt succesfuldt", "ok");
-    setTimeout(function() { btn.innerHTML = origHTML; btn.className = "fix-btn primary"; btn.disabled = false; }, 8000);
-  } catch (e) {
-    if (outEl) outEl.textContent = "Fejl: " + e.message;
-    btn.innerHTML = origHTML;
-    btn.className = "fix-btn primary";
-    btn.disabled = false;
-    showToast("Fejl ved kørsel", "error");
-  }
-}
-
-// ── DisplayLink install ───────────────────────────────────────────────────────
-var PS_CHECK_VERSION = [
-  "$sw = Get-ItemProperty 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like '*DisplayLink*' } | Select-Object -First 1",
-  "$dl = Get-WmiObject -Class Win32_PnPSignedDriver | Where-Object { $_.DeviceName -like '*DisplayLink*' } | Select-Object -First 1",
-  "$ver = if ($sw) { $sw.DisplayVersion } elseif ($dl) { $dl.DriverVersion } else { 'ikke installeret' }",
-  "Write-Output ('VERSION:' + $ver)"
+// ── Genstart USB-C controller ─────────────────────────────────────────────────
+var PS_RESTART_USB = [
+  "$controllers = Get-PnpDevice | Where-Object {",
+  "  $_.FriendlyName -like '*xHCI*' -or",
+  "  $_.FriendlyName -like '*USB 3*' -or",
+  "  $_.FriendlyName -like '*Extensible Host Controller*'",
+  "}",
+  "$count = 0",
+  "foreach ($ctrl in $controllers) {",
+  "  Write-Host 'Genstarter:' $ctrl.FriendlyName",
+  "  Disable-PnpDevice -InstanceId $ctrl.InstanceId -Confirm:$false -ErrorAction SilentlyContinue",
+  "  Start-Sleep -Milliseconds 1500",
+  "  Enable-PnpDevice -InstanceId $ctrl.InstanceId -Confirm:$false -ErrorAction SilentlyContinue",
+  "  $count++",
+  "}",
+  "if ($count -eq 0) { Write-Host 'Ingen USB-C controller fundet.' }",
+  "else { Write-Host ('Faerdig - ' + $count + ' controller(e) genstartet. Tilslut docken igen.') }"
 ].join("\n");
 
-async function checkDisplayLinkVersion() {
-  try {
-    var res  = await fetch(AGENT + "/api/run-ps", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script: PS_CHECK_VERSION }) });
-    var data = await res.json();
-    var m    = (data.output || "").match(/VERSION:(.+)/);
-    return m ? m[1].trim() : "ukendt";
-  } catch {
-    return "fejl ved tjek";
-  }
-}
-
-async function checkDLVersionOnly() {
-  var version = await checkDisplayLinkVersion();
-  showPopup("✅", "DisplayLink version", version === "ikke installeret"
-    ? "DisplayLink driver er <strong>ikke installeret</strong> på denne PC.<br><br>Klik \"Installer DisplayLink\" for at installere."
-    : "DisplayLink driver er installeret.<br><br><strong>Version:</strong> " + esc(version),
-    null);
-}
-
-async function installDisplayLink(btn) {
+async function restartUsbController(btn) {
+  var outEl = document.getElementById("restartOutput");
   var origHTML = btn.innerHTML;
+
+  btn.innerHTML = '<div class="spinner"></div> Genstarter...';
   btn.disabled = true;
+  btn.className = "action-btn running";
+  outEl.style.display = "block";
+  outEl.textContent = "Kører...";
 
-  // Trin 1: Tjek version
-  btn.innerHTML = '<div class="spinner"></div> Tjekker version...';
-  btn.className = "fix-btn running";
-  var currentVersion = await checkDisplayLinkVersion();
-
-  var isInstalled = currentVersion !== "ikke installeret"
-                 && currentVersion !== "ukendt"
-                 && currentVersion !== "fejl ved tjek";
-
-  if (isInstalled) {
-    // Allerede installeret – spørg
-    showPopupWithChoice(
-      "✅",
-      "DisplayLink er allerede installeret",
-      "Driver er installeret på denne PC.<br><br><strong>Version:</strong> " + esc(currentVersion) + "<br><br>Vil du geninstallere / opdatere alligevel?",
-      "Nej, annuller",
-      function() { btn.innerHTML = origHTML; btn.className = "fix-btn primary"; btn.disabled = false; },
-      "Ja, geninstaller",
-      function() { doInstall(btn, origHTML); }
-    );
-    return;
-  }
-
-  // Ikke installeret – kør direkte
-  await doInstall(btn, origHTML);
-}
-
-async function doInstall(btn, origHTML) {
   try {
-    // Trin 2: Download fra Azure Blob
-    btn.innerHTML = '<div class="spinner"></div> Downloader...';
-    btn.className = "fix-btn running";
-    btn.disabled = true;
-
-    var dlRes  = await fetch(AGENT + "/api/download", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: DISPLAYLINK_URL, filename: "DisplayLink_installer.exe" }) });
-    var dlData = await dlRes.json();
-    if (!dlData.path) throw new Error(dlData.error || "Download fejlede");
-
-    // Trin 3: Silent install
-    btn.innerHTML = '<div class="spinner"></div> Installerer...';
-    var installScript = [
-      "Write-Output 'Starter installation...'",
-      "$proc = Start-Process -FilePath '" + dlData.path.replace(/\\/g, "\\\\") + "' -ArgumentList '/S /v/qn' -Wait -PassThru",
-      "Write-Output ('EXIT:' + $proc.ExitCode)"
-    ].join("\n");
-
-    var instRes  = await fetch(AGENT + "/api/run-ps", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ script: installScript }) });
-    var instData = await instRes.json();
-    var exitM    = (instData.output || "").match(/EXIT:(\d+)/);
-    var exitCode = exitM ? parseInt(exitM[1]) : -1;
-
-    // Trin 4: Tjek ny version
-    btn.innerHTML = '<div class="spinner"></div> Tjekker version...';
-    var newVersion = await checkDisplayLinkVersion();
-
-    if (exitCode === 0 || exitCode === 3010) {
-      var rebootMsg = exitCode === 3010 ? "<br><br>⚠️ <strong>Genstart PC</strong> for at aktivere driveren." : "";
-      showPopup("✅", "DisplayLink installeret", "Installation gennemført.<br><br><strong>Version:</strong> " + esc(newVersion) + rebootMsg, null);
-      btn.innerHTML = "✅ Installeret";
-      btn.className = "fix-btn success";
-      setTimeout(function() { btn.innerHTML = '📦 Installer DisplayLink'; btn.className = "fix-btn primary"; btn.disabled = false; }, 8000);
-    } else {
-      showPopup("❌", "Installation fejlede", "Exit code: " + exitCode + "<br><br><strong>Nuværende version:</strong> " + esc(newVersion) + "<br><br><code style='font-size:.8rem;word-break:break-all'>" + esc(instData.output || "") + "</code>", null);
+    var res  = await fetch(AGENT + "/api/run-ps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ script: PS_RESTART_USB })
+    });
+    var data = await res.json();
+    outEl.textContent = data.output || data.error || "Intet output";
+    btn.innerHTML = "✅ Færdig — tilslut docken igen";
+    btn.className = "action-btn success";
+    showToast("USB-C controller genstartet", "ok");
+    setTimeout(function() {
       btn.innerHTML = origHTML;
-      btn.className = "fix-btn primary";
+      btn.className = "action-btn";
       btn.disabled = false;
-    }
+    }, 12000);
   } catch (e) {
-    var version = await checkDisplayLinkVersion();
-    showPopup("❌", "Fejl", esc(e.message) + "<br><br><strong>Version:</strong> " + esc(version), null);
+    outEl.textContent = "Fejl: " + e.message;
     btn.innerHTML = origHTML;
-    btn.className = "fix-btn primary";
+    btn.className = "action-btn";
     btn.disabled = false;
+    showToast("Fejl ved genstart", "error");
   }
 }
 
-// ── Popup helpers ─────────────────────────────────────────────────────────────
-function showPopup(icon, title, bodyHTML, onClose) {
-  document.getElementById("dlPopupIcon").textContent  = icon;
-  document.getElementById("dlPopupTitle").textContent = title;
-  document.getElementById("dlPopupBody").innerHTML    = bodyHTML;
-  document.getElementById("dlPopupActions").innerHTML =
-    '<button class="popup-close" onclick="closePopup()">Luk</button>';
-  window._popupOnClose = onClose;
-  document.getElementById("dlPopup").classList.add("open");
+// ── Grafik-driver status ──────────────────────────────────────────────────────
+// Viser installeret driver + udbyder (Intel/Microsoft/AMD osv.)
+// Kan IKKE afgøre om driveren er hentet via Windows Update, HPIA
+// eller direkte fra hjemmeside — kun udbydernavn er sikkert.
+var PS_CHECK_DRIVERS = [
+  "$drivers = Get-WmiObject Win32_PnPSignedDriver",
+  "  | Where-Object { $_.DeviceClass -eq 'DISPLAY' }",
+  "foreach ($d in $drivers) {",
+  "  $dateStr = ''",
+  "  try {",
+  "    $dateStr = [Management.ManagementDateTimeConverter]::ToDateTime($d.DriverDate).ToString('dd-MM-yyyy')",
+  "  } catch {}",
+  "  Write-Output ('DRIVER|' + $d.DeviceName + '|' + $d.DriverProviderName + '|' + $d.DriverVersion + '|' + $dateStr)",
+  "}"
+].join("\n");
+
+async function loadDriverStatus() {
+  try {
+    var res  = await fetch(AGENT + "/api/run-ps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ script: PS_CHECK_DRIVERS })
+    });
+    var data = await res.json();
+    var lines = (data.output || "").split("\n").filter(function(l) { return l.startsWith("DRIVER|"); });
+
+    if (!lines.length) return;
+
+    var html = "";
+    lines.forEach(function(line) {
+      var p        = line.split("|");
+      var name     = p[1] || "–";
+      var provider = p[2] || "–";
+      var version  = p[3] || "–";
+      var date     = p[4] || "–";
+
+      var badgeCls   = "warn";
+      var badgeLabel = esc(provider);
+
+      if (provider.indexOf("Intel") !== -1) {
+        badgeCls = "ok"; badgeLabel = "Intel";
+      } else if (provider === "Microsoft") {
+        badgeCls = "warn"; badgeLabel = "Microsoft (generisk)";
+      } else if (provider.indexOf("NVIDIA") !== -1) {
+        badgeCls = "ok"; badgeLabel = "NVIDIA";
+      } else if (provider.indexOf("Advanced Micro") !== -1 || provider.indexOf("AMD") !== -1) {
+        badgeCls = "ok"; badgeLabel = "AMD";
+      }
+
+      html += '<div class="driver-item">' +
+        '<div class="driver-name">' + esc(name) + '</div>' +
+        '<div class="driver-meta">' +
+          '<span class="badge ' + badgeCls + '">' + badgeLabel + '</span>' +
+          '<span class="driver-version">v' + esc(version) + '</span>' +
+          '<span class="driver-date">' + esc(date) + '</span>' +
+        '</div>' +
+      '</div>';
+    });
+
+    document.getElementById("driverList").innerHTML = html;
+    document.getElementById("driverSection").style.display = "";
+  } catch {}
 }
 
-function showPopupWithChoice(icon, title, bodyHTML, cancelLabel, onCancel, confirmLabel, onConfirm) {
-  document.getElementById("dlPopupIcon").textContent  = icon;
-  document.getElementById("dlPopupTitle").textContent = title;
-  document.getElementById("dlPopupBody").innerHTML    = bodyHTML;
-  document.getElementById("dlPopupActions").innerHTML =
-    '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
-      '<button class="fix-btn secondary" style="padding:10px 22px;font-size:.9rem" onclick="closePopup(\'cancel\')">' + cancelLabel + '</button>' +
-      '<button class="fix-btn primary"   style="padding:10px 22px;font-size:.9rem" onclick="closePopup(\'confirm\')">' + confirmLabel + '</button>' +
-    '</div>';
-  window._popupOnCancel  = onCancel;
-  window._popupOnConfirm = onConfirm;
-  document.getElementById("dlPopup").classList.add("open");
-}
-
-function closePopup(action) {
-  document.getElementById("dlPopup").classList.remove("open");
-  if (action === "confirm" && window._popupOnConfirm) window._popupOnConfirm();
-  else if (window._popupOnCancel && action !== "confirm") window._popupOnCancel();
-}
-
-// ── Toast ─────────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function showToast(msg, type) {
   var t = document.getElementById("toast");
   t.textContent = msg;
   t.className = type;
   t.style.display = "block";
   t.style.opacity = "1";
-  setTimeout(function() { t.style.opacity = "0"; setTimeout(function() { t.style.display = "none"; }, 300); }, 3000);
+  setTimeout(function() {
+    t.style.opacity = "0";
+    setTimeout(function() { t.style.display = "none"; }, 300);
+  }, 3000);
 }
 
 function esc(s) {
