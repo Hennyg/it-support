@@ -102,6 +102,13 @@
 
     .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
     .problem-title { font-size: .9rem; font-weight: 700; color: #374151; margin-bottom: 8px; }
+
+    .guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .guide-tile { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+    .guide-tile-icon  { font-size: 1.3rem; }
+    .guide-tile-title { font-size: .9rem; font-weight: 700; color: #111827; }
+    .guide-tile-desc  { font-size: .82rem; color: #6b7280; line-height: 1.5; flex: 1; }
+    .guide-tile-btns  { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
     .loading-ph { display: flex; align-items: center; gap: 10px; color: #9ca3af; font-size: .9rem; padding: 8px 0; }
 
     .driver-item { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 8px; }
@@ -463,12 +470,13 @@ function row(label, value, rawHtml) {
 }
 
 // Grafik-driver med download-link
+// Win32_VideoController er langt mere paaliidelig end Win32_PnPSignedDriver til GPU-detektion
 var PS_CHECK_DRIVERS = [
-  "$drivers = Get-WmiObject Win32_PnPSignedDriver | Where-Object { $_.DeviceClass -eq 'DISPLAY' }",
-  "foreach ($d in $drivers) {",
+  "$gpus = Get-WmiObject Win32_VideoController",
+  "foreach ($g in $gpus) {",
   "  $dateStr = ''",
-  "  try { $dateStr = [Management.ManagementDateTimeConverter]::ToDateTime($d.DriverDate).ToString('dd-MM-yyyy') } catch {}",
-  "  Write-Output ('DRIVER|' + $d.DeviceName + '|' + $d.DriverProviderName + '|' + $d.DriverVersion + '|' + $dateStr)",
+  "  try { $dateStr = [Management.ManagementDateTimeConverter]::ToDateTime($g.DriverDate).ToString('dd-MM-yyyy') } catch {}",
+  "  Write-Output ('DRIVER|' + $g.Name + '|' + $g.AdapterCompatibility + '|' + $g.DriverVersion + '|' + $dateStr)",
   "}"
 ].join("\n");
 
@@ -517,43 +525,48 @@ async function loadDriverStatus() {
   } catch (e) { el.innerHTML = '<p style="color:#991b1b;font-size:.9rem;margin:0">Fejl: ' + esc(e.message) + '</p>'; }
 }
 
-// Guide
+// Guide — tiles uden numre
 var GUIDES = {
   lenovo: [
-    { title: "Genstart Dock Manager service", desc: "Mange dock-problemer loeses ved at genstarte Dock Manager.", btns: [{ label: "Genstart Dock Manager service", id: "restart_dock_service", primary: true }] },
-    { title: "Opdater Dock Manager", desc: "Tjek om der er en nyere version tilgaengelig fra Lenovo.", btns: [{ label: "Opdater Dock Manager", href: "https://support.lenovo.com/dk/da/solutions/ht037099", primary: true }] },
-    { title: "Deaktiver USB stromstyring", desc: "Windows slukker USB-porte for at spare strøm - det afbryder docken.", btns: [{ label: "Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true }] },
-    { title: "Nulstil USB Hub", desc: "Docken genkendes ikke? Nulstil USB-hubben.", btns: [{ label: "Nulstil USB Hub", id: "reset_usb_hub", primary: true }, { label: "Scan hardware-aendringer", id: "scan_hardware_changes", primary: false }] },
-    { title: "Tjek netvaerk via dock", desc: "Ethernet via dock virker ikke? Tjek netvaerksadapteren.", btns: [{ label: "Tjek dock netvaerksadapter", id: "check_dock_network", primary: true }] },
-    { title: "Lenovo support", desc: "Intet har virket? Se Lenovos support-side.", btns: [{ label: "Lenovo Dock support", href: "https://support.lenovo.com/dk/da/solutions/pd500265", primary: false }] }
+    { icon: "&#128260;", title: "Genstart Dock Manager service", desc: "Mange dock-problemer loeses ved at genstarte Dock Manager. Start her.", btns: [{ label: "Genstart Dock Manager service", id: "restart_dock_service", primary: true }] },
+    { icon: "&#128230;", title: "Opdater Dock Manager", desc: "Tjek om der er en nyere version tilgaengelig fra Lenovo.", btns: [{ label: "Opdater Dock Manager", href: "https://support.lenovo.com/dk/da/solutions/ht037099", primary: true }] },
+    { icon: "&#9889;",   title: "Deaktiver USB stromstyring", desc: "Windows slukker USB-porte for at spare strøm - det afbryder docken.", btns: [{ label: "Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true }] },
+    { icon: "&#128256;", title: "Nulstil USB Hub", desc: "Docken genkendes ikke? Nulstil USB-hubben.", btns: [{ label: "Nulstil USB Hub", id: "reset_usb_hub", primary: true }, { label: "Scan hardware-aendringer", id: "scan_hardware_changes", primary: false }] },
+    { icon: "&#127760;", title: "Tjek netvaerk via dock", desc: "Ethernet via dock virker ikke? Tjek netvaerksadapteren.", btns: [{ label: "Tjek dock netvaerksadapter", id: "check_dock_network", primary: true }] },
+    { icon: "&#128196;", title: "Lenovo support", desc: "Intet har virket? Se Lenovos support-side.", btns: [{ label: "Lenovo Dock support", href: "https://support.lenovo.com/dk/da/solutions/pd500265", primary: false }] }
   ],
   displaylink: [
-    { title: "Installer / opdater DisplayLink driver", desc: "Skaerm blinker eller virker ikke? DisplayLink driveren er den vigtigste.", btns: [{ label: "Installer / opdater DisplayLink", fn: "installDisplayLink(this)", primary: true }] },
-    { title: "Deaktiver USB stromstyring", desc: "Windows slukker USB-porte for at spare strøm.", btns: [{ label: "Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true }] },
-    { title: "Genstart DisplayLink service", desc: "Skaerm stadig sort? Genstart DisplayLink-tjenesten.", btns: [{ label: "Genstart DisplayLink service", id: "restart_displaylink", primary: true }] },
-    { title: "Nulstil USB Hub", desc: "Dock genkendes ikke? Nulstil USB-hubben.", btns: [{ label: "Nulstil USB Hub", id: "reset_usb_hub", primary: true }, { label: "Scan hardware-aendringer", id: "scan_hardware_changes", primary: false }] },
-    { title: "Tjek netvaerk via dock", desc: "Ethernet virker ikke? Tjek netvaerksadapteren.", btns: [{ label: "Tjek dock netvaerksadapter", id: "check_dock_network", primary: true }] },
-    { title: "i-Tec support", desc: "Intet har virket? Se i-Tec support og firmware.", btns: [{ label: "i-Tec support", href: "https://i-tec.pro/en/support", primary: false }, { label: "i-Tec firmware", href: "https://i-tec.pro/en/software", primary: false }] }
+    { icon: "&#128230;", title: "Installer / opdater DisplayLink driver", desc: "Skaerm blinker eller virker ikke? DisplayLink driveren er den vigtigste.", btns: [{ label: "Installer / opdater DisplayLink", fn: "installDisplayLink(this)", primary: true }] },
+    { icon: "&#9889;",   title: "Deaktiver USB stromstyring", desc: "Windows slukker USB-porte for at spare strøm.", btns: [{ label: "Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true }] },
+    { icon: "&#128260;", title: "Genstart DisplayLink service", desc: "Skaerm stadig sort? Genstart DisplayLink-tjenesten.", btns: [{ label: "Genstart DisplayLink service", id: "restart_displaylink", primary: true }] },
+    { icon: "&#128256;", title: "Nulstil USB Hub", desc: "Dock genkendes ikke? Nulstil USB-hubben.", btns: [{ label: "Nulstil USB Hub", id: "reset_usb_hub", primary: true }, { label: "Scan hardware-aendringer", id: "scan_hardware_changes", primary: false }] },
+    { icon: "&#127760;", title: "Tjek netvaerk via dock", desc: "Ethernet virker ikke? Tjek netvaerksadapteren.", btns: [{ label: "Tjek dock netvaerksadapter", id: "check_dock_network", primary: true }] },
+    { icon: "&#128196;", title: "i-Tec support", desc: "Intet har virket? Se i-Tec support og firmware.", btns: [{ label: "i-Tec support", href: "https://i-tec.pro/en/support", primary: false }, { label: "i-Tec firmware", href: "https://i-tec.pro/en/software", primary: false }] }
   ],
   generic: [
-    { title: "Deaktiver USB stromstyring", desc: "Windows slukker USB-porte for at spare strøm.", btns: [{ label: "Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true }] },
-    { title: "Nulstil USB Hub", desc: "Dock genkendes ikke? Nulstil USB-hubben.", btns: [{ label: "Nulstil USB Hub", id: "reset_usb_hub", primary: true }, { label: "Scan hardware-aendringer", id: "scan_hardware_changes", primary: false }] },
-    { title: "Tjek driver", desc: "Tjek om alle dock-enheder har korrekt driver.", btns: [{ label: "Tjek dock driver", id: "check_itec_driver", primary: true }] }
+    { icon: "&#9889;",   title: "Deaktiver USB stromstyring", desc: "Windows slukker USB-porte for at spare strøm.", btns: [{ label: "Deaktiver USB selective suspend", id: "disable_usb_selective_suspend", primary: true }] },
+    { icon: "&#128256;", title: "Nulstil USB Hub", desc: "Dock genkendes ikke? Nulstil USB-hubben.", btns: [{ label: "Nulstil USB Hub", id: "reset_usb_hub", primary: true }, { label: "Scan hardware-aendringer", id: "scan_hardware_changes", primary: false }] },
+    { icon: "&#128269;", title: "Tjek driver", desc: "Tjek om alle dock-enheder har korrekt driver.", btns: [{ label: "Tjek dock driver", id: "check_itec_driver", primary: true }] }
   ]
 };
 function renderGuide(dockType) {
-  var steps = GUIDES[dockType] || GUIDES.generic; var el = document.getElementById("guideBody"); if (!el) return;
-  el.innerHTML = steps.map(function(step, i) {
-    var isLast = i === steps.length - 1;
+  var steps = GUIDES[dockType] || GUIDES.generic;
+  var el = document.getElementById("guideBody");
+  if (!el) return;
+  el.innerHTML = '<div class="guide-grid">' + steps.map(function(step) {
     var btnHtml = step.btns.map(function(b) {
       if (b.href) return '<a class="fix-btn ' + (b.primary?"primary":"secondary") + '" href="' + esc(b.href) + '" target="_blank">' + b.label + '</a>';
       if (b.fn)   return '<button class="fix-btn ' + (b.primary?"primary":"secondary") + '" onclick="' + b.fn + '">' + b.label + '</button>';
-      return '<button class="fix-btn ' + (b.primary?"primary":"secondary") + '" onclick="runFix(&quot;' + b.id + '&quot;, this)">' + b.label + '</button><div class="script-output" id="out_' + b.id + '_guide"></div>';
+      return '<button class="fix-btn ' + (b.primary?"primary":"secondary") + '" onclick="runFix(&quot;' + b.id + '&quot;, this)">' + b.label + '</button>' +
+             '<div class="script-output" id="out_' + b.id + '_guide"></div>';
     }).join("");
-    return '<div style="display:flex;gap:16px;padding:14px 0;' + (isLast?"":"border-bottom:1px solid #f3f4f6") + '">' +
-      '<div style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:' + (i===0?"#850c18":"#e5e7eb") + ';color:' + (i===0?"#fff":"#374151") + ';display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem">' + (i+1) + '</div>' +
-      '<div style="flex:1"><div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:4px">' + esc(step.title) + '</div><div style="font-size:.85rem;color:#6b7280;margin-bottom:10px">' + esc(step.desc) + '</div><div style="display:flex;flex-wrap:wrap;gap:8px">' + btnHtml + '</div></div></div>';
-  }).join("");
+    return '<div class="guide-tile">' +
+      '<div class="guide-tile-icon">' + step.icon + '</div>' +
+      '<div class="guide-tile-title">' + esc(step.title) + '</div>' +
+      '<div class="guide-tile-desc">' + esc(step.desc) + '</div>' +
+      '<div class="guide-tile-btns">' + btnHtml + '</div>' +
+      '</div>';
+  }).join("") + '</div>';
 }
 
 // Dock-enheder
