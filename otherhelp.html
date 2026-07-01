@@ -189,7 +189,7 @@ async function checkRegValues() {
     tbody.rows[i].cells[2].innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
   });
 
-  const script = `
+const script = `
 $path = "${REG_PATH}"
 $names = @(${REG_VALUES.map(v => `"${v}"`).join(",")})
 $results = @()
@@ -201,7 +201,7 @@ foreach ($name in $names) {
     $results += "$name=MISSING"
   }
 }
-$results -join "|"
+Write-Output ($results -join "|")
 `.trim();
 
   let allOk = true;
