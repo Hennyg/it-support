@@ -141,7 +141,7 @@
 <script>
 const AGENT = "http://localhost:5199";
 
-const REG_PATH = "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Office\\16.0\\Excel\\Security\\ProtectedView";
+const REG_PATH = "HKCU:\\Software\\Microsoft\\Office\\16.0\\Excel\\Security\\ProtectedView";
 const REG_VALUES = [
   "DisableInternetFilesInPV",
   "DisableUnsafeLocationsInPV",
@@ -183,7 +183,6 @@ document.getElementById("excelPvOverlay").addEventListener("click", function(e) 
 
 async function checkRegValues() {
   const tbody = document.getElementById("regTableBody");
-  // Sæt alle til loading
   REG_VALUES.forEach((_, i) => {
     tbody.rows[i].cells[2].innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
   });
@@ -241,7 +240,7 @@ async function applyExcelPvFix() {
   btn.textContent = "Opdaterer...";
   document.getElementById("pvResult").textContent = "";
 
-const script = `
+  const script = `
 $path = "${REG_PATH}"
 try {
   if (!(Test-Path $path)) { New-Item -Path $path -Force -ErrorAction Stop | Out-Null }
@@ -257,17 +256,12 @@ try {
   try {
     const data = await runPs(script);
     const output = (data.output || "").trim();
-if (output === "OK") {
-  // ...
-} else {
-  throw new Error(output || "Ukendt fejl fra PowerShell");
-}
-    if (output.includes("OK")) {
+    if (output === "OK") {
       document.getElementById("pvResult").textContent = "✓ Registreringsdatabasen er opdateret.";
       document.getElementById("pvResult").className = "popup-result ok";
       await checkRegValues();
     } else {
-      throw new Error(output || "Ukendt fejl");
+      throw new Error(output || "Ukendt fejl fra PowerShell");
     }
   } catch (err) {
     document.getElementById("pvResult").textContent = "Fejl: " + err.message;
