@@ -161,7 +161,9 @@ async function runPs(script) {
     body: JSON.stringify({ script })
   });
   if (!res.ok) throw new Error("Agent svarede " + res.status);
-  return await res.json();
+  const data = await res.json();
+  console.log("run-ps svar:", JSON.stringify(data));
+  return data;
 }
 
 async function openExcelPvPopup() {
