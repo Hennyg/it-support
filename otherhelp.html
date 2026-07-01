@@ -141,7 +141,7 @@
 <script>
 const AGENT = "http://localhost:5199";
 
-const REG_PATH = "HKCU:\\Software\\Microsoft\\Office\\16.0\\Excel\\Security\\ProtectedView";
+const REG_PATH = "HKLM:\\SOFTWARE\\Policies\\Microsoft\\Office\\16.0\\Excel\\Security\\ProtectedView";
 const REG_VALUES = [
   "DisableInternetFilesInPV",
   "DisableUnsafeLocationsInPV",
@@ -241,18 +241,27 @@ async function applyExcelPvFix() {
   btn.textContent = "Opdaterer...";
   document.getElementById("pvResult").textContent = "";
 
-  const script = `
+const script = `
 $path = "${REG_PATH}"
-if (!(Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
-Set-ItemProperty -Path $path -Name "DisableInternetFilesInPV"   -Value 1 -Type DWord
-Set-ItemProperty -Path $path -Name "DisableUnsafeLocationsInPV" -Value 1 -Type DWord
-Set-ItemProperty -Path $path -Name "DisableAttachmentsInPV"     -Value 1 -Type DWord
-Write-Host "OK"
+try {
+  if (!(Test-Path $path)) { New-Item -Path $path -Force -ErrorAction Stop | Out-Null }
+  Set-ItemProperty -Path $path -Name "DisableInternetFilesInPV"   -Value 1 -Type DWord -ErrorAction Stop
+  Set-ItemProperty -Path $path -Name "DisableUnsafeLocationsInPV" -Value 1 -Type DWord -ErrorAction Stop
+  Set-ItemProperty -Path $path -Name "DisableAttachmentsInPV"     -Value 1 -Type DWord -ErrorAction Stop
+  Write-Host "OK"
+} catch {
+  Write-Host "ERROR: $($_.Exception.Message)"
+}
 `.trim();
 
   try {
     const data = await runPs(script);
     const output = (data.output || "").trim();
+if (output === "OK") {
+  // ...
+} else {
+  throw new Error(output || "Ukendt fejl fra PowerShell");
+}
     if (output.includes("OK")) {
       document.getElementById("pvResult").textContent = "✓ Registreringsdatabasen er opdateret.";
       document.getElementById("pvResult").className = "popup-result ok";
