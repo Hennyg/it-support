@@ -86,6 +86,20 @@
         <button class="btn-run" id="excelPvBtn" onclick="openExcelPvPopup()">▶ Kør</button>
       </div>
 
+      <div class="action-card">
+        <div class="card-icon">🗑️</div>
+        <h2>Slet Temp filer</h2>
+        <p>Fjerner alle filer i den midlertidige mappe (%temp%). Kan frigøre diskplads og løse problemer med programmer der opfører sig underligt.</p>
+        <button class="btn-run" id="tempBtn" onclick="openTempPopup()">🗑 Slet</button>
+      </div>
+
+      <div class="action-card">
+        <div class="card-icon">🌐</div>
+        <h2>Tjek Edge opdatering</h2>
+        <p>Viser den installerede version af Microsoft Edge, og giver mulighed for at rydde Edges cache.</p>
+        <button class="btn-run" id="edgeBtn" onclick="openEdgePopup()">▶ Kør</button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -131,6 +145,63 @@
   </div>
 </div>
 
+<!-- Popup: Slet Temp filer -->
+<div class="popup-overlay" id="tempOverlay">
+  <div class="popup-box">
+    <h2 class="popup-title">🗑️ Slet Temp filer</h2>
+    <p class="popup-desc">Alle filer og mapper i %temp% bliver slettet. Filer der er i brug af et åbent program springes automatisk over.</p>
+
+    <table class="reg-table">
+      <thead>
+        <tr>
+          <th>Antal filer</th>
+          <th>Størrelse</th>
+        </tr>
+      </thead>
+      <tbody id="tempTableBody">
+        <tr>
+          <td colspan="2"><span class="status-badge loading"><span class="spinner"></span> Tjekker...</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="popup-footer">
+      <span class="popup-result" id="tempResult"></span>
+      <button class="btn-close" onclick="closeTempPopup()">Luk</button>
+      <button class="btn-update" id="tempDeleteBtn" onclick="applyTempDelete()" disabled>🗑 Slet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Popup: Edge opdatering / cache -->
+<div class="popup-overlay" id="edgeOverlay">
+  <div class="popup-box">
+    <h2 class="popup-title">🌐 Edge opdatering</h2>
+    <p class="popup-desc">Viser den version af Edge der er installeret på pc'en. Luk Edge før du sletter cachen for det bedste resultat.</p>
+
+    <table class="reg-table">
+      <thead>
+        <tr>
+          <th>Egenskab</th>
+          <th>Værdi</th>
+        </tr>
+      </thead>
+      <tbody id="edgeTableBody">
+        <tr>
+          <td>Installeret version</td>
+          <td><span class="status-badge loading"><span class="spinner"></span> Tjekker...</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="popup-footer">
+      <span class="popup-result" id="edgeResult"></span>
+      <button class="btn-close" onclick="closeEdgePopup()">Luk</button>
+      <button class="btn-update" id="edgeCacheBtn" onclick="clearEdgeCache()">Slet cache</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const AGENT = "http://localhost:5199";
 const REG_PATH = "HKCU:\\Software\\Microsoft\\Office\\16.0\\Excel\\Security\\ProtectedView";
@@ -172,6 +243,14 @@ function closeExcelPvPopup() {
 
 document.getElementById("excelPvOverlay").addEventListener("click", function(e) {
   if (e.target === this) closeExcelPvPopup();
+});
+
+document.getElementById("tempOverlay").addEventListener("click", function(e) {
+  if (e.target === this) closeTempPopup();
+});
+
+document.getElementById("edgeOverlay").addEventListener("click", function(e) {
+  if (e.target === this) closeEdgePopup();
 });
 
 async function checkRegValues() {
@@ -246,6 +325,146 @@ async function applyExcelPvFix() {
     btn.disabled = false;
   } finally {
     btn.textContent = "Opdater";
+  }
+}
+
+/* ---------- Slet Temp filer ---------- */
+
+async function openTempPopup() {
+  document.getElementById("tempOverlay").classList.add("open");
+  document.getElementById("tempResult").textContent = "";
+  document.getElementById("tempResult").className = "popup-result";
+  document.getElementById("tempDeleteBtn").disabled = true;
+  await checkTempFiles();
+}
+
+function closeTempPopup() {
+  document.getElementById("tempOverlay").classList.remove("open");
+}
+
+async function checkTempFiles() {
+  const tbody = document.getElementById("tempTableBody");
+  tbody.rows[0].cells[0].innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
+
+  const script = 'try { $items = Get-ChildItem -Path $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue; $count = ($items | Measure-Object).Count; $size = [math]::Round((($items | Measure-Object -Property Length -Sum).Sum / 1MB), 1); Write-Output "$count|$size" } catch { Write-Output "ERROR|0" }';
+
+  console.log("Temp check script:", script);
+
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    const [count, size] = output.split("|");
+
+    tbody.innerHTML = '<tr><td>' + (count === "ERROR" ? "0" : count) + ' filer</td><td>' + (size || "0") + ' MB</td></tr>';
+
+    const hasFiles = count !== "ERROR" && Number(count) > 0;
+    document.getElementById("tempDeleteBtn").disabled = !hasFiles;
+    if (!hasFiles) {
+      document.getElementById("tempResult").textContent = "Temp-mappen er allerede tom.";
+      document.getElementById("tempResult").className = "popup-result ok";
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="2"><span class="status-badge error">Agent ikke fundet</span></td></tr>';
+    document.getElementById("tempResult").textContent = "Kunne ikke forbinde til IT Support Agent.";
+    document.getElementById("tempResult").className = "popup-result err";
+  }
+}
+
+async function applyTempDelete() {
+  const btn = document.getElementById("tempDeleteBtn");
+  btn.disabled = true;
+  btn.textContent = "Sletter...";
+  document.getElementById("tempResult").textContent = "";
+
+  const script = 'try { $errors = 0; $deleted = 0; Get-ChildItem -Path $env:TEMP -Force -ErrorAction SilentlyContinue | ForEach-Object { try { Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop; $deleted++ } catch { $errors++ } }; Write-Output "OK|$deleted|$errors" } catch { Write-Output "ERROR|0|0" }';
+
+  console.log("Temp delete script:", script);
+
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    const [status, deleted, errors] = output.split("|");
+
+    if (status === "OK") {
+      const skipped = Number(errors) > 0 ? ` (${errors} filer var i brug og blev sprunget over)` : "";
+      document.getElementById("tempResult").textContent = `✓ ${deleted} filer/mapper slettet${skipped}.`;
+      document.getElementById("tempResult").className = "popup-result ok";
+      await checkTempFiles();
+    } else {
+      throw new Error("Ukendt fejl fra PowerShell");
+    }
+  } catch (err) {
+    document.getElementById("tempResult").textContent = "Fejl: " + err.message;
+    document.getElementById("tempResult").className = "popup-result err";
+  } finally {
+    btn.textContent = "🗑 Slet";
+  }
+}
+
+/* ---------- Edge opdatering / cache ---------- */
+
+async function openEdgePopup() {
+  document.getElementById("edgeOverlay").classList.add("open");
+  document.getElementById("edgeResult").textContent = "";
+  document.getElementById("edgeResult").className = "popup-result";
+  await checkEdgeVersion();
+}
+
+function closeEdgePopup() {
+  document.getElementById("edgeOverlay").classList.remove("open");
+}
+
+async function checkEdgeVersion() {
+  const tbody = document.getElementById("edgeTableBody");
+  tbody.rows[0].cells[1].innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
+
+  const script = 'try { $v = (Get-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Edge\\BLBeacon" -Name version -ErrorAction Stop).version; Write-Output "OK|$v" } catch { Write-Output "MISSING|" }';
+
+  console.log("Edge version script:", script);
+
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    const [status, version] = output.split("|");
+
+    tbody.innerHTML = status === "OK"
+      ? '<tr><td>Installeret version</td><td><span class="status-badge ok">✓ ' + version + '</span></td></tr>'
+      : '<tr><td>Installeret version</td><td><span class="status-badge missing">⚠ Kunne ikke findes</span></td></tr>';
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="2"><span class="status-badge error">Agent ikke fundet</span></td></tr>';
+    document.getElementById("edgeResult").textContent = "Kunne ikke forbinde til IT Support Agent.";
+    document.getElementById("edgeResult").className = "popup-result err";
+  }
+}
+
+async function clearEdgeCache() {
+  const btn = document.getElementById("edgeCacheBtn");
+  btn.disabled = true;
+  btn.textContent = "Sletter...";
+  document.getElementById("edgeResult").textContent = "";
+
+  const script = 'try { $paths = @("$env:LOCALAPPDATA\\Microsoft\\Edge\\User Data\\Default\\Cache","$env:LOCALAPPDATA\\Microsoft\\Edge\\User Data\\Default\\Code Cache","$env:LOCALAPPDATA\\Microsoft\\Edge\\User Data\\Default\\GPUCache"); $deleted=0; $errors=0; foreach($p in $paths){ if(Test-Path $p){ Get-ChildItem -Path $p -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { try { Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop; $deleted++ } catch { $errors++ } } } }; Write-Output "OK|$deleted|$errors" } catch { Write-Output "ERROR|0|0" }';
+
+  console.log("Edge cache clear script:", script);
+
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    const [status, deleted, errors] = output.split("|");
+
+    if (status === "OK") {
+      const skipped = Number(errors) > 0 ? ` (${errors} filer var i brug, sandsynligvis fordi Edge er åben)` : "";
+      document.getElementById("edgeResult").textContent = `✓ Cache ryddet, ${deleted} filer slettet${skipped}.`;
+      document.getElementById("edgeResult").className = "popup-result ok";
+    } else {
+      throw new Error("Ukendt fejl fra PowerShell");
+    }
+  } catch (err) {
+    document.getElementById("edgeResult").textContent = "Fejl: " + err.message;
+    document.getElementById("edgeResult").className = "popup-result err";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Slet cache";
   }
 }
 </script>
