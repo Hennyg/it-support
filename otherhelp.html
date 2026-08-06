@@ -210,6 +210,7 @@ const REG_VALUES = [
   "DisableUnsafeLocationsInPV",
   "DisableAttachmentsInPV"
 ];
+let tempBeforeCount = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
   ITAuth.requireAuth(({ user }) => {
@@ -358,6 +359,7 @@ async function checkTempFiles() {
     tbody.innerHTML = '<tr><td>' + (count === "ERROR" ? "0" : count) + ' filer</td><td>' + (size || "0") + ' MB</td></tr>';
 
     const hasFiles = count !== "ERROR" && Number(count) > 0;
+    tempBeforeCount = hasFiles ? Number(count) : 0;
     document.getElementById("tempDeleteBtn").disabled = !hasFiles;
     if (!hasFiles) {
       document.getElementById("tempResult").textContent = "Temp-mappen er allerede tom.";
@@ -376,18 +378,20 @@ async function applyTempDelete() {
   btn.textContent = "Sletter...";
   document.getElementById("tempResult").textContent = "";
 
-  const script = 'try { $errors = 0; $deleted = 0; Get-ChildItem -Path $env:TEMP -Force -ErrorAction SilentlyContinue | ForEach-Object { try { Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop; $deleted++ } catch { $errors++ } }; Write-Output "OK|$deleted|$errors" } catch { Write-Output "ERROR|0|0" }';
+  const script = 'try { Remove-Item -Path ($env:TEMP + "\\*") -Recurse -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300; $remaining = (Get-ChildItem -Path $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object).Count; Write-Output "OK|$remaining" } catch { Write-Output "ERROR|0" }';
 
   console.log("Temp delete script:", script);
 
   try {
     const data = await runPs(script);
     const output = (data.output || "").trim();
-    const [status, deleted, errors] = output.split("|");
+    const [status, remaining] = output.split("|");
 
     if (status === "OK") {
-      const skipped = Number(errors) > 0 ? ` (${errors} filer var i brug og blev sprunget over)` : "";
-      document.getElementById("tempResult").textContent = `✓ ${deleted} filer/mapper slettet${skipped}.`;
+      const remainingNum = Number(remaining) || 0;
+      const deleted = Math.max(tempBeforeCount - remainingNum, 0);
+      const stillThere = remainingNum > 0 ? ` ${remainingNum} filer/mapper kunne ikke slettes, fordi de er i brug lige nu.` : "";
+      document.getElementById("tempResult").textContent = `✓ ${deleted} filer/mapper slettet.${stillThere}`;
       document.getElementById("tempResult").className = "popup-result ok";
       await checkTempFiles();
     } else {
@@ -418,7 +422,7 @@ async function checkEdgeVersion() {
   const tbody = document.getElementById("edgeTableBody");
   tbody.rows[0].cells[1].innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
 
-  const script = 'try { $v = (Get-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Edge\\BLBeacon" -Name version -ErrorAction Stop).version; Write-Output "OK|$v" } catch { Write-Output "MISSING|" }';
+  const script = 'try { $paths = @("$env:ProgramFiles\\Microsoft\\Edge\\Application\\msedge.exe", "${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe"); $exe = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1; if ($exe) { $v = (Get-Item $exe).VersionInfo.ProductVersion; Write-Output "OK|$v" } else { Write-Output "MISSING|" } } catch { Write-Output "MISSING|" }';
 
   console.log("Edge version script:", script);
 
