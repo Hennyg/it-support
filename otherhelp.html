@@ -165,6 +165,8 @@
       </tbody>
     </table>
 
+    <div id="tempPathInfo" style="font-size:.78rem;color:#6b7280;font-family:monospace;margin:-8px 0 16px;word-break:break-all;"></div>
+
     <div class="popup-footer">
       <span class="popup-result" id="tempResult"></span>
       <button class="btn-close" onclick="closeTempPopup()">Luk</button>
@@ -346,17 +348,19 @@ function closeTempPopup() {
 async function checkTempFiles() {
   const tbody = document.getElementById("tempTableBody");
   tbody.rows[0].cells[0].innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
+  document.getElementById("tempPathInfo").textContent = "";
 
-  const script = 'try { $items = Get-ChildItem -Path $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue; $count = ($items | Measure-Object).Count; $size = [math]::Round((($items | Measure-Object -Property Length -Sum).Sum / 1MB), 1); Write-Output "$count|$size" } catch { Write-Output "ERROR|0" }';
+  const script = 'try { $u=(Get-CimInstance -ClassName Win32_ComputerSystem).UserName; if($u){ $u=$u.Split([char]92)[-1] } else { $u=$env:USERNAME }; $tempPath="C:\\Users\\$u\\AppData\\Local\\Temp"; $items = Get-ChildItem -Path $tempPath -Recurse -Force -ErrorAction SilentlyContinue; $count = ($items | Measure-Object).Count; $size = [math]::Round((($items | Measure-Object -Property Length -Sum).Sum / 1MB), 1); Write-Output "$count|$size|$tempPath" } catch { Write-Output "ERROR|0|" }';
 
   console.log("Temp check script:", script);
 
   try {
     const data = await runPs(script);
     const output = (data.output || "").trim();
-    const [count, size] = output.split("|");
+    const [count, size, tempPath] = output.split("|");
 
     tbody.innerHTML = '<tr><td>' + (count === "ERROR" ? "0" : count) + ' filer</td><td>' + (size || "0") + ' MB</td></tr>';
+    document.getElementById("tempPathInfo").textContent = tempPath ? ("Mappe: " + tempPath) : "";
 
     const hasFiles = count !== "ERROR" && Number(count) > 0;
     tempBeforeCount = hasFiles ? Number(count) : 0;
@@ -378,7 +382,7 @@ async function applyTempDelete() {
   btn.textContent = "Sletter...";
   document.getElementById("tempResult").textContent = "";
 
-  const script = 'try { Remove-Item -Path ($env:TEMP + "\\*") -Recurse -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300; $remaining = (Get-ChildItem -Path $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object).Count; Write-Output "OK|$remaining" } catch { Write-Output "ERROR|0" }';
+  const script = 'try { $u=(Get-CimInstance -ClassName Win32_ComputerSystem).UserName; if($u){ $u=$u.Split([char]92)[-1] } else { $u=$env:USERNAME }; $tempPath="C:\\Users\\$u\\AppData\\Local\\Temp"; Remove-Item -Path ($tempPath + "\\*") -Recurse -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300; $remaining = (Get-ChildItem -Path $tempPath -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object).Count; Write-Output "OK|$remaining" } catch { Write-Output "ERROR|0" }';
 
   console.log("Temp delete script:", script);
 
@@ -447,18 +451,19 @@ async function clearEdgeCache() {
   btn.textContent = "Sletter...";
   document.getElementById("edgeResult").textContent = "";
 
-  const script = 'try { $paths = @("$env:LOCALAPPDATA\\Microsoft\\Edge\\User Data\\Default\\Cache","$env:LOCALAPPDATA\\Microsoft\\Edge\\User Data\\Default\\Code Cache","$env:LOCALAPPDATA\\Microsoft\\Edge\\User Data\\Default\\GPUCache"); $deleted=0; $errors=0; foreach($p in $paths){ if(Test-Path $p){ Get-ChildItem -Path $p -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { try { Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop; $deleted++ } catch { $errors++ } } } }; Write-Output "OK|$deleted|$errors" } catch { Write-Output "ERROR|0|0" }';
+  const script = 'try { $u=(Get-CimInstance -ClassName Win32_ComputerSystem).UserName; if($u){ $u=$u.Split([char]92)[-1] } else { $u=$env:USERNAME }; $base="C:\\Users\\$u\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default"; $paths=@("$base\\Cache","$base\\Code Cache","$base\\GPUCache"); $deleted=0; $errors=0; foreach($p in $paths){ if(Test-Path $p){ Get-ChildItem -Path $p -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { try { Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop; $deleted++ } catch { $errors++ } } } }; Write-Output "OK|$deleted|$errors|$u" } catch { Write-Output "ERROR|0|0|" }';
 
   console.log("Edge cache clear script:", script);
 
   try {
     const data = await runPs(script);
     const output = (data.output || "").trim();
-    const [status, deleted, errors] = output.split("|");
+    const [status, deleted, errors, user] = output.split("|");
 
     if (status === "OK") {
       const skipped = Number(errors) > 0 ? ` (${errors} filer var i brug, sandsynligvis fordi Edge er åben)` : "";
-      document.getElementById("edgeResult").textContent = `✓ Cache ryddet, ${deleted} filer slettet${skipped}.`;
+      const userInfo = user ? ` (bruger: ${user})` : "";
+      document.getElementById("edgeResult").textContent = `✓ Cache ryddet, ${deleted} filer slettet${skipped}${userInfo}.`;
       document.getElementById("edgeResult").className = "popup-result ok";
     } else {
       throw new Error("Ukendt fejl fra PowerShell");
