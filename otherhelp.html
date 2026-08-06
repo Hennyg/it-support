@@ -201,10 +201,20 @@
       <tbody id="edgeTableBody">
         <tr>
           <td>Installeret version</td>
-          <td><span class="status-badge loading"><span class="spinner"></span> Tjekker...</span></td>
+          <td id="edgeVersionValue"><span class="status-badge loading"><span class="spinner"></span> Tjekker...</span></td>
+        </tr>
+        <tr>
+          <td>Cache – antal filer</td>
+          <td id="edgeCacheCountValue"><span class="status-badge loading"><span class="spinner"></span> Tjekker...</span></td>
+        </tr>
+        <tr>
+          <td>Cache – størrelse</td>
+          <td id="edgeCacheSizeValue"><span class="status-badge loading"><span class="spinner"></span> Tjekker...</span></td>
         </tr>
       </tbody>
     </table>
+
+    <div id="edgeCachePathInfo" style="font-size:.78rem;color:#6b7280;font-family:monospace;margin:-6px 0 16px;word-break:break-all;"></div>
 
     <div id="edgeProgressWrap" class="hidden">
       <div class="progressTrack"><div class="progressBarIndeterminate"></div></div>
@@ -228,6 +238,7 @@ const REG_VALUES = [
   "DisableAttachmentsInPV"
 ];
 let tempBeforeCount = 0;
+let edgeCacheBeforeCount = 0;
 
 function startProgress(wrapId, textId, label) {
   const wrap = document.getElementById(wrapId);
@@ -449,7 +460,7 @@ async function openEdgePopup() {
   document.getElementById("edgeOverlay").classList.add("open");
   document.getElementById("edgeResult").textContent = "";
   document.getElementById("edgeResult").className = "popup-result";
-  await checkEdgeVersion();
+  await Promise.all([checkEdgeVersion(), checkEdgeCache()]);
 }
 
 function closeEdgePopup() {
@@ -457,8 +468,8 @@ function closeEdgePopup() {
 }
 
 async function checkEdgeVersion() {
-  const tbody = document.getElementById("edgeTableBody");
-  tbody.rows[0].cells[1].innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
+  const cell = document.getElementById("edgeVersionValue");
+  cell.innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
 
   const script = 'try { $paths = @("$env:ProgramFiles\\Microsoft\\Edge\\Application\\msedge.exe", "${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe"); $exe = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1; if ($exe) { $v = (Get-Item $exe).VersionInfo.ProductVersion; Write-Output "OK|$v" } else { Write-Output "MISSING|" } } catch { Write-Output "MISSING|" }';
 
@@ -469,13 +480,41 @@ async function checkEdgeVersion() {
     const output = (data.output || "").trim();
     const [status, version] = output.split("|");
 
-    tbody.innerHTML = status === "OK"
-      ? '<tr><td>Installeret version</td><td><span class="status-badge ok">✓ ' + version + '</span></td></tr>'
-      : '<tr><td>Installeret version</td><td><span class="status-badge missing">⚠ Kunne ikke findes</span></td></tr>';
+    cell.innerHTML = status === "OK"
+      ? '<span class="status-badge ok">✓ ' + version + '</span>'
+      : '<span class="status-badge missing">⚠ Kunne ikke findes</span>';
   } catch (err) {
-    tbody.innerHTML = '<tr><td colspan="2"><span class="status-badge error">Agent ikke fundet</span></td></tr>';
+    cell.innerHTML = '<span class="status-badge error">Agent ikke fundet</span>';
     document.getElementById("edgeResult").textContent = "Kunne ikke forbinde til IT Support Agent.";
     document.getElementById("edgeResult").className = "popup-result err";
+  }
+}
+
+async function checkEdgeCache() {
+  const countCell = document.getElementById("edgeCacheCountValue");
+  const sizeCell = document.getElementById("edgeCacheSizeValue");
+  countCell.innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
+  sizeCell.innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
+  document.getElementById("edgeCachePathInfo").textContent = "";
+
+  const script = 'try { $u=(Get-CimInstance -ClassName Win32_ComputerSystem).UserName; if($u){ $u=$u.Split([char]92)[-1] } else { $u=$env:USERNAME }; $base="C:\\Users\\$u\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default"; $paths=@("$base\\Cache","$base\\Code Cache","$base\\GPUCache"); $items=@(); foreach($p in $paths){ if(Test-Path $p){ $items += Get-ChildItem -Path $p -Recurse -Force -ErrorAction SilentlyContinue } }; $count=($items|Measure-Object).Count; $size=[math]::Round((($items|Measure-Object -Property Length -Sum).Sum/1MB),1); Write-Output "$count|$size|$base" } catch { Write-Output "ERROR|0|" }';
+
+  console.log("Edge cache check script:", script);
+
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    const [count, size, basePath] = output.split("|");
+
+    const hasFiles = count !== "ERROR" && Number(count) > 0;
+    edgeCacheBeforeCount = hasFiles ? Number(count) : 0;
+
+    countCell.textContent = (count === "ERROR" ? "0" : count) + " filer";
+    sizeCell.textContent = (size || "0") + " MB";
+    document.getElementById("edgeCachePathInfo").textContent = basePath ? ("Mappe: " + basePath) : "";
+  } catch (err) {
+    countCell.innerHTML = '<span class="status-badge error">Agent ikke fundet</span>';
+    sizeCell.textContent = "—";
   }
 }
 
@@ -486,20 +525,23 @@ async function clearEdgeCache() {
   document.getElementById("edgeResult").textContent = "";
   const progressTimer = startProgress("edgeProgressWrap", "edgeProgressText", "Sletter cache");
 
-  const script = 'try { $u=(Get-CimInstance -ClassName Win32_ComputerSystem).UserName; if($u){ $u=$u.Split([char]92)[-1] } else { $u=$env:USERNAME }; $base="C:\\Users\\$u\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default"; $paths=@("$base\\Cache","$base\\Code Cache","$base\\GPUCache"); $deleted=0; $errors=0; foreach($p in $paths){ if(Test-Path $p){ Get-ChildItem -Path $p -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { try { Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop; $deleted++ } catch { $errors++ } } } }; Write-Output "OK|$deleted|$errors|$u" } catch { Write-Output "ERROR|0|0|" }';
+  const script = 'try { $u=(Get-CimInstance -ClassName Win32_ComputerSystem).UserName; if($u){ $u=$u.Split([char]92)[-1] } else { $u=$env:USERNAME }; $base="C:\\Users\\$u\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default"; $paths=@("$base\\Cache","$base\\Code Cache","$base\\GPUCache"); foreach($p in $paths){ if(Test-Path $p){ Remove-Item -Path ($p + "\\*") -Recurse -Force -ErrorAction SilentlyContinue } }; Start-Sleep -Milliseconds 300; $remaining=0; foreach($p in $paths){ if(Test-Path $p){ $remaining += (Get-ChildItem -Path $p -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object).Count } }; Write-Output "OK|$remaining|$u" } catch { Write-Output "ERROR|0|" }';
 
   console.log("Edge cache clear script:", script);
 
   try {
     const data = await runPs(script);
     const output = (data.output || "").trim();
-    const [status, deleted, errors, user] = output.split("|");
+    const [status, remaining, user] = output.split("|");
 
     if (status === "OK") {
-      const skipped = Number(errors) > 0 ? ` (${errors} filer var i brug, sandsynligvis fordi Edge er åben)` : "";
+      const remainingNum = Number(remaining) || 0;
+      const deleted = Math.max(edgeCacheBeforeCount - remainingNum, 0);
+      const stillThere = remainingNum > 0 ? ` ${remainingNum} filer kunne ikke slettes, fordi de er i brug lige nu.` : "";
       const userInfo = user ? ` (bruger: ${user})` : "";
-      document.getElementById("edgeResult").textContent = `✓ Cache ryddet, ${deleted} filer slettet${skipped}${userInfo}.`;
+      document.getElementById("edgeResult").textContent = `✓ ${deleted} filer slettet.${stillThere}${userInfo}`;
       document.getElementById("edgeResult").className = "popup-result ok";
+      await checkEdgeCache();
     } else {
       throw new Error("Ukendt fejl fra PowerShell");
     }
