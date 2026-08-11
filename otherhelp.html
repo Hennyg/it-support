@@ -247,17 +247,19 @@
     </div>
 
     <h3 style="font-size:.88rem;margin:0 0 8px;color:#374151;">Installerede printere</h3>
+    <p id="printerUserInfo" style="font-size:.78rem;color:#9ca3af;margin:-4px 0 8px;"></p>
     <table class="reg-table" id="printerTable">
       <thead>
         <tr>
           <th>Navn</th>
           <th>Port</th>
           <th>Status</th>
+          <th>Netværk</th>
           <th>Job i kø</th>
         </tr>
       </thead>
       <tbody id="printerTableBody">
-        <tr><td colspan="4"><span class="status-badge loading"><span class="spinner"></span> Henter printere...</span></td></tr>
+        <tr><td colspan="5"><span class="status-badge loading"><span class="spinner"></span> Henter printere...</span></td></tr>
       </tbody>
     </table>
 
@@ -648,22 +650,59 @@ try {
   $result.spooler = @{ status = 'Ukendt' }
 }
 
+# ── Find den faktiske standardprinter for den INDLOGGEDE bruger ──
+# Agenten kører som SYSTEM, og WMI/Get-Printer 'Default' afspejler SYSTEM's
+# egen kontekst, ikke brugerens. Derfor læses værdien direkte fra brugerens
+# registreringsdatabase-hive (HKEY_USERS) i stedet.
+$defaultPrinter = ''
+$loggedInUser = ''
+try {
+  $cs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+  $rawUser = $cs.UserName
+  if ($rawUser) {
+    $loggedInUser = $rawUser.Split([char]92)[-1]
+    $sid = (New-Object System.Security.Principal.NTAccount($rawUser)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+    if (-not (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue)) {
+      New-PSDrive -PSProvider Registry -Name HKU -Root HKEY_USERS -ErrorAction SilentlyContinue | Out-Null
+    }
+    $winKey = "HKU:\$sid\Software\Microsoft\Windows NT\CurrentVersion\Windows"
+    if (Test-Path $winKey) {
+      $deviceVal = (Get-ItemProperty -Path $winKey -Name Device -ErrorAction Stop).Device
+      if ($deviceVal) { $defaultPrinter = ($deviceVal -split ',')[0] }
+    }
+  }
+} catch {}
+$result.defaultPrinter = $defaultPrinter
+$result.loggedInUser = $loggedInUser
+
+# ── Printere: brug Get-Printer, som giver en langt mere retvisende status ──
+# end WMI's Win32_Printer.Status (som ofte bare returnerer 'Unknown').
 $printers = @()
 try {
-  $wp = Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop
-  foreach ($p in $wp) {
+  $gp = Get-Printer -ErrorAction Stop
+  foreach ($p in $gp) {
     $printers += @{
       name = $p.Name
       driver = $p.DriverName
       port = $p.PortName
-      statusText = [string]$p.Status
-      offline = [bool]$p.WorkOffline
-      default = [bool]$p.Default
-      network = [bool]$p.Network
+      statusText = [string]$p.PrinterStatus
       shared = [bool]$p.Shared
+      default = ($p.Name -eq $defaultPrinter)
+      reachable = $null
+      pingChecked = $false
     }
   }
 } catch {}
+
+# ── Ping-test af netværksprintere (port = ren IP-adresse) ──
+foreach ($p in $printers) {
+  if ($p.port -match '^\d{1,3}(\.\d{1,3}){3}$') {
+    try {
+      $p.reachable = [bool](Test-Connection -ComputerName $p.port -Count 1 -Quiet -ErrorAction SilentlyContinue)
+    } catch { $p.reachable = $false }
+    $p.pingChecked = $true
+  }
+}
 $result.printers = $printers
 
 $jobs = @()
@@ -717,12 +756,19 @@ function closePrinterPopup() {
   document.getElementById("printerOverlay").classList.remove("open");
 }
 
-function printerStatusBadge(text, offline) {
+function printerStatusBadge(text) {
   const t = (text || "").toLowerCase();
-  if (offline) return '<span class="status-badge missing">⚠ Offline</span>';
-  if (t === "ok") return '<span class="status-badge ok">✓ OK</span>';
-  if (t === "error" || t === "degraded") return `<span class="status-badge error">⚠ ${text}</span>`;
-  return `<span class="status-badge missing">${text || "Ukendt"}</span>`;
+  if (t === "normal") return '<span class="status-badge ok">✓ OK</span>';
+  if (t === "offline") return '<span class="status-badge missing">⚠ Offline</span>';
+  if (t === "unknown" || t === "") return '<span class="status-badge missing">Ukendt</span>';
+  return `<span class="status-badge error">⚠ ${text}</span>`;
+}
+
+function pingBadge(p) {
+  if (!p.pingChecked) return '<span style="color:#9ca3af;">—</span>';
+  return p.reachable
+    ? '<span class="status-badge ok">✓ Svarer</span>'
+    : '<span class="status-badge error">⚠ Svarer ikke</span>';
 }
 
 async function checkPrinterStatus() {
@@ -732,7 +778,7 @@ async function checkPrinterStatus() {
   const eventsBody = document.getElementById("eventsTableBody");
 
   spoolerRow.innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker printerkø-service (spooler)...</span>';
-  printerBody.innerHTML = '<tr><td colspan="4"><span class="status-badge loading"><span class="spinner"></span> Henter printere...</span></td></tr>';
+  printerBody.innerHTML = '<tr><td colspan="5"><span class="status-badge loading"><span class="spinner"></span> Henter printere...</span></td></tr>';
   jobsBody.innerHTML = '<tr><td colspan="5">—</td></tr>';
   eventsBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
   document.getElementById("printerResult").textContent = "";
@@ -751,8 +797,11 @@ async function checkPrinterStatus() {
     // Printers
     const printers = json.printers || [];
     const jobs = json.jobs || [];
+    document.getElementById("printerUserInfo").textContent = json.loggedInUser
+      ? `Standardprinter tjekket for indlogget bruger: ${json.loggedInUser}`
+      : "";
     if (printers.length === 0) {
-      printerBody.innerHTML = '<tr><td colspan="4">Ingen printere fundet.</td></tr>';
+      printerBody.innerHTML = '<tr><td colspan="5">Ingen printere fundet.</td></tr>';
     } else {
       printerBody.innerHTML = printers.map(p => {
         const jobCount = jobs.filter(j => j.printer === p.name).length;
@@ -760,7 +809,8 @@ async function checkPrinterStatus() {
         return `<tr>
           <td>${nameLabel}</td>
           <td class="reg-name">${p.port || "—"}</td>
-          <td>${printerStatusBadge(p.statusText, p.offline)}</td>
+          <td>${printerStatusBadge(p.statusText)}</td>
+          <td>${pingBadge(p)}</td>
           <td>${jobCount > 0 ? `<b>${jobCount}</b>` : "0"}</td>
         </tr>`;
       }).join("");
@@ -797,7 +847,7 @@ async function checkPrinterStatus() {
 
   } catch (err) {
     spoolerRow.innerHTML = '<span class="status-badge error">Agent ikke fundet</span>';
-    printerBody.innerHTML = '<tr><td colspan="4">—</td></tr>';
+    printerBody.innerHTML = '<tr><td colspan="5">—</td></tr>';
     jobsBody.innerHTML = '<tr><td colspan="5">—</td></tr>';
     eventsBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
     document.getElementById("printerResult").textContent = "Kunne ikke forbinde til IT Support Agent.";
