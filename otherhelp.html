@@ -321,6 +321,16 @@
       <ul id="printerDebugList" style="margin:0;padding-left:18px;font-size:.78rem;color:#991b1b;font-family:monospace;line-height:1.6;"></ul>
     </div>
 
+    <div style="margin-top:20px;border-top:1px solid #e5e7eb;padding-top:16px;">
+      <h3 style="font-size:.88rem;margin:0 0 8px;color:#374151;">🧹 Avanceret: Fjern printer(e), port og driver</h3>
+      <p style="font-size:.78rem;color:#9ca3af;margin:0 0 10px;">Til fuld nulstilling når en kø er varigt defekt. Fjerner de valgte printer-køer og deres netværksport, samt driveren — men kun hvis ingen anden kø på pc'en stadig bruger den. Kører direkte via IT Support Agent, så det virker uanset hvilken pc du sidder ved.</p>
+      <div id="printerResetList" style="margin-bottom:10px;font-size:.85rem;"></div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button class="btn-run" id="printerResetBtn" onclick="confirmResetPrinters()" disabled>🗑️ Fjern valgte</button>
+        <span class="popup-result" id="printerResetResult"></span>
+      </div>
+    </div>
+
     <div id="printerProgressWrap" class="hidden">
       <div class="progressTrack"><div class="progressBarIndeterminate"></div></div>
       <p class="progressText" id="printerProgressText">Rydder fastlåst printerkø...</p>
@@ -964,6 +974,10 @@ async function checkPrinterStatus() {
   spoolBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
   document.getElementById("printerDebugBox").classList.add("hidden");
   document.getElementById("printerSolutionBanner").classList.add("hidden");
+  document.getElementById("printerResetList").innerHTML = '<p style="font-size:.78rem;color:#9ca3af;">Henter...</p>';
+  document.getElementById("printerResetBtn").disabled = true;
+  document.getElementById("printerResetResult").textContent = "";
+  document.getElementById("printerResetResult").className = "popup-result";
   document.getElementById("printerResult").textContent = "";
   document.getElementById("printerResult").className = "popup-result";
 
@@ -1074,6 +1088,7 @@ async function checkPrinterStatus() {
     }
 
     lastPrinterDiagnosis = json;
+    renderResetSection(printers);
 
     // Teknisk fejllog — konkrete fejlmeddelelser fra tjek der ikke kunne gennemføres
     const debugBox = document.getElementById("printerDebugBox");
@@ -1136,6 +1151,123 @@ function emailPrinterDiagnosis() {
   const subject = "Printerproblem — " + (errorPrinters.length > 0 ? errorPrinters[0].name : "diagnose");
   const mailto = `mailto:hng@lcherrup.dk?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = mailto;
+}
+
+function renderResetSection(printers) {
+  const list = document.getElementById("printerResetList");
+  const btn = document.getElementById("printerResetBtn");
+  // Skip virtuelle "printere" der ikke giver mening at nulstille (PDF, OneNote osv.)
+  const real = (printers || []).filter(p => p.port && p.port !== "nul:" && !p.port.toUpperCase().startsWith("PORTPROMPT"));
+
+  if (real.length === 0) {
+    list.innerHTML = '<p style="font-size:.78rem;color:#9ca3af;">Ingen netværksprintere at nulstille.</p>';
+    btn.disabled = true;
+    return;
+  }
+
+  list.innerHTML = real.map(p => `
+    <label style="display:flex;align-items:center;gap:8px;padding:4px 0;">
+      <input type="checkbox" class="printerResetCheck" value="${p.name.replace(/"/g, "&quot;")}" onchange="updateResetButtonState()">
+      <span>${p.name}</span>
+      <span style="color:#9ca3af;font-size:.76rem;">(${p.port}, driver: ${p.driver || "ukendt"})</span>
+    </label>
+  `).join("");
+  updateResetButtonState();
+}
+
+function updateResetButtonState() {
+  const checked = document.querySelectorAll(".printerResetCheck:checked").length;
+  document.getElementById("printerResetBtn").disabled = checked === 0;
+}
+
+function psQuote(str) {
+  return "'" + String(str).replace(/'/g, "''") + "'";
+}
+
+async function confirmResetPrinters() {
+  if (!lastPrinterDiagnosis) return;
+  const checked = Array.from(document.querySelectorAll(".printerResetCheck:checked")).map(cb => cb.value);
+  if (checked.length === 0) return;
+
+  const printersByName = {};
+  (lastPrinterDiagnosis.printers || []).forEach(p => { printersByName[p.name] = p; });
+
+  const ports = checked.map(n => printersByName[n] && printersByName[n].port).filter(Boolean);
+  const drivers = [...new Set(checked.map(n => printersByName[n] && printersByName[n].driver).filter(Boolean))];
+
+  const summary = checked.map(n => `- ${n} (port ${(printersByName[n] && printersByName[n].port) || "?"})`).join("\n");
+  const driverLine = drivers.length > 0
+    ? `\n\nDriver der forsøges fjernet (kun hvis ingen anden printer på pc'en stadig bruger den):\n${drivers.join(", ")}`
+    : "";
+
+  const confirmed = confirm(
+    `Du er ved at fjerne følgende printer-køer permanent på denne pc:\n\n${summary}${driverLine}\n\nAlle aktive job i disse køer går tabt. Fortsæt?`
+  );
+  if (!confirmed) return;
+
+  const btn = document.getElementById("printerResetBtn");
+  btn.disabled = true;
+  btn.textContent = "Fjerner...";
+  const resultEl = document.getElementById("printerResetResult");
+  resultEl.textContent = "";
+  resultEl.className = "popup-result";
+
+  const namesArr = checked.map(psQuote).join(",");
+  const portsArr = ports.map(psQuote).join(",");
+  const driversArr = drivers.map(psQuote).join(",");
+
+  const script = `
+$ErrorActionPreference = 'SilentlyContinue'
+$namesToRemove = @(${namesArr})
+$portsToRemove = @(${portsArr})
+$driversToCheck = @(${driversArr})
+$result = @{ removedPrinters=@(); failedPrinters=@(); removedPorts=@(); failedPorts=@(); removedDrivers=@(); skippedDrivers=@() }
+
+foreach ($n in $namesToRemove) {
+  try { Remove-Printer -Name $n -ErrorAction Stop; $result.removedPrinters += $n } catch { $result.failedPrinters += ($n + ": " + $_.Exception.Message) }
+}
+
+Restart-Service -Name Spooler -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
+
+foreach ($p in $portsToRemove) {
+  try { Remove-PrinterPort -Name $p -ErrorAction Stop; $result.removedPorts += $p } catch { $result.failedPorts += ($p + ": " + $_.Exception.Message) }
+}
+
+foreach ($d in $driversToCheck) {
+  $stillUsed = Get-Printer -ErrorAction SilentlyContinue | Where-Object { $_.DriverName -eq $d }
+  if ($stillUsed) {
+    $result.skippedDrivers += ($d + " (bruges stadig af: " + ($stillUsed.Name -join ', ') + ")")
+  } else {
+    try { Remove-PrinterDriver -Name $d -ErrorAction Stop; $result.removedDrivers += $d } catch { $result.skippedDrivers += ($d + ": " + $_.Exception.Message) }
+  }
+}
+
+Stop-Service -Name Spooler -Force -ErrorAction SilentlyContinue
+Get-ChildItem -Path (Join-Path $env:WINDIR 'System32\\spool\\PRINTERS') -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+Start-Service -Name Spooler -ErrorAction SilentlyContinue
+
+$result | ConvertTo-Json -Depth 5 -Compress
+`.trim();
+
+  try {
+    const data = await runPs(script);
+    const result = JSON.parse((data.output || "").trim());
+    let msg = `✓ Fjernet: ${result.removedPrinters.join(", ") || "ingen"}.`;
+    if (result.removedPorts.length) msg += ` Porte fjernet: ${result.removedPorts.join(", ")}.`;
+    if (result.removedDrivers.length) msg += ` Driver fjernet: ${result.removedDrivers.join(", ")}.`;
+    if (result.skippedDrivers.length) msg += ` Driver IKKE fjernet: ${result.skippedDrivers.join("; ")}.`;
+    if (result.failedPrinters.length) msg += ` Fejlede: ${result.failedPrinters.join("; ")}.`;
+    resultEl.textContent = msg;
+    resultEl.className = (result.failedPrinters.length > 0) ? "popup-result err" : "popup-result ok";
+    await checkPrinterStatus();
+  } catch (err) {
+    resultEl.textContent = "Fejl: " + err.message;
+    resultEl.className = "popup-result err";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🗑️ Fjern valgte";
+  }
 }
 
 async function restartSpoolerService() {
