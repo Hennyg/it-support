@@ -246,6 +246,12 @@
       <span class="status-badge loading"><span class="spinner"></span> Tjekker printerkø-service (spooler)...</span>
     </div>
 
+    <div id="printerSolutionBanner" class="hidden" style="margin-bottom:16px;background:#fef3f2;border:1px solid #850c18;border-radius:12px;padding:14px 16px;">
+      <p style="margin:0 0 6px;font-weight:700;color:#850c18;font-size:.92rem;">🔧 Sandsynlig løsning fundet</p>
+      <p id="printerSolutionText" style="margin:0 0 10px;font-size:.85rem;color:#374151;line-height:1.5;"></p>
+      <button class="btn-run" id="printerEmailBtn" onclick="emailPrinterDiagnosis()">📧 Send diagnose til IT</button>
+    </div>
+
     <h3 style="font-size:.88rem;margin:0 0 8px;color:#374151;">Installerede printere</h3>
     <p id="printerUserInfo" style="font-size:.78rem;color:#9ca3af;margin:-4px 0 8px;"></p>
     <table class="reg-table" id="printerTable">
@@ -338,6 +344,7 @@ const REG_VALUES = [
   "DisableAttachmentsInPV"
 ];
 let tempBeforeCount = 0;
+let lastPrinterDiagnosis = null;
 let edgeCacheBeforeCount = 0;
 
 function startProgress(wrapId, textId, label) {
@@ -949,6 +956,7 @@ async function checkPrinterStatus() {
   eventsBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
   spoolBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
   document.getElementById("printerDebugBox").classList.add("hidden");
+  document.getElementById("printerSolutionBanner").classList.add("hidden");
   document.getElementById("printerResult").textContent = "";
   document.getElementById("printerResult").className = "popup-result";
 
@@ -1039,6 +1047,27 @@ async function checkPrinterStatus() {
       document.getElementById("printerResult").textContent = "Se den røde fejltekst under printeren/jobbet for den konkrete årsag, eller ryd printerkøen hvis job sidder fast.";
     }
 
+    // Løsningsbanner i klart sprog — så en almindelig bruger ikke skal tolke
+    // tekniske fejlkoder selv. Viser den nyeste hændelse med en kendt,
+    // genkendt Win32-fejlkode, og giver mulighed for at sende hele
+    // diagnosen videre til IT med et enkelt klik.
+    const plainHints = {
+      1241: "Der er sandsynligvis et netværksproblem på printerens forbindelse, som kræver at en IT-tekniker ændrer en indstilling på printerporten. Klik herunder for at sende diagnosen til IT — de kan se præcis hvad der er galt.",
+      1722: "Printeren eller print-serveren svarer ikke korrekt lige nu. Kontakt IT — send gerne denne diagnose med.",
+      5: "Der er et rettighedsproblem med printeren. Kontakt IT — send gerne denne diagnose med.",
+      1801: "Printeren ser ud til at være fejlkonfigureret. Kontakt IT — send gerne denne diagnose med."
+    };
+    const solutionBanner = document.getElementById("printerSolutionBanner");
+    const knownEvent = events.find(e => e.win32Code && plainHints[e.win32Code]);
+    if (knownEvent) {
+      document.getElementById("printerSolutionText").textContent = plainHints[knownEvent.win32Code];
+      solutionBanner.classList.remove("hidden");
+    } else {
+      solutionBanner.classList.add("hidden");
+    }
+
+    lastPrinterDiagnosis = json;
+
     // Teknisk fejllog — konkrete fejlmeddelelser fra tjek der ikke kunne gennemføres
     const debugBox = document.getElementById("printerDebugBox");
     const debugList = document.getElementById("printerDebugList");
@@ -1060,6 +1089,46 @@ async function checkPrinterStatus() {
     document.getElementById("printerResult").textContent = "Kunne ikke forbinde til IT Support Agent.";
     document.getElementById("printerResult").className = "popup-result err";
   }
+}
+
+function emailPrinterDiagnosis() {
+  if (!lastPrinterDiagnosis) return;
+  const j = lastPrinterDiagnosis;
+
+  const errorPrinters = (j.printers || []).filter(p => p.errorDetail);
+  const stuckSpoolFiles = (j.spoolFiles || []).filter(f => f.ageMin > 2);
+  const relevantEvents = (j.events || []).filter(e => e.hint).slice(0, 3);
+
+  let body = "Automatisk printerdiagnose fra IT Support-portalen.\n\n";
+  body += `Bruger: ${j.loggedInUser || "ukendt"}\n`;
+  body += `Standardprinter: ${j.defaultPrinter || "ukendt"}\n`;
+  body += `Spooler-status: ${(j.spooler && j.spooler.status) || "ukendt"}\n\n`;
+
+  if (errorPrinters.length > 0) {
+    body += "Printere med fejl:\n";
+    errorPrinters.forEach(p => {
+      body += `- ${p.name} (port ${p.port}): ${p.statusText} — ${p.errorDetail}\n`;
+    });
+    body += "\n";
+  }
+
+  if (stuckSpoolFiles.length > 0) {
+    body += `Fastlåste spoolfiler på denne pc: ${stuckSpoolFiles.length} stk (ældste ${Math.max(...stuckSpoolFiles.map(f => f.ageMin))} min)\n\n`;
+  }
+
+  if (relevantEvents.length > 0) {
+    body += "Konkrete fejl fra printloggen:\n";
+    relevantEvents.forEach(e => {
+      body += `- [${e.time}] ${e.message}\n  → ${e.hint}\n`;
+    });
+    body += "\n";
+  }
+
+  body += "(Sendt automatisk via Diagnosticér printerproblem-værktøjet)";
+
+  const subject = "Printerproblem — " + (errorPrinters.length > 0 ? errorPrinters[0].name : "diagnose");
+  const mailto = `mailto:hng@lcherrup.dk?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailto;
 }
 
 async function restartSpoolerService() {
