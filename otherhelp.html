@@ -309,6 +309,12 @@
       </tbody>
     </table>
 
+    <div id="printerDebugBox" class="hidden" style="margin-top:16px;background:#fef3f2;border:1px solid #fecaca;border-radius:10px;padding:12px 14px;">
+      <h3 style="font-size:.85rem;margin:0 0 8px;color:#991b1b;">🛈 Teknisk fejllog (til IT)</h3>
+      <p style="font-size:.76rem;color:#6b7280;margin:0 0 8px;">Konkrete fejlmeddelelser fra de tjek der ikke kunne gennemføres — brug dette til at finde den reelle årsag, i stedet for bare "—".</p>
+      <ul id="printerDebugList" style="margin:0;padding-left:18px;font-size:.78rem;color:#991b1b;font-family:monospace;line-height:1.6;"></ul>
+    </div>
+
     <div id="printerProgressWrap" class="hidden">
       <div class="progressTrack"><div class="progressBarIndeterminate"></div></div>
       <p class="progressText" id="printerProgressText">Rydder fastlåst printerkø...</p>
@@ -658,12 +664,14 @@ async function clearEdgeCache() {
 const PS_PRINTER_STATUS = `
 $ErrorActionPreference = 'SilentlyContinue'
 $result = @{}
+$debug = @()
 
 try {
   $svc = Get-Service -Name Spooler -ErrorAction Stop
   $result.spooler = @{ status = $svc.Status.ToString() }
 } catch {
   $result.spooler = @{ status = 'Ukendt' }
+  $debug += "Spooler-tjek: " + $_.Exception.Message
 }
 
 # ── Find den faktiske standardprinter for den INDLOGGEDE bruger ──
@@ -677,17 +685,27 @@ try {
   $rawUser = $cs.UserName
   if ($rawUser) {
     $loggedInUser = $rawUser.Split([char]92)[-1]
-    $sid = (New-Object System.Security.Principal.NTAccount($rawUser)).Translate([System.Security.Principal.SecurityIdentifier]).Value
-    if (-not (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue)) {
-      New-PSDrive -PSProvider Registry -Name HKU -Root HKEY_USERS -ErrorAction SilentlyContinue | Out-Null
+    try {
+      $sid = (New-Object System.Security.Principal.NTAccount($rawUser)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+      if (-not (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue)) {
+        New-PSDrive -PSProvider Registry -Name HKU -Root HKEY_USERS -ErrorAction Stop | Out-Null
+      }
+      $winKey = "HKU:\\$sid\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows"
+      if (Test-Path $winKey) {
+        $deviceVal = (Get-ItemProperty -Path $winKey -Name Device -ErrorAction Stop).Device
+        if ($deviceVal) { $defaultPrinter = ($deviceVal -split ',')[0] }
+      } else {
+        $debug += "Standardprinter: registreringssti findes ikke (bruger-hive muligvis ikke indlæst) - $winKey"
+      }
+    } catch {
+      $debug += "Standardprinter (SID/registry): " + $_.Exception.Message
     }
-    $winKey = "HKU:\$sid\Software\Microsoft\Windows NT\CurrentVersion\Windows"
-    if (Test-Path $winKey) {
-      $deviceVal = (Get-ItemProperty -Path $winKey -Name Device -ErrorAction Stop).Device
-      if ($deviceVal) { $defaultPrinter = ($deviceVal -split ',')[0] }
-    }
+  } else {
+    $debug += "Standardprinter: Win32_ComputerSystem.UserName er tom (ingen bruger fundet logget ind)"
   }
-} catch {}
+} catch {
+  $debug += "Standardprinter (Win32_ComputerSystem): " + $_.Exception.Message
+}
 $result.defaultPrinter = $defaultPrinter
 $result.loggedInUser = $loggedInUser
 
@@ -709,7 +727,9 @@ try {
     $text = if ($errorStateMap.ContainsKey($code)) { $errorStateMap[$code] } else { "Ukendt fejlkode ($code)" }
     $wmiErrorStates[$_.Name] = @{ code = $code; text = $text }
   }
-} catch {}
+} catch {
+  $debug += "Win32_Printer (fejlkoder): " + $_.Exception.Message
+}
 
 # ── Printere: brug Get-Printer, som giver en langt mere retvisende status ──
 # end WMI's Win32_Printer.Status (som ofte bare returnerer 'Unknown').
@@ -733,18 +753,23 @@ try {
       port9100Checked = $false
     }
   }
-} catch {}
+} catch {
+  $debug += "Get-Printer: " + $_.Exception.Message
+}
 
 # ── Ping-test af netværksprintere ──
 # Portnavne har ofte et suffiks efter IP'en (fx "192.168.10.11_10" for en
 # bestemt bakke/kø på samme fysiske printer) — derfor matches KUN selve
 # IP-delen i starten af portnavnet, ikke hele strengen.
 foreach ($p in $printers) {
-  if ($p.port -match '^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})') {
+  if ($p.port -match '^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})') {
     $ip = $Matches[1]
     try {
-      $p.reachable = [bool](Test-Connection -ComputerName $ip -Count 1 -Quiet -ErrorAction SilentlyContinue)
-    } catch { $p.reachable = $false }
+      $p.reachable = [bool](Test-Connection -ComputerName $ip -Count 1 -Quiet -ErrorAction Stop)
+    } catch {
+      $p.reachable = $false
+      $debug += "Ping (" + $p.name + ", " + $ip + "): " + $_.Exception.Message
+    }
     $p.pingChecked = $true
 
     # ── TCP-test af selve print-porten (9100 = standard raw/JetDirect-port) ──
@@ -758,7 +783,10 @@ foreach ($p in $printers) {
       $ok = $connectTask.AsyncWaitHandle.WaitOne(1500) -and $tcp.Connected
       $p.port9100 = [bool]$ok
       $tcp.Close()
-    } catch { $p.port9100 = $false }
+    } catch {
+      $p.port9100 = $false
+      $debug += "Port 9100 (" + $p.name + ", " + $ip + "): " + $_.Exception.Message
+    }
     $p.port9100Checked = $true
   }
 }
@@ -772,13 +800,15 @@ $result.printers = $printers
 # til problemet.
 $spoolFiles = @()
 try {
-  $spoolPath = Join-Path $env:WINDIR 'System32\spool\PRINTERS'
+  $spoolPath = Join-Path $env:WINDIR 'System32\\spool\\PRINTERS'
   $files = Get-ChildItem -Path $spoolPath -Force -ErrorAction Stop
   foreach ($f in $files) {
     $ageMin = [math]::Round(((Get-Date) - $f.LastWriteTime).TotalMinutes, 1)
     $spoolFiles += @{ name = $f.Name; sizeKb = [math]::Round($f.Length / 1KB, 1); ageMin = $ageMin }
   }
-} catch {}
+} catch {
+  $debug += "Spoolmappe (" + $spoolPath + "): " + $_.Exception.Message
+}
 $result.spoolFiles = $spoolFiles
 
 $jobs = @()
@@ -802,7 +832,9 @@ try {
       submitted = $submitted
     }
   }
-} catch {}
+} catch {
+  $debug += "Win32_PrintJob: " + $_.Exception.Message
+}
 $result.jobs = $jobs
 
 $events = @()
@@ -815,10 +847,12 @@ try {
       time = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
       level = $e.LevelDisplayName
       id = $e.Id
-      message = ($e.Message -replace '\s+',' ')
+      message = ($e.Message -replace '\\s+',' ')
     }
   }
-} catch {}
+} catch {
+  $debug += "Printlog (PrintService/Admin): " + $_.Exception.Message
+}
 # Fallback / supplement: klassiske spooler-fejl logges nogle gange i System-loggen
 # under kilden "Print" i stedet for PrintService/Admin.
 try {
@@ -830,12 +864,15 @@ try {
       time = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
       level = $e.LevelDisplayName
       id = $e.Id
-      message = ($e.Message -replace '\s+',' ')
+      message = ($e.Message -replace '\\s+',' ')
     }
   }
-} catch {}
+} catch {
+  $debug += "Printlog (System/Print): " + $_.Exception.Message
+}
 $events = $events | Sort-Object -Property time -Descending
 $result.events = $events
+$result.debug = $debug
 
 $result | ConvertTo-Json -Depth 5 -Compress
 `.trim();
@@ -885,6 +922,7 @@ async function checkPrinterStatus() {
   jobsBody.innerHTML = '<tr><td colspan="5">—</td></tr>';
   eventsBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
   spoolBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
+  document.getElementById("printerDebugBox").classList.add("hidden");
   document.getElementById("printerResult").textContent = "";
   document.getElementById("printerResult").className = "popup-result";
 
@@ -970,6 +1008,18 @@ async function checkPrinterStatus() {
 
     if (jobs.length > 0 || (events.length > 0 && !spoolerOk)) {
       document.getElementById("printerResult").textContent = "Se den røde fejltekst under printeren/jobbet for den konkrete årsag, eller ryd printerkøen hvis job sidder fast.";
+    }
+
+    // Teknisk fejllog — konkrete fejlmeddelelser fra tjek der ikke kunne gennemføres
+    const debugBox = document.getElementById("printerDebugBox");
+    const debugList = document.getElementById("printerDebugList");
+    const debugItems = json.debug || [];
+    if (debugItems.length > 0) {
+      debugBox.classList.remove("hidden");
+      debugList.innerHTML = debugItems.map(d => `<li>${d}</li>`).join("");
+    } else {
+      debugBox.classList.add("hidden");
+      debugList.innerHTML = "";
     }
 
   } catch (err) {
