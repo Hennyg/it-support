@@ -675,17 +675,40 @@ try {
 $result.defaultPrinter = $defaultPrinter
 $result.loggedInUser = $loggedInUser
 
+# ── Detaljeret fejlårsag pr. printer (Win32_Printer.DetectedErrorState) ──
+# Get-Printer's status siger kun "Error" — DetectedErrorState fortæller HVAD
+# fejlen faktisk er (papirstop, tør for toner, offline, døren er åben, osv.)
+$errorStateMap = @{
+  0 = 'Ukendt'; 1 = 'Anden fejl'; 2 = 'Ingen fejl'; 3 = 'Lavt papir'
+  4 = 'Løbet tør for papir'; 5 = 'Lavt toner/blæk'; 6 = 'Løbet tør for toner/blæk'
+  7 = 'Printerdøren/-lugen er åben'; 8 = 'Papirstop'; 9 = 'Printeren er offline'
+  10 = 'Kræver service'; 11 = 'Udskriftsbakke er fuld'; 12 = 'Papirproblem'
+  13 = 'Kan ikke printe siden'; 14 = 'Kræver handling ved printeren'
+  15 = 'Løbet tør for hukommelse'
+}
+$wmiErrorStates = @{}
+try {
+  Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop | ForEach-Object {
+    $code = [int]$_.DetectedErrorState
+    $text = if ($errorStateMap.ContainsKey($code)) { $errorStateMap[$code] } else { "Ukendt fejlkode ($code)" }
+    $wmiErrorStates[$_.Name] = @{ code = $code; text = $text }
+  }
+} catch {}
+
 # ── Printere: brug Get-Printer, som giver en langt mere retvisende status ──
 # end WMI's Win32_Printer.Status (som ofte bare returnerer 'Unknown').
 $printers = @()
 try {
   $gp = Get-Printer -ErrorAction Stop
   foreach ($p in $gp) {
+    $errInfo = $wmiErrorStates[$p.Name]
+    $errDetail = if ($errInfo -and $errInfo.code -notin @(0,2)) { $errInfo.text } else { '' }
     $printers += @{
       name = $p.Name
       driver = $p.DriverName
       port = $p.PortName
       statusText = [string]$p.PrinterStatus
+      errorDetail = $errDetail
       shared = [bool]$p.Shared
       default = ($p.Name -eq $defaultPrinter)
       reachable = $null
@@ -714,10 +737,13 @@ try {
       $submitted = ([Management.ManagementDateTimeConverter]::ToDateTime($j.TimeSubmitted)).ToString('yyyy-MM-dd HH:mm:ss')
     } catch {}
     $printerName = ($j.Name -split ',')[0].Trim()
+    $jobErrInfo = $wmiErrorStates[$printerName]
+    $jobErrDetail = if ($jobErrInfo -and $jobErrInfo.code -notin @(0,2)) { $jobErrInfo.text } else { '' }
     $jobs += @{
       printer = $printerName
       document = $j.Document
       status = [string]$j.JobStatus
+      errorDetail = $jobErrDetail
       totalPages = $j.TotalPages
       pagesPrinted = $j.PagesPrinted
       submitted = $submitted
@@ -728,7 +754,7 @@ $result.jobs = $jobs
 
 $events = @()
 try {
-  $evts = Get-WinEvent -LogName 'Microsoft-Windows-PrintService/Admin' -MaxEvents 150 -ErrorAction Stop |
+  $evts = Get-WinEvent -LogName 'Microsoft-Windows-PrintService/Admin' -MaxEvents 300 -ErrorAction Stop |
     Where-Object { $_.LevelDisplayName -in @('Error','Warning') } |
     Select-Object -First 20
   foreach ($e in $evts) {
@@ -740,6 +766,22 @@ try {
     }
   }
 } catch {}
+# Fallback / supplement: klassiske spooler-fejl logges nogle gange i System-loggen
+# under kilden "Print" i stedet for PrintService/Admin.
+try {
+  $sysEvts = Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Print' } -MaxEvents 100 -ErrorAction Stop |
+    Where-Object { $_.LevelDisplayName -in @('Error','Warning') } |
+    Select-Object -First 15
+  foreach ($e in $sysEvts) {
+    $events += @{
+      time = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
+      level = $e.LevelDisplayName
+      id = $e.Id
+      message = ($e.Message -replace '\s+',' ')
+    }
+  }
+} catch {}
+$events = $events | Sort-Object -Property time -Descending
 $result.events = $events
 
 $result | ConvertTo-Json -Depth 5 -Compress
@@ -806,10 +848,13 @@ async function checkPrinterStatus() {
       printerBody.innerHTML = printers.map(p => {
         const jobCount = jobs.filter(j => j.printer === p.name).length;
         const nameLabel = p.default ? `${p.name} <span style="color:#850c18;font-size:.75rem;font-weight:700;">(standard)</span>` : p.name;
+        const statusCell = p.errorDetail
+          ? `${printerStatusBadge(p.statusText)}<br><span style="font-size:.76rem;color:#991b1b;">${p.errorDetail}</span>`
+          : printerStatusBadge(p.statusText);
         return `<tr>
           <td>${nameLabel}</td>
           <td class="reg-name">${p.port || "—"}</td>
-          <td>${printerStatusBadge(p.statusText)}</td>
+          <td>${statusCell}</td>
           <td>${pingBadge(p)}</td>
           <td>${jobCount > 0 ? `<b>${jobCount}</b>` : "0"}</td>
         </tr>`;
@@ -823,7 +868,7 @@ async function checkPrinterStatus() {
       jobsBody.innerHTML = jobs.map(j => `<tr>
         <td>${j.printer || "—"}</td>
         <td>${j.document || "—"}</td>
-        <td>${j.status || "—"}</td>
+        <td>${j.status || "—"}${j.errorDetail ? `<br><span style="font-size:.76rem;color:#991b1b;">⚠ ${j.errorDetail}</span>` : ""}</td>
         <td>${j.pagesPrinted || 0}/${j.totalPages || "?"}</td>
         <td class="reg-name">${j.submitted || "—"}</td>
       </tr>`).join("");
@@ -842,7 +887,7 @@ async function checkPrinterStatus() {
     }
 
     if (jobs.length > 0 || (events.length > 0 && !spoolerOk)) {
-      document.getElementById("printerResult").textContent = "Se evt. det seneste fejl i printloggen nedenfor, eller genstart printerkøen hvis job sidder fast.";
+      document.getElementById("printerResult").textContent = "Se den røde fejltekst under printeren/jobbet for den konkrete årsag, eller genstart printerkøen hvis job sidder fast.";
     }
 
   } catch (err) {
