@@ -860,9 +860,14 @@ try {
   # Kigger op til 60 dage tilbage — print-loggen fyldes hurtigt med
   # informations-hændelser (fx "standardprinter ændret"), så et lille
   # MaxEvents-tal rammer sjældent de faktiske fejl fra mere end få dage siden.
+  #
+  # VIGTIGT: Filtreres på det numeriske $_.Level (2=Fejl, 3=Advarsel) og IKKE
+  # på $_.LevelDisplayName — den er sprog-afhængig og returnerer "Fejl"/
+  # "Advarsel" på en dansk Windows-installation, ikke "Error"/"Warning".
+  # Et filter på de engelske ord matcher derfor ALDRIG noget her.
   $cutoff = (Get-Date).AddDays(-60)
   $evts = Get-WinEvent -LogName 'Microsoft-Windows-PrintService/Admin' -MaxEvents 2000 -ErrorAction Stop |
-    Where-Object { $_.LevelDisplayName -in @('Error','Warning') -and $_.TimeCreated -ge $cutoff } |
+    Where-Object { $_.Level -in @(2,3) -and $_.TimeCreated -ge $cutoff } |
     Select-Object -First 20
   foreach ($e in $evts) {
     $msg = ($e.Message -replace '\\s+',' ')
@@ -875,6 +880,7 @@ try {
     $events += @{
       time = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
       level = $e.LevelDisplayName
+      levelNum = $e.Level
       id = $e.Id
       message = $msg
       win32Code = $win32Code
@@ -890,12 +896,13 @@ try {
 # logges derfor ikke i den tekniske fejllog.
 try {
   $sysEvts = Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Print' } -MaxEvents 100 -ErrorAction Stop |
-    Where-Object { $_.LevelDisplayName -in @('Error','Warning') } |
+    Where-Object { $_.Level -in @(2,3) } |
     Select-Object -First 15
   foreach ($e in $sysEvts) {
     $events += @{
       time = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
       level = $e.LevelDisplayName
+      levelNum = $e.Level
       id = $e.Id
       message = ($e.Message -replace '\\s+',' ')
       win32Code = $null
@@ -1016,7 +1023,7 @@ async function checkPrinterStatus() {
     } else {
       eventsBody.innerHTML = events.map(e => `<tr>
         <td class="reg-name">${e.time || "—"}</td>
-        <td>${e.level === "Error" ? '<span class="status-badge error">Fejl</span>' : '<span class="status-badge missing">Advarsel</span>'}</td>
+        <td>${e.levelNum === 2 ? '<span class="status-badge error">Fejl</span>' : '<span class="status-badge missing">Advarsel</span>'}</td>
         <td style="font-size:.78rem;">
           ${e.message || "—"}
           ${e.hint ? `<div style="margin-top:6px;padding:8px 10px;background:#fef3f2;border-left:3px solid #850c18;border-radius:4px;color:#7f1d1d;font-size:.76rem;"><b>⚠ Win32-fejlkode ${e.win32Code}:</b> ${e.hint}</div>` : ""}
