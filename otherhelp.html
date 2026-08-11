@@ -854,7 +854,9 @@ try {
   $debug += "Printlog (PrintService/Admin): " + $_.Exception.Message
 }
 # Fallback / supplement: klassiske spooler-fejl logges nogle gange i System-loggen
-# under kilden "Print" i stedet for PrintService/Admin.
+# under kilden "Print" i stedet for PrintService/Admin. Kilden findes ikke
+# på alle Windows-versioner, så en manglende provider her er harmløs og
+# logges derfor ikke i den tekniske fejllog.
 try {
   $sysEvts = Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Print' } -MaxEvents 100 -ErrorAction Stop |
     Where-Object { $_.LevelDisplayName -in @('Error','Warning') } |
@@ -867,9 +869,7 @@ try {
       message = ($e.Message -replace '\\s+',' ')
     }
   }
-} catch {
-  $debug += "Printlog (System/Print): " + $_.Exception.Message
-}
+} catch {}
 $events = $events | Sort-Object -Property time -Descending
 $result.events = $events
 $result.debug = $debug
