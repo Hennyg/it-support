@@ -105,6 +105,13 @@
         <button class="btn-run" id="edgeBtn" onclick="openEdgePopup()">▶ Kør</button>
       </div>
 
+      <div class="action-card">
+        <div class="card-icon">🖨️</div>
+        <h2>Diagnosticér printerproblem</h2>
+        <p>Viser installerede printere og deres status, aktive print-job i køen og de seneste fejl/advarsler fra Windows' printlog — så du kan se hvorfor en udskrift hænger og fejler.</p>
+        <button class="btn-run" id="printerBtn" onclick="openPrinterPopup()">▶ Kør</button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -229,6 +236,75 @@
   </div>
 </div>
 
+<!-- Popup: Printerdiagnose -->
+<div class="popup-overlay" id="printerOverlay">
+  <div class="popup-box" style="max-width:720px;">
+    <h2 class="popup-title">🖨️ Diagnosticér printerproblem</h2>
+    <p class="popup-desc">Overblik over installerede printere, aktive print-job og de seneste fejl/advarsler fra Windows' egen printlog — brug det til at finde hvorfor en udskrift hænger og går i fejl.</p>
+
+    <div id="printerSpoolerRow" style="margin-bottom:16px;">
+      <span class="status-badge loading"><span class="spinner"></span> Tjekker printerkø-service (spooler)...</span>
+    </div>
+
+    <h3 style="font-size:.88rem;margin:0 0 8px;color:#374151;">Installerede printere</h3>
+    <table class="reg-table" id="printerTable">
+      <thead>
+        <tr>
+          <th>Navn</th>
+          <th>Port</th>
+          <th>Status</th>
+          <th>Job i kø</th>
+        </tr>
+      </thead>
+      <tbody id="printerTableBody">
+        <tr><td colspan="4"><span class="status-badge loading"><span class="spinner"></span> Henter printere...</span></td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size:.88rem;margin:16px 0 8px;color:#374151;">Aktive print-job</h3>
+    <table class="reg-table" id="jobsTable">
+      <thead>
+        <tr>
+          <th>Printer</th>
+          <th>Dokument</th>
+          <th>Status</th>
+          <th>Sider</th>
+          <th>Indsendt</th>
+        </tr>
+      </thead>
+      <tbody id="jobsTableBody">
+        <tr><td colspan="5">—</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size:.88rem;margin:16px 0 8px;color:#374151;">Seneste fejl/advarsler (printlog)</h3>
+    <table class="reg-table" id="eventsTable">
+      <thead>
+        <tr>
+          <th style="width:130px;">Tid</th>
+          <th style="width:70px;">Niveau</th>
+          <th>Besked</th>
+        </tr>
+      </thead>
+      <tbody id="eventsTableBody">
+        <tr><td colspan="3">—</td></tr>
+      </tbody>
+    </table>
+
+    <div id="printerProgressWrap" class="hidden">
+      <div class="progressTrack"><div class="progressBarIndeterminate"></div></div>
+      <p class="progressText" id="printerProgressText">Genstarter printerkø...</p>
+    </div>
+
+    <div class="popup-footer">
+      <span class="popup-result" id="printerResult"></span>
+      <button class="btn-close" onclick="closePrinterPopup()">Luk</button>
+      <button class="btn-update" id="printerRestartBtn" onclick="restartSpoolerService()">🔄 Genstart printerkø</button>
+      <button class="btn-update" id="printerRefreshBtn" onclick="checkPrinterStatus()">↻ Opdater</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const AGENT = "http://localhost:5199";
 const REG_PATH = "HKCU:\\Software\\Microsoft\\Office\\16.0\\Excel\\Security\\ProtectedView";
@@ -297,6 +373,10 @@ document.getElementById("tempOverlay").addEventListener("click", function(e) {
 
 document.getElementById("edgeOverlay").addEventListener("click", function(e) {
   if (e.target === this) closeEdgePopup();
+});
+
+document.getElementById("printerOverlay").addEventListener("click", function(e) {
+  if (e.target === this) closePrinterPopup();
 });
 
 async function checkRegValues() {
@@ -552,6 +632,207 @@ async function clearEdgeCache() {
     stopProgress("edgeProgressWrap", progressTimer);
     btn.disabled = false;
     btn.textContent = "Slet cache";
+  }
+}
+
+/* ---------- Printerdiagnose ---------- */
+
+const PS_PRINTER_STATUS = `
+$ErrorActionPreference = 'SilentlyContinue'
+$result = @{}
+
+try {
+  $svc = Get-Service -Name Spooler -ErrorAction Stop
+  $result.spooler = @{ status = $svc.Status.ToString() }
+} catch {
+  $result.spooler = @{ status = 'Ukendt' }
+}
+
+$printers = @()
+try {
+  $wp = Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop
+  foreach ($p in $wp) {
+    $printers += @{
+      name = $p.Name
+      driver = $p.DriverName
+      port = $p.PortName
+      statusText = [string]$p.Status
+      offline = [bool]$p.WorkOffline
+      default = [bool]$p.Default
+      network = [bool]$p.Network
+      shared = [bool]$p.Shared
+    }
+  }
+} catch {}
+$result.printers = $printers
+
+$jobs = @()
+try {
+  $wj = Get-CimInstance -ClassName Win32_PrintJob -ErrorAction Stop
+  foreach ($j in $wj) {
+    $submitted = ''
+    try {
+      $submitted = ([Management.ManagementDateTimeConverter]::ToDateTime($j.TimeSubmitted)).ToString('yyyy-MM-dd HH:mm:ss')
+    } catch {}
+    $printerName = ($j.Name -split ',')[0].Trim()
+    $jobs += @{
+      printer = $printerName
+      document = $j.Document
+      status = [string]$j.JobStatus
+      totalPages = $j.TotalPages
+      pagesPrinted = $j.PagesPrinted
+      submitted = $submitted
+    }
+  }
+} catch {}
+$result.jobs = $jobs
+
+$events = @()
+try {
+  $evts = Get-WinEvent -LogName 'Microsoft-Windows-PrintService/Admin' -MaxEvents 150 -ErrorAction Stop |
+    Where-Object { $_.LevelDisplayName -in @('Error','Warning') } |
+    Select-Object -First 20
+  foreach ($e in $evts) {
+    $events += @{
+      time = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
+      level = $e.LevelDisplayName
+      id = $e.Id
+      message = ($e.Message -replace '\s+',' ')
+    }
+  }
+} catch {}
+$result.events = $events
+
+$result | ConvertTo-Json -Depth 5 -Compress
+`.trim();
+
+async function openPrinterPopup() {
+  document.getElementById("printerOverlay").classList.add("open");
+  document.getElementById("printerResult").textContent = "";
+  document.getElementById("printerResult").className = "popup-result";
+  await checkPrinterStatus();
+}
+
+function closePrinterPopup() {
+  document.getElementById("printerOverlay").classList.remove("open");
+}
+
+function printerStatusBadge(text, offline) {
+  const t = (text || "").toLowerCase();
+  if (offline) return '<span class="status-badge missing">⚠ Offline</span>';
+  if (t === "ok") return '<span class="status-badge ok">✓ OK</span>';
+  if (t === "error" || t === "degraded") return `<span class="status-badge error">⚠ ${text}</span>`;
+  return `<span class="status-badge missing">${text || "Ukendt"}</span>`;
+}
+
+async function checkPrinterStatus() {
+  const spoolerRow = document.getElementById("printerSpoolerRow");
+  const printerBody = document.getElementById("printerTableBody");
+  const jobsBody = document.getElementById("jobsTableBody");
+  const eventsBody = document.getElementById("eventsTableBody");
+
+  spoolerRow.innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker printerkø-service (spooler)...</span>';
+  printerBody.innerHTML = '<tr><td colspan="4"><span class="status-badge loading"><span class="spinner"></span> Henter printere...</span></td></tr>';
+  jobsBody.innerHTML = '<tr><td colspan="5">—</td></tr>';
+  eventsBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
+  document.getElementById("printerResult").textContent = "";
+  document.getElementById("printerResult").className = "popup-result";
+
+  try {
+    const data = await runPs(PS_PRINTER_STATUS);
+    const json = JSON.parse((data.output || "").trim());
+
+    // Spooler
+    const spoolerOk = (json.spooler && json.spooler.status === "Running");
+    spoolerRow.innerHTML = spoolerOk
+      ? '<span class="status-badge ok">✓ Printerkø-service (spooler) kører</span>'
+      : `<span class="status-badge error">⚠ Spooler status: ${(json.spooler && json.spooler.status) || "Ukendt"} — dette er ofte selve årsagen til fejlen</span>`;
+
+    // Printers
+    const printers = json.printers || [];
+    const jobs = json.jobs || [];
+    if (printers.length === 0) {
+      printerBody.innerHTML = '<tr><td colspan="4">Ingen printere fundet.</td></tr>';
+    } else {
+      printerBody.innerHTML = printers.map(p => {
+        const jobCount = jobs.filter(j => j.printer === p.name).length;
+        const nameLabel = p.default ? `${p.name} <span style="color:#850c18;font-size:.75rem;font-weight:700;">(standard)</span>` : p.name;
+        return `<tr>
+          <td>${nameLabel}</td>
+          <td class="reg-name">${p.port || "—"}</td>
+          <td>${printerStatusBadge(p.statusText, p.offline)}</td>
+          <td>${jobCount > 0 ? `<b>${jobCount}</b>` : "0"}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    // Jobs
+    if (jobs.length === 0) {
+      jobsBody.innerHTML = '<tr><td colspan="5">Ingen aktive print-job — køen er tom.</td></tr>';
+    } else {
+      jobsBody.innerHTML = jobs.map(j => `<tr>
+        <td>${j.printer || "—"}</td>
+        <td>${j.document || "—"}</td>
+        <td>${j.status || "—"}</td>
+        <td>${j.pagesPrinted || 0}/${j.totalPages || "?"}</td>
+        <td class="reg-name">${j.submitted || "—"}</td>
+      </tr>`).join("");
+    }
+
+    // Events
+    const events = json.events || [];
+    if (events.length === 0) {
+      eventsBody.innerHTML = '<tr><td colspan="3">Ingen fejl eller advarsler fundet i printloggen.</td></tr>';
+    } else {
+      eventsBody.innerHTML = events.map(e => `<tr>
+        <td class="reg-name">${e.time || "—"}</td>
+        <td>${e.level === "Error" ? '<span class="status-badge error">Fejl</span>' : '<span class="status-badge missing">Advarsel</span>'}</td>
+        <td style="font-size:.78rem;">${e.message || "—"}</td>
+      </tr>`).join("");
+    }
+
+    if (jobs.length > 0 || (events.length > 0 && !spoolerOk)) {
+      document.getElementById("printerResult").textContent = "Se evt. det seneste fejl i printloggen nedenfor, eller genstart printerkøen hvis job sidder fast.";
+    }
+
+  } catch (err) {
+    spoolerRow.innerHTML = '<span class="status-badge error">Agent ikke fundet</span>';
+    printerBody.innerHTML = '<tr><td colspan="4">—</td></tr>';
+    jobsBody.innerHTML = '<tr><td colspan="5">—</td></tr>';
+    eventsBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
+    document.getElementById("printerResult").textContent = "Kunne ikke forbinde til IT Support Agent.";
+    document.getElementById("printerResult").className = "popup-result err";
+  }
+}
+
+async function restartSpoolerService() {
+  const btn = document.getElementById("printerRestartBtn");
+  btn.disabled = true;
+  btn.textContent = "Genstarter...";
+  document.getElementById("printerResult").textContent = "";
+  const progressTimer = startProgress("printerProgressWrap", "printerProgressText", "Genstarter printerkø");
+
+  const script = 'try { Restart-Service -Name Spooler -Force -ErrorAction Stop; Start-Sleep -Seconds 2; $s=(Get-Service -Name Spooler).Status; Write-Output ("OK|" + $s) } catch { Write-Output ("ERROR|" + $_.Exception.Message) }';
+
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    const [status] = output.split("|");
+
+    if (status === "OK") {
+      document.getElementById("printerResult").textContent = "✓ Printerkøen er genstartet. Prøv at printe igen.";
+      document.getElementById("printerResult").className = "popup-result ok";
+      await checkPrinterStatus();
+    } else {
+      throw new Error(output.split("|")[1] || "Ukendt fejl fra PowerShell");
+    }
+  } catch (err) {
+    document.getElementById("printerResult").textContent = "Fejl: " + err.message;
+    document.getElementById("printerResult").className = "popup-result err";
+  } finally {
+    stopProgress("printerProgressWrap", progressTimer);
+    btn.disabled = false;
+    btn.textContent = "🔄 Genstart printerkø";
   }
 }
 </script>
