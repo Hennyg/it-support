@@ -838,16 +838,40 @@ try {
 $result.jobs = $jobs
 
 $events = @()
+
+# ── Kendte Win32-fejlkoder fra udskriftsprocessoren, med konkret forklaring ──
+# Disse koder står i selve event-beskeden ("Win32-fejlkode, der returneres
+# af udskriftsprocessoren: XXXX") og er den mest konkrete årsag vi kan finde.
+$win32Hints = @{
+  1241 = 'Netværksadressen er ugyldig — dette er typisk SNMP-statustjekket på TCP/IP-porten der fejler, IKKE selve print-forbindelsen (port 9100 kan virke helt fint samtidig). Løsning: åbn printerens Egenskaber → Porte → Konfigurer port, og fjern fluebenet ved "SNMP Status Enabled". Skyldes ofte at UDP/SNMP (port 161) er blokeret på netværket for netop denne pc.'
+  1722 = 'RPC-serveren kan ikke nås — kontrollér at printerens spooler/netværkstjeneste kører, og at der ikke er en firewall der blokerer.'
+  5    = 'Adgang nægtet — brugeren eller pc''en har ikke rettigheder til printeren/print-serveren.'
+  1801 = 'Ugyldigt printernavn — printerobjektet er muligvis fejlkonfigureret eller nyligt omdøbt.'
+}
+
 try {
-  $evts = Get-WinEvent -LogName 'Microsoft-Windows-PrintService/Admin' -MaxEvents 300 -ErrorAction Stop |
-    Where-Object { $_.LevelDisplayName -in @('Error','Warning') } |
+  # Kigger op til 60 dage tilbage — print-loggen fyldes hurtigt med
+  # informations-hændelser (fx "standardprinter ændret"), så et lille
+  # MaxEvents-tal rammer sjældent de faktiske fejl fra mere end få dage siden.
+  $cutoff = (Get-Date).AddDays(-60)
+  $evts = Get-WinEvent -LogName 'Microsoft-Windows-PrintService/Admin' -MaxEvents 2000 -ErrorAction Stop |
+    Where-Object { $_.LevelDisplayName -in @('Error','Warning') -and $_.TimeCreated -ge $cutoff } |
     Select-Object -First 20
   foreach ($e in $evts) {
+    $msg = ($e.Message -replace '\\s+',' ')
+    $win32Code = $null
+    $hint = ''
+    if ($msg -match 'udskriftsprocessoren:\\s*(\\d+)') {
+      $win32Code = [int]$Matches[1]
+      if ($win32Hints.ContainsKey($win32Code)) { $hint = $win32Hints[$win32Code] }
+    }
     $events += @{
       time = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss')
       level = $e.LevelDisplayName
       id = $e.Id
-      message = ($e.Message -replace '\\s+',' ')
+      message = $msg
+      win32Code = $win32Code
+      hint = $hint
     }
   }
 } catch {
@@ -867,6 +891,8 @@ try {
       level = $e.LevelDisplayName
       id = $e.Id
       message = ($e.Message -replace '\\s+',' ')
+      win32Code = $null
+      hint = ''
     }
   }
 } catch {}
@@ -978,12 +1004,15 @@ async function checkPrinterStatus() {
     // Events
     const events = json.events || [];
     if (events.length === 0) {
-      eventsBody.innerHTML = '<tr><td colspan="3">Ingen fejl eller advarsler fundet i printloggen.</td></tr>';
+      eventsBody.innerHTML = '<tr><td colspan="3">Ingen fejl eller advarsler fundet i printloggen (seneste 60 dage).</td></tr>';
     } else {
       eventsBody.innerHTML = events.map(e => `<tr>
         <td class="reg-name">${e.time || "—"}</td>
         <td>${e.level === "Error" ? '<span class="status-badge error">Fejl</span>' : '<span class="status-badge missing">Advarsel</span>'}</td>
-        <td style="font-size:.78rem;">${e.message || "—"}</td>
+        <td style="font-size:.78rem;">
+          ${e.message || "—"}
+          ${e.hint ? `<div style="margin-top:6px;padding:8px 10px;background:#fef3f2;border-left:3px solid #850c18;border-radius:4px;color:#7f1d1d;font-size:.76rem;"><b>⚠ Win32-fejlkode ${e.win32Code}:</b> ${e.hint}</div>` : ""}
+        </td>
       </tr>`).join("");
     }
 
