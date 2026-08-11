@@ -255,11 +255,12 @@
           <th>Port</th>
           <th>Status</th>
           <th>Netværk</th>
+          <th>Printerport (9100)</th>
           <th>Job i kø</th>
         </tr>
       </thead>
       <tbody id="printerTableBody">
-        <tr><td colspan="5"><span class="status-badge loading"><span class="spinner"></span> Henter printere...</span></td></tr>
+        <tr><td colspan="6"><span class="status-badge loading"><span class="spinner"></span> Henter printere...</span></td></tr>
       </tbody>
     </table>
 
@@ -279,6 +280,21 @@
       </tbody>
     </table>
 
+    <h3 style="font-size:.88rem;margin:16px 0 8px;color:#374151;">Lokale spoolfiler på denne pc</h3>
+    <p style="font-size:.78rem;color:#9ca3af;margin:-4px 0 8px;">Hvis andre kan printe fint på samme printer, sidder fejlen typisk her — en fastlåst fil fra denne pc's egen printerkø, ikke i printeren selv.</p>
+    <table class="reg-table" id="spoolTable">
+      <thead>
+        <tr>
+          <th>Fil</th>
+          <th>Størrelse</th>
+          <th>Alder</th>
+        </tr>
+      </thead>
+      <tbody id="spoolTableBody">
+        <tr><td colspan="3">—</td></tr>
+      </tbody>
+    </table>
+
     <h3 style="font-size:.88rem;margin:16px 0 8px;color:#374151;">Seneste fejl/advarsler (printlog)</h3>
     <table class="reg-table" id="eventsTable">
       <thead>
@@ -295,13 +311,13 @@
 
     <div id="printerProgressWrap" class="hidden">
       <div class="progressTrack"><div class="progressBarIndeterminate"></div></div>
-      <p class="progressText" id="printerProgressText">Genstarter printerkø...</p>
+      <p class="progressText" id="printerProgressText">Rydder fastlåst printerkø...</p>
     </div>
 
     <div class="popup-footer">
       <span class="popup-result" id="printerResult"></span>
       <button class="btn-close" onclick="closePrinterPopup()">Luk</button>
-      <button class="btn-update" id="printerRestartBtn" onclick="restartSpoolerService()">🔄 Genstart printerkø</button>
+      <button class="btn-update" id="printerRestartBtn" onclick="restartSpoolerService()">🧹 Ryd fastlåst printerkø</button>
       <button class="btn-update" id="printerRefreshBtn" onclick="checkPrinterStatus()">↻ Opdater</button>
     </div>
   </div>
@@ -713,20 +729,57 @@ try {
       default = ($p.Name -eq $defaultPrinter)
       reachable = $null
       pingChecked = $false
+      port9100 = $null
+      port9100Checked = $false
     }
   }
 } catch {}
 
-# ── Ping-test af netværksprintere (port = ren IP-adresse) ──
+# ── Ping-test af netværksprintere ──
+# Portnavne har ofte et suffiks efter IP'en (fx "192.168.10.11_10" for en
+# bestemt bakke/kø på samme fysiske printer) — derfor matches KUN selve
+# IP-delen i starten af portnavnet, ikke hele strengen.
 foreach ($p in $printers) {
-  if ($p.port -match '^\d{1,3}(\.\d{1,3}){3}$') {
+  if ($p.port -match '^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})') {
+    $ip = $Matches[1]
     try {
-      $p.reachable = [bool](Test-Connection -ComputerName $p.port -Count 1 -Quiet -ErrorAction SilentlyContinue)
+      $p.reachable = [bool](Test-Connection -ComputerName $ip -Count 1 -Quiet -ErrorAction SilentlyContinue)
     } catch { $p.reachable = $false }
     $p.pingChecked = $true
+
+    # ── TCP-test af selve print-porten (9100 = standard raw/JetDirect-port) ──
+    # Ping fortæller kun om enheden svarer på netværket — ikke om selve
+    # print-servicen på printeren rent faktisk lytter. En printer kan svare
+    # fint på ping, men have en hængende eller blokeret port 9100, hvilket
+    # netop giver symptomet "hænger længe, går så i fejl".
+    try {
+      $tcp = New-Object System.Net.Sockets.TcpClient
+      $connectTask = $tcp.BeginConnect($ip, 9100, $null, $null)
+      $ok = $connectTask.AsyncWaitHandle.WaitOne(1500) -and $tcp.Connected
+      $p.port9100 = [bool]$ok
+      $tcp.Close()
+    } catch { $p.port9100 = $false }
+    $p.port9100Checked = $true
   }
 }
 $result.printers = $printers
+
+# ── Lokale spoolfiler på DENNE pc ──
+# Hvis andre kan printe på samme printer, er fejlen ikke på printeren, men i
+# den lokale printerkø på denne pc — typisk en fastlåst .SPL/.SHD-fil fra et
+# job der aldrig blev sendt korrekt. Normale job ligger kun i mappen i få
+# sekunder, så filer der er mere end et par minutter gamle er som regel roden
+# til problemet.
+$spoolFiles = @()
+try {
+  $spoolPath = Join-Path $env:WINDIR 'System32\spool\PRINTERS'
+  $files = Get-ChildItem -Path $spoolPath -Force -ErrorAction Stop
+  foreach ($f in $files) {
+    $ageMin = [math]::Round(((Get-Date) - $f.LastWriteTime).TotalMinutes, 1)
+    $spoolFiles += @{ name = $f.Name; sizeKb = [math]::Round($f.Length / 1KB, 1); ageMin = $ageMin }
+  }
+} catch {}
+$result.spoolFiles = $spoolFiles
 
 $jobs = @()
 try {
@@ -813,16 +866,25 @@ function pingBadge(p) {
     : '<span class="status-badge error">⚠ Svarer ikke</span>';
 }
 
+function port9100Badge(p) {
+  if (!p.port9100Checked) return '<span style="color:#9ca3af;">—</span>';
+  return p.port9100
+    ? '<span class="status-badge ok">✓ Åben</span>'
+    : '<span class="status-badge error">⚠ Lukket/hænger</span>';
+}
+
 async function checkPrinterStatus() {
   const spoolerRow = document.getElementById("printerSpoolerRow");
   const printerBody = document.getElementById("printerTableBody");
   const jobsBody = document.getElementById("jobsTableBody");
   const eventsBody = document.getElementById("eventsTableBody");
+  const spoolBody = document.getElementById("spoolTableBody");
 
   spoolerRow.innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker printerkø-service (spooler)...</span>';
-  printerBody.innerHTML = '<tr><td colspan="5"><span class="status-badge loading"><span class="spinner"></span> Henter printere...</span></td></tr>';
+  printerBody.innerHTML = '<tr><td colspan="6"><span class="status-badge loading"><span class="spinner"></span> Henter printere...</span></td></tr>';
   jobsBody.innerHTML = '<tr><td colspan="5">—</td></tr>';
   eventsBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
+  spoolBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
   document.getElementById("printerResult").textContent = "";
   document.getElementById("printerResult").className = "popup-result";
 
@@ -843,7 +905,7 @@ async function checkPrinterStatus() {
       ? `Standardprinter tjekket for indlogget bruger: ${json.loggedInUser}`
       : "";
     if (printers.length === 0) {
-      printerBody.innerHTML = '<tr><td colspan="5">Ingen printere fundet.</td></tr>';
+      printerBody.innerHTML = '<tr><td colspan="6">Ingen printere fundet.</td></tr>';
     } else {
       printerBody.innerHTML = printers.map(p => {
         const jobCount = jobs.filter(j => j.printer === p.name).length;
@@ -856,6 +918,7 @@ async function checkPrinterStatus() {
           <td class="reg-name">${p.port || "—"}</td>
           <td>${statusCell}</td>
           <td>${pingBadge(p)}</td>
+          <td>${port9100Badge(p)}</td>
           <td>${jobCount > 0 ? `<b>${jobCount}</b>` : "0"}</td>
         </tr>`;
       }).join("");
@@ -886,15 +949,35 @@ async function checkPrinterStatus() {
       </tr>`).join("");
     }
 
+    // Local spool files (this PC only)
+    const spoolBody = document.getElementById("spoolTableBody");
+    const spoolFiles = json.spoolFiles || [];
+    if (spoolFiles.length === 0) {
+      spoolBody.innerHTML = '<tr><td colspan="3">Ingen filer i den lokale spool-mappe — køen er tom på denne pc.</td></tr>';
+    } else {
+      spoolBody.innerHTML = spoolFiles.map(f => {
+        const stuck = f.ageMin > 2;
+        const ageLabel = f.ageMin >= 60
+          ? `${(f.ageMin / 60).toFixed(1)} timer`
+          : `${f.ageMin} min`;
+        return `<tr>
+          <td class="reg-name">${f.name}${stuck ? ' <span class="status-badge error" style="margin-left:6px;">⚠ Fastlåst</span>' : ""}</td>
+          <td>${f.sizeKb} KB</td>
+          <td>${ageLabel}</td>
+        </tr>`;
+      }).join("");
+    }
+
     if (jobs.length > 0 || (events.length > 0 && !spoolerOk)) {
-      document.getElementById("printerResult").textContent = "Se den røde fejltekst under printeren/jobbet for den konkrete årsag, eller genstart printerkøen hvis job sidder fast.";
+      document.getElementById("printerResult").textContent = "Se den røde fejltekst under printeren/jobbet for den konkrete årsag, eller ryd printerkøen hvis job sidder fast.";
     }
 
   } catch (err) {
     spoolerRow.innerHTML = '<span class="status-badge error">Agent ikke fundet</span>';
-    printerBody.innerHTML = '<tr><td colspan="5">—</td></tr>';
+    printerBody.innerHTML = '<tr><td colspan="6">—</td></tr>';
     jobsBody.innerHTML = '<tr><td colspan="5">—</td></tr>';
     eventsBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
+    spoolBody.innerHTML = '<tr><td colspan="3">—</td></tr>';
     document.getElementById("printerResult").textContent = "Kunne ikke forbinde til IT Support Agent.";
     document.getElementById("printerResult").className = "popup-result err";
   }
@@ -903,23 +986,31 @@ async function checkPrinterStatus() {
 async function restartSpoolerService() {
   const btn = document.getElementById("printerRestartBtn");
   btn.disabled = true;
-  btn.textContent = "Genstarter...";
+  btn.textContent = "Rydder...";
   document.getElementById("printerResult").textContent = "";
-  const progressTimer = startProgress("printerProgressWrap", "printerProgressText", "Genstarter printerkø");
+  const progressTimer = startProgress("printerProgressWrap", "printerProgressText", "Rydder fastlåst printerkø");
 
-  const script = 'try { Restart-Service -Name Spooler -Force -ErrorAction Stop; Start-Sleep -Seconds 2; $s=(Get-Service -Name Spooler).Status; Write-Output ("OK|" + $s) } catch { Write-Output ("ERROR|" + $_.Exception.Message) }';
+  // Stopper spooler, sletter tilbageværende .SPL/.SHD-filer i den LOKALE
+  // spool-mappe på denne pc, og starter spooler igen. Dette rammer kun
+  // denne pc's egen kø — den fysiske printer og andre brugeres kø påvirkes
+  // ikke, så det er sikkert selv når andre kan printe fint i mellemtiden.
+  const script = 'try { Stop-Service -Name Spooler -Force -ErrorAction Stop; Start-Sleep -Seconds 1; $spoolPath = Join-Path $env:WINDIR "System32\\spool\\PRINTERS"; $before = (Get-ChildItem -Path $spoolPath -Force -ErrorAction SilentlyContinue | Measure-Object).Count; Get-ChildItem -Path $spoolPath -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue; Start-Service -Name Spooler -ErrorAction Stop; Start-Sleep -Seconds 2; $s=(Get-Service -Name Spooler).Status; Write-Output ("OK|" + $s + "|" + $before) } catch { Start-Service -Name Spooler -ErrorAction SilentlyContinue; Write-Output ("ERROR|" + $_.Exception.Message) }';
 
   try {
     const data = await runPs(script);
     const output = (data.output || "").trim();
-    const [status] = output.split("|");
+    const parts = output.split("|");
+    const status = parts[0];
 
     if (status === "OK") {
-      document.getElementById("printerResult").textContent = "✓ Printerkøen er genstartet. Prøv at printe igen.";
+      const removedCount = Number(parts[2]) || 0;
+      document.getElementById("printerResult").textContent = removedCount > 0
+        ? `✓ Printerkøen er ryddet (${removedCount} fastlåst${removedCount === 1 ? "" : "e"} fil${removedCount === 1 ? "" : "er"} fjernet). Prøv at printe igen.`
+        : "✓ Printerkøen er genstartet. Der lå ingen filer tilbage at rydde.";
       document.getElementById("printerResult").className = "popup-result ok";
       await checkPrinterStatus();
     } else {
-      throw new Error(output.split("|")[1] || "Ukendt fejl fra PowerShell");
+      throw new Error(parts[1] || "Ukendt fejl fra PowerShell");
     }
   } catch (err) {
     document.getElementById("printerResult").textContent = "Fejl: " + err.message;
@@ -927,7 +1018,7 @@ async function restartSpoolerService() {
   } finally {
     stopProgress("printerProgressWrap", progressTimer);
     btn.disabled = false;
-    btn.textContent = "🔄 Genstart printerkø";
+    btn.textContent = "🧹 Ryd fastlåst printerkø";
   }
 }
 </script>
