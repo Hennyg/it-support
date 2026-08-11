@@ -35,7 +35,7 @@
 
     .popup-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 9998; align-items: center; justify-content: center; }
     .popup-overlay.open { display: flex; }
-    .popup-box { background: #fff; border-radius: 20px; padding: 32px 28px; max-width: 480px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+    .popup-box { background: #fff; border-radius: 20px; padding: 32px 28px; max-width: 480px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
     .popup-title { margin: 0 0 6px; font-size: 1.2rem; font-weight: 700; color: #111827; }
     .popup-desc { margin: 0 0 20px; font-size: .88rem; color: #6b7280; }
 
@@ -50,7 +50,7 @@
     .status-badge.loading { background: #f3f4f6; color: #6b7280; }
     .status-badge.error   { background: #fee2e2; color: #991b1b; }
 
-    .popup-footer { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 4px; }
+    .popup-footer { display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 4px; position: sticky; bottom: -32px; background: #fff; padding: 12px 0 4px; margin-bottom: -32px; }
     .btn-update { padding: 9px 22px; background: #850c18; color: #fff; border: none; border-radius: 10px; font-size: .9rem; font-weight: 600; cursor: pointer; }
     .btn-update:hover { background: #6b0913; }
     .btn-update:disabled { opacity: .5; cursor: not-allowed; }
