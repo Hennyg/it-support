@@ -301,7 +301,7 @@
       </tbody>
     </table>
 
-    <h3 style="font-size:.88rem;margin:16px 0 8px;color:#374151;">Seneste fejl/advarsler (printlog)</h3>
+    <h3 style="font-size:.88rem;margin:16px 0 8px;color:#374151;">Seneste fejl/advarsler (printlog, seneste 48 timer)</h3>
     <table class="reg-table" id="eventsTable">
       <thead>
         <tr>
@@ -857,15 +857,15 @@ $win32Hints = @{
 }
 
 try {
-  # Kigger op til 60 dage tilbage — print-loggen fyldes hurtigt med
-  # informations-hændelser (fx "standardprinter ændret"), så et lille
-  # MaxEvents-tal rammer sjældent de faktiske fejl fra mere end få dage siden.
+  # Kigger kun 48 timer tilbage — ældre fejl (fra tidligere hændelser der
+  # allerede er løst) er ikke relevante for det aktuelle problem, og skaber
+  # bare forvirring i diagnosen.
   #
   # VIGTIGT: Filtreres på det numeriske $_.Level (2=Fejl, 3=Advarsel) og IKKE
   # på $_.LevelDisplayName — den er sprog-afhængig og returnerer "Fejl"/
   # "Advarsel" på en dansk Windows-installation, ikke "Error"/"Warning".
   # Et filter på de engelske ord matcher derfor ALDRIG noget her.
-  $cutoff = (Get-Date).AddDays(-60)
+  $cutoff = (Get-Date).AddHours(-48)
   $evts = Get-WinEvent -LogName 'Microsoft-Windows-PrintService/Admin' -MaxEvents 2000 -ErrorAction Stop |
     Where-Object { $_.Level -in @(2,3) -and $_.TimeCreated -ge $cutoff } |
     Select-Object -First 20
@@ -1019,7 +1019,7 @@ async function checkPrinterStatus() {
     // Events
     const events = json.events || [];
     if (events.length === 0) {
-      eventsBody.innerHTML = '<tr><td colspan="3">Ingen fejl eller advarsler fundet i printloggen (seneste 60 dage).</td></tr>';
+      eventsBody.innerHTML = '<tr><td colspan="3">Ingen fejl eller advarsler fundet i printloggen (seneste 48 timer).</td></tr>';
     } else {
       eventsBody.innerHTML = events.map(e => `<tr>
         <td class="reg-name">${e.time || "—"}</td>
