@@ -268,7 +268,11 @@
         <div class="pdf-step-num">1</div>
         <div>
           <div class="pdf-step-title">Test den samme PDF lokalt</div>
-          <p class="pdf-step-text">Kopiér en PDF der fejler fra netværksdrevet til <span class="pdf-code">C:\Temp\Test.pdf</span>. Genstart Stifinder og markér filen som den første PDF i mappen.</p>
+          <p class="pdf-step-text">Kopiér en PDF der fejler fra <strong>S-drevet</strong> til <span class="pdf-code">C:\Temp\Test.pdf</span>. Genstart Stifinder og markér filen som den første PDF i mappen.</p>
+          <div class="pdf-actions">
+            <button class="btn-close" onclick="openPdfFolder('S', this)">📁 Åbn S-drevet</button>
+            <button class="btn-close" onclick="openPdfFolder('TEMP', this)">📁 Åbn C:\Temp</button>
+          </div>
           <div class="pdf-step-result"><strong>Virker lokalt:</strong> fokusér på SMB/netværksplacering eller sikkerhedszone. <strong>Fejler også lokalt:</strong> fokusér på Preview Handler.</div>
         </div>
       </div>
@@ -276,13 +280,31 @@
       <div class="pdf-step">
         <div class="pdf-step-num">2</div>
         <div>
+          <div class="pdf-step-title">Ryd Windows Temp-filer</div>
+          <p class="pdf-step-text">Rydder den indloggede brugers <span class="pdf-code">%temp%</span>. Filer der er i brug springes over.</p>
+          <div class="pdf-actions"><button class="btn-close" onclick="pdfDeleteTemp(this)">🗑 Slet Temp-filer</button></div>
+        </div>
+      </div>
+
+      <div class="pdf-step">
+        <div class="pdf-step-num">3</div>
+        <div>
+          <div class="pdf-step-title">Ryd Microsoft Edge-cache</div>
+          <p class="pdf-step-text">Rydder Cache, Code Cache og GPUCache for den indloggede brugers Edge-profil. Filer der er i brug springes over.</p>
+          <div class="pdf-actions"><button class="btn-close" onclick="pdfDeleteEdgeCache(this)">🌐 Slet Edge-cache</button></div>
+        </div>
+      </div>
+
+      <div class="pdf-step">
+        <div class="pdf-step-num">4</div>
+        <div>
           <div class="pdf-step-title">Kontrollér hvilken PDF Preview Handler Windows bruger</div>
           <p class="pdf-step-text">Klik <strong>Kør automatisk tjek</strong> nedenfor. Værktøjet læser PDF-associationen, Preview Handler-navn og DLL fra registreringsdatabasen samt Edge/3. parts PDF-programmer/PowerToys-status.</p>
         </div>
       </div>
 
       <div class="pdf-step">
-        <div class="pdf-step-num">3</div>
+        <div class="pdf-step-num">5</div>
         <div>
           <div class="pdf-step-title">Tjek PowerToys File Explorer Add-ons</div>
           <p class="pdf-step-text">Hvis PowerToys er installeret: åbn <strong>PowerToys → File Management → File Explorer Add-ons</strong> og slå <strong>PDF preview</strong> fra. Genstart derefter Stifinder og test igen.</p>
@@ -290,15 +312,15 @@
       </div>
 
       <div class="pdf-step">
-        <div class="pdf-step-num">4</div>
+        <div class="pdf-step-num">6</div>
         <div>
           <div class="pdf-step-title">Test UNC-stien i stedet for det mappede drev</div>
-          <p class="pdf-step-text">Hvis filen fx ligger på <span class="pdf-code">P:\Mappe</span>, åbn samme mappe via <span class="pdf-code">\\server\share\Mappe</span>. Hvis UNC virker anderledes, er problemet sandsynligvis netværks-/zone-relateret.</p>
+          <p class="pdf-step-text">Hvis filen fx ligger på <span class="pdf-code">S:\Mappe</span>, åbn samme mappe via <span class="pdf-code">\\server\share\Mappe</span>. Hvis UNC virker anderledes, er problemet sandsynligvis netværks-/zone-relateret.</p>
         </div>
       </div>
 
       <div class="pdf-step">
-        <div class="pdf-step-num">5</div>
+        <div class="pdf-step-num">7</div>
         <div>
           <div class="pdf-step-title">Kontrollér sikkerhedszone for filserveren</div>
           <p class="pdf-step-text">Åbn Internetindstillinger → <strong>Sikkerhed → Lokalt intranet → Websteder → Avanceret</strong> og kontrollér at filserveren behandles som lokalt intranet.</p>
@@ -307,7 +329,7 @@
       </div>
 
       <div class="pdf-step">
-        <div class="pdf-step-num">6</div>
+        <div class="pdf-step-num">8</div>
         <div>
           <div class="pdf-step-title">Genstart Stifinder og test igen</div>
           <p class="pdf-step-text">Efter ændringer i Preview Handler eller PowerToys skal explorer.exe genstartes, så handleren indlæses på ny.</p>
@@ -798,6 +820,60 @@ document.getElementById("pdfHandlerOverlay").addEventListener("click", function(
   if (e.target === this) closePdfHandlerPopup();
 });
 
+async function openPdfFolder(which, btn) {
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Åbner...";
+  document.getElementById("pdfHandlerResult").textContent = "";
+
+  const targetScript = which === "TEMP"
+    ? `$target = 'C:\\Temp'; if (!(Test-Path $target)) { New-Item -ItemType Directory -Path $target -Force | Out-Null }`
+    : `$target = 'S:\\'; try { $user=(Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).UserName; if($user){ $sid=(New-Object System.Security.Principal.NTAccount($user)).Translate([System.Security.Principal.SecurityIdentifier]).Value; if(-not (Get-PSDrive HKU -ErrorAction SilentlyContinue)){ New-PSDrive -PSProvider Registry -Name HKU -Root HKEY_USERS | Out-Null }; $remote=(Get-ItemProperty -Path ("HKU:\\"+$sid+"\\Network\\S") -Name RemotePath -ErrorAction SilentlyContinue).RemotePath; if($remote){$target=[string]$remote} } } catch {}`;
+
+  const script = `
+$ErrorActionPreference='Stop'
+${targetScript}
+if (!(Test-Path $target)) { throw "Stien blev ikke fundet: $target" }
+$user=(Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).UserName
+if(-not $user){throw 'Ingen interaktiv bruger fundet'}
+$task='ITSupport-OpenFolder-'+[guid]::NewGuid().ToString('N')
+$action=New-ScheduledTaskAction -Execute 'explorer.exe' -Argument ('"'+$target+'"')
+$principal=New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
+Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Force | Out-Null
+Start-ScheduledTask -TaskName $task
+Start-Sleep -Milliseconds 800
+Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+Write-Output ('OK|'+$target)
+`.trim();
+
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    if (!output.startsWith("OK|")) throw new Error(output || "Kunne ikke åbne Stifinder");
+    document.getElementById("pdfHandlerResult").textContent = "✓ Stifinder åbnet: " + output.substring(3);
+    document.getElementById("pdfHandlerResult").className = "popup-result ok";
+  } catch (err) {
+    document.getElementById("pdfHandlerResult").textContent = "Fejl ved åbning af mappe: " + err.message;
+    document.getElementById("pdfHandlerResult").className = "popup-result err";
+  } finally { btn.disabled = false; btn.textContent = old; }
+}
+
+async function pdfDeleteTemp(btn) {
+  const old=btn.textContent; btn.disabled=true; btn.textContent="Sletter...";
+  const script='try { $u=(Get-CimInstance Win32_ComputerSystem).UserName; if($u){$u=$u.Split([char]92)[-1]}else{$u=$env:USERNAME}; $p="C:\\Users\\$u\\AppData\\Local\\Temp"; $b=(Get-ChildItem $p -Recurse -Force -ErrorAction SilentlyContinue|Measure-Object).Count; Remove-Item ($p+"\\*") -Recurse -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300; $a=(Get-ChildItem $p -Recurse -Force -ErrorAction SilentlyContinue|Measure-Object).Count; Write-Output ("OK|"+$b+"|"+$a) } catch { Write-Output ("ERROR|"+$_.Exception.Message) }';
+  try { const data=await runPs(script); const p=(data.output||"").trim().split("|"); if(p[0]!=="OK")throw new Error(p.slice(1).join("|")||"Ukendt fejl"); const b=Number(p[1])||0,a=Number(p[2])||0,d=Math.max(b-a,0); document.getElementById("pdfHandlerResult").textContent=`✓ Temp: ${d} filer/mapper slettet.${a?` ${a} er stadig i brug/kunne ikke slettes.`:""}`; document.getElementById("pdfHandlerResult").className="popup-result ok"; }
+  catch(err){ document.getElementById("pdfHandlerResult").textContent="Fejl ved sletning af Temp: "+err.message; document.getElementById("pdfHandlerResult").className="popup-result err"; }
+  finally{btn.disabled=false;btn.textContent=old;}
+}
+
+async function pdfDeleteEdgeCache(btn) {
+  const old=btn.textContent; btn.disabled=true; btn.textContent="Sletter...";
+  const script='try { $u=(Get-CimInstance Win32_ComputerSystem).UserName; if($u){$u=$u.Split([char]92)[-1]}else{$u=$env:USERNAME}; $base="C:\\Users\\$u\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default"; $paths=@("$base\\Cache","$base\\Code Cache","$base\\GPUCache"); $b=0; foreach($p in $paths){if(Test-Path $p){$b+=(Get-ChildItem $p -Recurse -Force -ErrorAction SilentlyContinue|Measure-Object).Count;Remove-Item ($p+"\\*") -Recurse -Force -ErrorAction SilentlyContinue}};Start-Sleep -Milliseconds 300;$a=0;foreach($p in $paths){if(Test-Path $p){$a+=(Get-ChildItem $p -Recurse -Force -ErrorAction SilentlyContinue|Measure-Object).Count}};Write-Output ("OK|"+$b+"|"+$a) } catch { Write-Output ("ERROR|"+$_.Exception.Message) }';
+  try { const data=await runPs(script); const p=(data.output||"").trim().split("|"); if(p[0]!=="OK")throw new Error(p.slice(1).join("|")||"Ukendt fejl"); const b=Number(p[1])||0,a=Number(p[2])||0,d=Math.max(b-a,0); document.getElementById("pdfHandlerResult").textContent=`✓ Edge-cache: ${d} filer slettet.${a?` ${a} er stadig i brug/kunne ikke slettes.`:""}`; document.getElementById("pdfHandlerResult").className="popup-result ok"; }
+  catch(err){ document.getElementById("pdfHandlerResult").textContent="Fejl ved sletning af Edge-cache: "+err.message; document.getElementById("pdfHandlerResult").className="popup-result err"; }
+  finally{btn.disabled=false;btn.textContent=old;}
+}
+
 async function runPdfHandlerDiagnosis() {
   const btn = document.getElementById("pdfDiagBtn");
   btn.disabled = true;
@@ -839,26 +915,92 @@ $result.handlerDll = if ($dll) { [string]$dll } else { '' }
 $edge = @("$env:ProgramFiles\\Microsoft\\Edge\\Application\\msedge.exe", "\${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 $result.edgeVersion = if ($edge) { (Get-Item $edge).VersionInfo.ProductVersion } else { '' }
 
-# Find installerede 3. parts PDF-programmer via Windows' uninstall-registre.
-$uninstallPaths = @(
-  'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
-  'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
-  'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
-)
+# Find installerede 3. parts PDF-programmer.
+# Agenten koerer som SYSTEM, saa HKCU er normalt SYSTEM-kontoen. Derfor finder vi
+# den interaktive brugers SID/profil og laeser ogsaa den brugers registry-hive.
+$pdfApps = @()
 $knownPdf = 'Adobe Acrobat|Adobe Reader|Foxit|SumatraPDF|Sumatra PDF|Nitro PDF|PDF-XChange|Bluebeam|PDF24|Kofax Power PDF|Tracker Software'
-$pdfApps = Get-ItemProperty $uninstallPaths -ErrorAction SilentlyContinue |
+$interactiveUser = $null
+$interactiveSid = $null
+$userProfile = $null
+try {
+  $interactiveUser = (Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop).UserName
+  if ($interactiveUser) {
+    $interactiveSid = (New-Object System.Security.Principal.NTAccount($interactiveUser)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+    $userNameOnly = $interactiveUser.Split([char]92)[-1]
+    $userProfile = "C:\\Users\\$userNameOnly"
+    if (-not (Test-Path $userProfile)) { $userProfile = $null }
+    if (-not (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue)) {
+      New-PSDrive -PSProvider Registry -Name HKU -Root HKEY_USERS -ErrorAction SilentlyContinue | Out-Null
+    }
+  }
+} catch {}
+
+$uninstallPaths = @(
+  'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+  'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'
+)
+if ($interactiveSid) {
+  $uninstallPaths += "HKU:\\$interactiveSid\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*"
+}
+
+Get-ItemProperty $uninstallPaths -ErrorAction SilentlyContinue |
   Where-Object {
     $_.DisplayName -and
     $_.DisplayName -notmatch 'Microsoft Edge' -and
-    ($_.DisplayName -match $knownPdf -or $_.DisplayName -match '(?i)\bPDF\b')
+    ($_.DisplayName -match $knownPdf -or $_.DisplayName -match '(?i)\\bPDF\\b')
   } |
   ForEach-Object {
-    [PSCustomObject]@{
+    $pdfApps += [PSCustomObject]@{
       name = [string]$_.DisplayName
       version = [string]$_.DisplayVersion
       publisher = [string]$_.Publisher
+      path = [string]$_.InstallLocation
+      source = 'Uninstall-register'
     }
-  } | Sort-Object name -Unique
+  }
+
+# Sumatra kan vaere installeret per-user eller portable og findes derfor ikke altid
+# i Uninstall-registret. Tjek kendte placeringer + App Paths eksplicit.
+$sumatraCandidates = @(
+  "$env:ProgramFiles\\SumatraPDF\\SumatraPDF.exe",
+  "\${env:ProgramFiles(x86)}\\SumatraPDF\\SumatraPDF.exe"
+)
+if ($userProfile) {
+  $sumatraCandidates += "$userProfile\\AppData\\Local\\SumatraPDF\\SumatraPDF.exe"
+}
+
+$appPathKeys = @(
+  'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\SumatraPDF.exe',
+  'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\App Paths\\SumatraPDF.exe'
+)
+if ($interactiveSid) {
+  $appPathKeys += "HKU:\\$interactiveSid\\Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\SumatraPDF.exe"
+}
+foreach ($k in $appPathKeys) {
+  try {
+    $v = (Get-ItemProperty -Path $k -ErrorAction Stop).'(default)'
+    if ($v) { $sumatraCandidates += [string]$v }
+  } catch {}
+}
+
+$sumatraExe = $sumatraCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if ($sumatraExe -and -not ($pdfApps | Where-Object { $_.name -match '(?i)sumatra' })) {
+  $ver = ''
+  try { $ver = (Get-Item $sumatraExe -ErrorAction Stop).VersionInfo.ProductVersion } catch {}
+  $pdfApps += [PSCustomObject]@{
+    name = 'SumatraPDF'
+    version = [string]$ver
+    publisher = 'SumatraPDF'
+    path = [string]$sumatraExe
+    source = 'Programfil/App Paths'
+  }
+}
+
+# Fjern dubletter efter navn, men behold den post der har mest information.
+$pdfApps = @($pdfApps | Group-Object { $_.name.ToLowerInvariant() } | ForEach-Object {
+  $_.Group | Sort-Object @{Expression={ if ($_.path) { 0 } else { 1 } }}, @{Expression={ if ($_.version) { 0 } else { 1 } }} | Select-Object -First 1
+} | Sort-Object name)
 $result.thirdPartyPdfApps = @($pdfApps)
 
 $pt = @("$env:LOCALAPPDATA\\PowerToys\\PowerToys.exe", "$env:ProgramFiles\\PowerToys\\PowerToys.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
@@ -883,7 +1025,7 @@ $result | ConvertTo-Json -Compress
     document.getElementById("pdfEdgeStatus").innerHTML = j.edgeVersion ? '<span class="status-badge ok">Installeret ' + escHtml(j.edgeVersion) + '</span>' : '<span class="status-badge missing">Ikke fundet</span>';
     const pdfApps = Array.isArray(j.thirdPartyPdfApps) ? j.thirdPartyPdfApps : [];
     document.getElementById("pdfThirdPartyStatus").innerHTML = pdfApps.length
-      ? pdfApps.map(a => '<span class="status-badge ok" style="margin:2px 4px 2px 0;">' + escHtml(a.name) + (a.version ? ' ' + escHtml(a.version) : '') + '</span>').join('')
+      ? pdfApps.map(a => '<span class="status-badge ok" style="margin:2px 4px 2px 0;" title="' + escHtml([a.source, a.path].filter(Boolean).join(' — ')) + '">' + escHtml(a.name) + (a.version ? ' ' + escHtml(a.version) : '') + '</span>').join('')
       : '<span class="status-badge missing">Ingen fundet</span>';
     document.getElementById("pdfPowerToysStatus").innerHTML = j.powerToys ? '<span class="status-badge missing">Installeret — tjek PDF preview add-on</span>' : '<span class="status-badge ok">Ikke fundet</span>';
 
