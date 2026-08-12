@@ -67,6 +67,18 @@
     @keyframes progressSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(285%); } }
     .progressText { font-size: .82rem; color: #6b7280; margin: 0 0 14px; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    /* PDF preview handler fejlfinding */
+    .pdf-steps { display: flex; flex-direction: column; gap: 12px; margin: 14px 0 18px; }
+    .pdf-step { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; padding: 12px 14px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 12px; }
+    .pdf-step-num { width: 28px; height: 28px; border-radius: 50%; background: #850c18; color: #fff; display: flex; align-items: center; justify-content: center; font-size: .82rem; font-weight: 700; }
+    .pdf-step-title { font-size: .9rem; font-weight: 700; color: #111827; margin: 1px 0 4px; }
+    .pdf-step-text { font-size: .82rem; color: #4b5563; line-height: 1.5; margin: 0; }
+    .pdf-step-result { margin-top: 7px; font-size: .8rem; color: #6b7280; }
+    .pdf-tech { margin-top: 18px; border-top: 1px solid #e5e7eb; padding-top: 16px; }
+    .pdf-tech-title { font-size: .9rem; font-weight: 700; margin-bottom: 10px; }
+    .pdf-code { font-family: Consolas, monospace; font-size: .78rem; word-break: break-all; }
+    .pdf-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .pdf-note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 10px 12px; font-size: .8rem; line-height: 1.45; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -103,6 +115,14 @@
         <h2>Tjek Edge opdatering</h2>
         <p>Viser den installerede version af Microsoft Edge, og giver mulighed for at rydde Edges cache.</p>
         <button class="btn-run" id="edgeBtn" onclick="openEdgePopup()">▶ Kør</button>
+      </div>
+
+
+      <div class="action-card">
+        <div class="card-icon">📄</div>
+        <h2>Fejlfind PDF Handler</h2>
+        <p>Fejlsøg PDF-preview i Stifinder — især når første PDF på et netværksdrev vises forkert, men efterfølgende filer virker.</p>
+        <button class="btn-run" id="pdfHandlerBtn" onclick="openPdfHandlerPopup()">🔎 Fejlfind</button>
       </div>
 
       <div class="action-card">
@@ -232,6 +252,92 @@
       <span class="popup-result" id="edgeResult"></span>
       <button class="btn-close" onclick="closeEdgePopup()">Luk</button>
       <button class="btn-update" id="edgeCacheBtn" onclick="clearEdgeCache()">Slet cache</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Popup: PDF Preview Handler -->
+<div class="popup-overlay" id="pdfHandlerOverlay">
+  <div class="popup-box" style="max-width:760px;">
+    <h2 class="popup-title">📄 Fejlfind PDF Handler</h2>
+    <p class="popup-desc">Trin-for-trin fejlfinding af PDF-preview i Windows Stifinder. Start øverst og stop når problemet er fundet.</p>
+
+    <div class="pdf-steps">
+      <div class="pdf-step">
+        <div class="pdf-step-num">1</div>
+        <div>
+          <div class="pdf-step-title">Test den samme PDF lokalt</div>
+          <p class="pdf-step-text">Kopiér en PDF der fejler fra netværksdrevet til <span class="pdf-code">C:\Temp\Test.pdf</span>. Genstart Stifinder og markér filen som den første PDF i mappen.</p>
+          <div class="pdf-step-result"><strong>Virker lokalt:</strong> fokusér på SMB/netværksplacering eller sikkerhedszone. <strong>Fejler også lokalt:</strong> fokusér på Preview Handler.</div>
+        </div>
+      </div>
+
+      <div class="pdf-step">
+        <div class="pdf-step-num">2</div>
+        <div>
+          <div class="pdf-step-title">Kontrollér hvilken PDF Preview Handler Windows bruger</div>
+          <p class="pdf-step-text">Klik <strong>Kør automatisk tjek</strong> nedenfor. Værktøjet læser PDF-associationen, Preview Handler-navn og DLL fra registreringsdatabasen samt Edge/Sumatra/PowerToys-status.</p>
+        </div>
+      </div>
+
+      <div class="pdf-step">
+        <div class="pdf-step-num">3</div>
+        <div>
+          <div class="pdf-step-title">Tjek PowerToys File Explorer Add-ons</div>
+          <p class="pdf-step-text">Hvis PowerToys er installeret: åbn <strong>PowerToys → File Management → File Explorer Add-ons</strong> og slå <strong>PDF preview</strong> fra. Genstart derefter Stifinder og test igen.</p>
+        </div>
+      </div>
+
+      <div class="pdf-step">
+        <div class="pdf-step-num">4</div>
+        <div>
+          <div class="pdf-step-title">Test UNC-stien i stedet for det mappede drev</div>
+          <p class="pdf-step-text">Hvis filen fx ligger på <span class="pdf-code">P:\Mappe</span>, åbn samme mappe via <span class="pdf-code">\\server\share\Mappe</span>. Hvis UNC virker anderledes, er problemet sandsynligvis netværks-/zone-relateret.</p>
+        </div>
+      </div>
+
+      <div class="pdf-step">
+        <div class="pdf-step-num">5</div>
+        <div>
+          <div class="pdf-step-title">Kontrollér sikkerhedszone for filserveren</div>
+          <p class="pdf-step-text">Åbn Internetindstillinger → <strong>Sikkerhed → Lokalt intranet → Websteder → Avanceret</strong> og kontrollér at filserveren behandles som lokalt intranet.</p>
+          <div class="pdf-actions"><button class="btn-close" onclick="openInternetOptions()">Åbn Internetindstillinger</button></div>
+        </div>
+      </div>
+
+      <div class="pdf-step">
+        <div class="pdf-step-num">6</div>
+        <div>
+          <div class="pdf-step-title">Genstart Stifinder og test igen</div>
+          <p class="pdf-step-text">Efter ændringer i Preview Handler eller PowerToys skal explorer.exe genstartes, så handleren indlæses på ny.</p>
+          <div class="pdf-actions"><button class="btn-close" onclick="restartExplorerForPdf(this)">↻ Genstart Stifinder</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pdf-tech">
+      <div class="pdf-tech-title">Teknisk diagnose</div>
+      <table class="reg-table">
+        <tbody>
+          <tr><td>PDF ProgID</td><td id="pdfProgId"><span class="status-badge loading"><span class="spinner"></span> Ikke kørt</span></td></tr>
+          <tr><td>Preview Handler GUID</td><td id="pdfHandlerGuid">—</td></tr>
+          <tr><td>Handler-navn</td><td id="pdfHandlerName">—</td></tr>
+          <tr><td>Handler DLL</td><td id="pdfHandlerDll" class="pdf-code">—</td></tr>
+          <tr><td>Microsoft Edge</td><td id="pdfEdgeStatus">—</td></tr>
+          <tr><td>SumatraPDF</td><td id="pdfSumatraStatus">—</td></tr>
+          <tr><td>PowerToys</td><td id="pdfPowerToysStatus">—</td></tr>
+        </tbody>
+      </table>
+      <div class="pdf-actions">
+        <button class="btn-update" id="pdfDiagBtn" onclick="runPdfHandlerDiagnosis()">🔎 Kør automatisk tjek</button>
+      </div>
+      <div class="pdf-note" id="pdfAdvice">Tip: At Edge er standardprogram til PDF betyder ikke nødvendigvis, at Explorer bruger Edge som Preview Handler.</div>
+    </div>
+
+    <div class="popup-footer">
+      <span class="popup-result" id="pdfHandlerResult"></span>
+      <button class="btn-close" onclick="closePdfHandlerPopup()">Luk</button>
     </div>
   </div>
 </div>
@@ -592,7 +698,7 @@ async function checkEdgeVersion() {
   const cell = document.getElementById("edgeVersionValue");
   cell.innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
 
-  const script = 'try { $paths = @("$env:ProgramFiles\\Microsoft\\Edge\\Application\\msedge.exe", "${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe"); $exe = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1; if ($exe) { $v = (Get-Item $exe).VersionInfo.ProductVersion; Write-Output "OK|$v" } else { Write-Output "MISSING|" } } catch { Write-Output "MISSING|" }';
+  const script = 'try { $paths = @("$env:ProgramFiles\\Microsoft\\Edge\\Application\\msedge.exe", "\${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe"); $exe = $paths | Where-Object { Test-Path $_ } | Select-Object -First 1; if ($exe) { $v = (Get-Item $exe).VersionInfo.ProductVersion; Write-Output "OK|$v" } else { Write-Output "MISSING|" } } catch { Write-Output "MISSING|" }';
 
   console.log("Edge version script:", script);
 
@@ -674,6 +780,138 @@ async function clearEdgeCache() {
     btn.disabled = false;
     btn.textContent = "Slet cache";
   }
+}
+
+
+/* ---------- PDF Preview Handler diagnose ---------- */
+
+function openPdfHandlerPopup() {
+  document.getElementById("pdfHandlerOverlay").classList.add("open");
+  document.getElementById("pdfHandlerResult").textContent = "";
+}
+
+function closePdfHandlerPopup() {
+  document.getElementById("pdfHandlerOverlay").classList.remove("open");
+}
+
+document.getElementById("pdfHandlerOverlay").addEventListener("click", function(e) {
+  if (e.target === this) closePdfHandlerPopup();
+});
+
+async function runPdfHandlerDiagnosis() {
+  const btn = document.getElementById("pdfDiagBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Tjekker...';
+  document.getElementById("pdfHandlerResult").textContent = "";
+  document.getElementById("pdfProgId").innerHTML = '<span class="status-badge loading"><span class="spinner"></span> Tjekker...</span>';
+
+  const script = `
+$ErrorActionPreference = 'SilentlyContinue'
+$result = [ordered]@{}
+$previewShell = '{8895b1c6-b41f-4c1c-a562-0d564250836f}'
+
+$progId = (Get-ItemProperty -Path 'Registry::HKEY_CLASSES_ROOT\\.pdf' -ErrorAction SilentlyContinue).'(default)'
+$result.progId = if ($progId) { $progId } else { '' }
+
+$handler = (Get-ItemProperty -Path ('Registry::HKEY_CLASSES_ROOT\\.pdf\\shellex\\' + $previewShell) -ErrorAction SilentlyContinue).'(default)'
+if (-not $handler) {
+  $handler = (Get-ItemProperty -Path ('Registry::HKEY_CLASSES_ROOT\\SystemFileAssociations\\.pdf\\shellex\\' + $previewShell) -ErrorAction SilentlyContinue).'(default)'
+}
+if (-not $handler -and $progId) {
+  $handler = (Get-ItemProperty -Path ('Registry::HKEY_CLASSES_ROOT\\' + $progId + '\\shellex\\' + $previewShell) -ErrorAction SilentlyContinue).'(default)'
+}
+$result.handlerGuid = if ($handler) { $handler } else { '' }
+
+$handlerName = ''
+$phKey = Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\PreviewHandlers' -ErrorAction SilentlyContinue
+if ($handler -and $phKey) {
+  $prop = $phKey.PSObject.Properties | Where-Object { $_.Name -ieq $handler } | Select-Object -First 1
+  if ($prop) { $handlerName = [string]$prop.Value }
+}
+$result.handlerName = $handlerName
+
+$dll = ''
+if ($handler) {
+  $dll = (Get-ItemProperty -Path ('Registry::HKEY_CLASSES_ROOT\\CLSID\\' + $handler + '\\InprocServer32') -ErrorAction SilentlyContinue).'(default)'
+}
+$result.handlerDll = if ($dll) { [string]$dll } else { '' }
+
+$edge = @("$env:ProgramFiles\\Microsoft\\Edge\\Application\\msedge.exe", "\${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+$result.edgeVersion = if ($edge) { (Get-Item $edge).VersionInfo.ProductVersion } else { '' }
+
+$sumatra = @("$env:LOCALAPPDATA\\SumatraPDF\\SumatraPDF.exe", "$env:ProgramFiles\\SumatraPDF\\SumatraPDF.exe", "\${env:ProgramFiles(x86)}\\SumatraPDF\\SumatraPDF.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+$result.sumatra = [bool]$sumatra
+
+$pt = @("$env:LOCALAPPDATA\\PowerToys\\PowerToys.exe", "$env:ProgramFiles\\PowerToys\\PowerToys.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $pt) { $pt = (Get-Process PowerToys -ErrorAction SilentlyContinue | Select-Object -First 1).Path }
+$result.powerToys = [bool]$pt
+$result.powerToysPath = if ($pt) { [string]$pt } else { '' }
+
+$result | ConvertTo-Json -Compress
+`.trim();
+
+  try {
+    const data = await runPs(script);
+    const raw = (data.output || "").trim();
+    const j = JSON.parse(raw);
+
+    document.getElementById("pdfProgId").innerHTML = j.progId
+      ? '<span class="status-badge ok">' + escHtml(j.progId) + '</span>'
+      : '<span class="status-badge missing">Ikke fundet</span>';
+    document.getElementById("pdfHandlerGuid").innerHTML = j.handlerGuid ? '<span class="pdf-code">' + escHtml(j.handlerGuid) + '</span>' : '<span class="status-badge missing">Ikke fundet</span>';
+    document.getElementById("pdfHandlerName").textContent = j.handlerName || "Ukendt / ikke registreret med navn";
+    document.getElementById("pdfHandlerDll").textContent = j.handlerDll || "Ikke fundet";
+    document.getElementById("pdfEdgeStatus").innerHTML = j.edgeVersion ? '<span class="status-badge ok">Installeret ' + escHtml(j.edgeVersion) + '</span>' : '<span class="status-badge missing">Ikke fundet</span>';
+    document.getElementById("pdfSumatraStatus").innerHTML = j.sumatra ? '<span class="status-badge ok">Installeret</span>' : '<span class="status-badge missing">Ikke fundet</span>';
+    document.getElementById("pdfPowerToysStatus").innerHTML = j.powerToys ? '<span class="status-badge missing">Installeret — tjek PDF preview add-on</span>' : '<span class="status-badge ok">Ikke fundet</span>';
+
+    let advice = [];
+    if (!j.handlerGuid) advice.push("Ingen PDF Preview Handler blev fundet. Reparation/genregistrering af en PDF-handler er næste fokus.");
+    if (j.powerToys) advice.push("PowerToys er installeret. Slå PDF preview fra under File Explorer Add-ons og genstart Stifinder.");
+    if (j.handlerName) advice.push("Aktiv handler: " + j.handlerName + ".");
+    if (j.sumatra && /sumatra/i.test(j.handlerName || "")) advice.push("Sumatra ser ud til at være aktiv Preview Handler. Test efter genstart af Stifinder.");
+    if (!advice.length) advice.push("Handleren ser registreret ud. Fortsæt med lokal-vs-netværk-testen og sikkerhedszonen.");
+    document.getElementById("pdfAdvice").textContent = advice.join(" ");
+    document.getElementById("pdfHandlerResult").textContent = "✓ Diagnose gennemført";
+    document.getElementById("pdfHandlerResult").className = "popup-result ok";
+  } catch (err) {
+    document.getElementById("pdfProgId").innerHTML = '<span class="status-badge error">Agent ikke fundet / fejl</span>';
+    document.getElementById("pdfHandlerResult").textContent = "Fejl: " + err.message;
+    document.getElementById("pdfHandlerResult").className = "popup-result err";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔎 Kør automatisk tjek";
+  }
+}
+
+async function restartExplorerForPdf(btn) {
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Genstarter...";
+  try {
+    await runPs('Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 800; Start-Process explorer.exe; Write-Output "OK"');
+    document.getElementById("pdfHandlerResult").textContent = "✓ Stifinder er genstartet. Test PDF-preview igen.";
+    document.getElementById("pdfHandlerResult").className = "popup-result ok";
+  } catch (err) {
+    document.getElementById("pdfHandlerResult").textContent = "Fejl: " + err.message;
+    document.getElementById("pdfHandlerResult").className = "popup-result err";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
+  }
+}
+
+async function openInternetOptions() {
+  try {
+    await runPs('Start-Process inetcpl.cpl; Write-Output "OK"');
+  } catch (err) {
+    document.getElementById("pdfHandlerResult").textContent = "Kunne ikke åbne Internetindstillinger: " + err.message;
+    document.getElementById("pdfHandlerResult").className = "popup-result err";
+  }
+}
+
+function escHtml(v) {
+  return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
 }
 
 /* ---------- Printerdiagnose ---------- */
@@ -1312,3 +1550,5 @@ async function restartSpoolerService() {
 
 </body>
 </html>
+
+
