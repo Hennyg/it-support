@@ -277,7 +277,7 @@
         <div class="pdf-step-num">2</div>
         <div>
           <div class="pdf-step-title">Kontrollér hvilken PDF Preview Handler Windows bruger</div>
-          <p class="pdf-step-text">Klik <strong>Kør automatisk tjek</strong> nedenfor. Værktøjet læser PDF-associationen, Preview Handler-navn og DLL fra registreringsdatabasen samt Edge/Sumatra/PowerToys-status.</p>
+          <p class="pdf-step-text">Klik <strong>Kør automatisk tjek</strong> nedenfor. Værktøjet læser PDF-associationen, Preview Handler-navn og DLL fra registreringsdatabasen samt Edge/3. parts PDF-programmer/PowerToys-status.</p>
         </div>
       </div>
 
@@ -325,7 +325,7 @@
           <tr><td>Handler-navn</td><td id="pdfHandlerName">—</td></tr>
           <tr><td>Handler DLL</td><td id="pdfHandlerDll" class="pdf-code">—</td></tr>
           <tr><td>Microsoft Edge</td><td id="pdfEdgeStatus">—</td></tr>
-          <tr><td>SumatraPDF</td><td id="pdfSumatraStatus">—</td></tr>
+          <tr><td>3. parts PDF-program</td><td id="pdfThirdPartyStatus">—</td></tr>
           <tr><td>PowerToys</td><td id="pdfPowerToysStatus">—</td></tr>
         </tbody>
       </table>
@@ -839,8 +839,27 @@ $result.handlerDll = if ($dll) { [string]$dll } else { '' }
 $edge = @("$env:ProgramFiles\\Microsoft\\Edge\\Application\\msedge.exe", "\${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 $result.edgeVersion = if ($edge) { (Get-Item $edge).VersionInfo.ProductVersion } else { '' }
 
-$sumatra = @("$env:LOCALAPPDATA\\SumatraPDF\\SumatraPDF.exe", "$env:ProgramFiles\\SumatraPDF\\SumatraPDF.exe", "\${env:ProgramFiles(x86)}\\SumatraPDF\\SumatraPDF.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-$result.sumatra = [bool]$sumatra
+# Find installerede 3. parts PDF-programmer via Windows' uninstall-registre.
+$uninstallPaths = @(
+  'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+  'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
+  'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+)
+$knownPdf = 'Adobe Acrobat|Adobe Reader|Foxit|SumatraPDF|Sumatra PDF|Nitro PDF|PDF-XChange|Bluebeam|PDF24|Kofax Power PDF|Tracker Software'
+$pdfApps = Get-ItemProperty $uninstallPaths -ErrorAction SilentlyContinue |
+  Where-Object {
+    $_.DisplayName -and
+    $_.DisplayName -notmatch 'Microsoft Edge' -and
+    ($_.DisplayName -match $knownPdf -or $_.DisplayName -match '(?i)\bPDF\b')
+  } |
+  ForEach-Object {
+    [PSCustomObject]@{
+      name = [string]$_.DisplayName
+      version = [string]$_.DisplayVersion
+      publisher = [string]$_.Publisher
+    }
+  } | Sort-Object name -Unique
+$result.thirdPartyPdfApps = @($pdfApps)
 
 $pt = @("$env:LOCALAPPDATA\\PowerToys\\PowerToys.exe", "$env:ProgramFiles\\PowerToys\\PowerToys.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $pt) { $pt = (Get-Process PowerToys -ErrorAction SilentlyContinue | Select-Object -First 1).Path }
@@ -862,14 +881,18 @@ $result | ConvertTo-Json -Compress
     document.getElementById("pdfHandlerName").textContent = j.handlerName || "Ukendt / ikke registreret med navn";
     document.getElementById("pdfHandlerDll").textContent = j.handlerDll || "Ikke fundet";
     document.getElementById("pdfEdgeStatus").innerHTML = j.edgeVersion ? '<span class="status-badge ok">Installeret ' + escHtml(j.edgeVersion) + '</span>' : '<span class="status-badge missing">Ikke fundet</span>';
-    document.getElementById("pdfSumatraStatus").innerHTML = j.sumatra ? '<span class="status-badge ok">Installeret</span>' : '<span class="status-badge missing">Ikke fundet</span>';
+    const pdfApps = Array.isArray(j.thirdPartyPdfApps) ? j.thirdPartyPdfApps : [];
+    document.getElementById("pdfThirdPartyStatus").innerHTML = pdfApps.length
+      ? pdfApps.map(a => '<span class="status-badge ok" style="margin:2px 4px 2px 0;">' + escHtml(a.name) + (a.version ? ' ' + escHtml(a.version) : '') + '</span>').join('')
+      : '<span class="status-badge missing">Ingen fundet</span>';
     document.getElementById("pdfPowerToysStatus").innerHTML = j.powerToys ? '<span class="status-badge missing">Installeret — tjek PDF preview add-on</span>' : '<span class="status-badge ok">Ikke fundet</span>';
 
     let advice = [];
     if (!j.handlerGuid) advice.push("Ingen PDF Preview Handler blev fundet. Reparation/genregistrering af en PDF-handler er næste fokus.");
     if (j.powerToys) advice.push("PowerToys er installeret. Slå PDF preview fra under File Explorer Add-ons og genstart Stifinder.");
     if (j.handlerName) advice.push("Aktiv handler: " + j.handlerName + ".");
-    if (j.sumatra && /sumatra/i.test(j.handlerName || "")) advice.push("Sumatra ser ud til at være aktiv Preview Handler. Test efter genstart af Stifinder.");
+    if (pdfApps.length) advice.push("Andre PDF-programmer fundet: " + pdfApps.map(a => a.name).join(", ") + ". De kan have registreret deres egen Preview Handler.");
+    if (pdfApps.some(a => /sumatra/i.test(a.name || "")) && /sumatra/i.test(j.handlerName || "")) advice.push("Sumatra ser ud til at være aktiv Preview Handler. Test efter genstart af Stifinder.");
     if (!advice.length) advice.push("Handleren ser registreret ud. Fortsæt med lokal-vs-netværk-testen og sikkerhedszonen.");
     document.getElementById("pdfAdvice").textContent = advice.join(" ");
     document.getElementById("pdfHandlerResult").textContent = "✓ Diagnose gennemført";
