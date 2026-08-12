@@ -268,12 +268,12 @@
         <div class="pdf-step-num">1</div>
         <div>
           <div class="pdf-step-title">Test den samme PDF lokalt</div>
-          <p class="pdf-step-text">Kopiér en PDF der fejler fra <strong>S-drevet</strong> til <span class="pdf-code">C:\Temp\Test.pdf</span>. Genstart Stifinder og markér filen som den første PDF i mappen.</p>
+          <p class="pdf-step-text">Klik på knappen og vælg den PDF på <strong>S-drevet</strong> som giver problemer. Filen kopieres automatisk til <span class="pdf-code">C:\Temp</span> (mappen oprettes hvis den mangler), filvælgeren lukker, og en ny Stifinder åbnes med den kopierede PDF markeret, så Preview-ruden kan vise den.</p>
           <div class="pdf-actions">
-            <button class="btn-close" onclick="openPdfFolder('S', this)">📁 Åbn S-drevet</button>
+            <button class="btn-update" onclick="pickAndTestPdf(this)">📄 Vælg PDF og test lokalt</button>
             <button class="btn-close" onclick="openPdfFolder('TEMP', this)">📁 Åbn C:\Temp</button>
           </div>
-          <div class="pdf-step-result"><strong>Virker lokalt:</strong> fokusér på SMB/netværksplacering eller sikkerhedszone. <strong>Fejler også lokalt:</strong> fokusér på Preview Handler.</div>
+          <div class="pdf-step-result"><strong>Virker lokalt:</strong> fokusér på SMB/netværksplacering eller sikkerhedszone. <strong>Fejler også lokalt:</strong> fokusér på Preview Handler. Preview-ruden skal være slået til i Stifinder.</div>
         </div>
       </div>
 
@@ -866,6 +866,108 @@ Write-Output ('OK|'+$target)
     document.getElementById("pdfHandlerResult").textContent = "Fejl ved åbning af mappe: " + err.message;
     document.getElementById("pdfHandlerResult").className = "popup-result err";
   } finally { btn.disabled = false; btn.textContent = old; }
+}
+
+async function pickAndTestPdf(btn) {
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Venter på filvalg...";
+  const resultEl = document.getElementById("pdfHandlerResult");
+  resultEl.textContent = "Vælg en PDF i filvinduet på pc'en.";
+  resultEl.className = "popup-result";
+
+  // Agenten kører som SYSTEM. Derfor oprettes et kortvarigt Scheduled Task i den
+  // interaktive brugers session, så Windows' almindelige OpenFileDialog vises på
+  // brugerens skrivebord og har adgang til brugerens mappede S-drev.
+  const script = `
+$ErrorActionPreference='Stop'
+$user=(Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).UserName
+if(-not $user){ throw 'Ingen interaktiv bruger fundet' }
+
+$work='C:\\ProgramData\\ITSupportAgent\\PdfLocalTest'
+New-Item -ItemType Directory -Path $work -Force | Out-Null
+$id=[guid]::NewGuid().ToString('N')
+$ps1=Join-Path $work ("pick-"+$id+".ps1")
+$resultFile=Join-Path $work ("result-"+$id+".txt")
+$task='ITSupport-PdfPick-'+$id
+
+$child=@'
+$ErrorActionPreference='Stop'
+Add-Type -AssemblyName System.Windows.Forms
+$destDir='C:\\Temp'
+if(!(Test-Path $destDir)){ New-Item -ItemType Directory -Path $destDir -Force | Out-Null }
+
+$dlg=New-Object System.Windows.Forms.OpenFileDialog
+$dlg.Title='Vælg PDF til lokal preview-test'
+$dlg.Filter='PDF-filer (*.pdf)|*.pdf'
+$dlg.Multiselect=$false
+$dlg.CheckFileExists=$true
+if(Test-Path 'S:\\'){ $dlg.InitialDirectory='S:\\' }
+
+if($dlg.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK){
+  'CANCEL|' | Set-Content -LiteralPath '__RESULT__' -Encoding UTF8
+  exit
+}
+
+$src=$dlg.FileName
+$name=[System.IO.Path]::GetFileName($src)
+$dest=Join-Path $destDir $name
+Copy-Item -LiteralPath $src -Destination $dest -Force
+
+# Åbn en ny Stifinder og markér den lokale kopi. Hvis Preview-ruden allerede er
+# slået til, vises preview automatisk for den markerede fil.
+Start-Process explorer.exe -ArgumentList ('/select,"'+$dest+'"')
+'OK|'+$dest | Set-Content -LiteralPath '__RESULT__' -Encoding UTF8
+'@
+$child=$child.Replace('__RESULT__',$resultFile.Replace("'","''"))
+Set-Content -LiteralPath $ps1 -Value $child -Encoding UTF8
+
+$action=New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -STA -ExecutionPolicy Bypass -File "'+$ps1+'"')
+$principal=New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
+Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Force | Out-Null
+Start-ScheduledTask -TaskName $task
+
+# Vent på at brugeren vælger fil eller annullerer. Maks. 5 minutter.
+$deadline=(Get-Date).AddMinutes(5)
+while((Get-Date) -lt $deadline -and !(Test-Path $resultFile)){ Start-Sleep -Milliseconds 400 }
+
+if(!(Test-Path $resultFile)){
+  Stop-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue
+  Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+  Remove-Item $ps1 -Force -ErrorAction SilentlyContinue
+  Write-Output 'TIMEOUT|'
+  exit
+}
+
+$out=(Get-Content -LiteralPath $resultFile -Raw -ErrorAction SilentlyContinue).Trim()
+Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+Remove-Item $ps1,$resultFile -Force -ErrorAction SilentlyContinue
+Write-Output $out
+`.trim();
+
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    const parts = output.split("|");
+    if (parts[0] === "CANCEL") {
+      resultEl.textContent = "Filvalg annulleret.";
+      resultEl.className = "popup-result";
+    } else if (parts[0] === "TIMEOUT") {
+      throw new Error("Filvalg fik timeout efter 5 minutter");
+    } else if (parts[0] === "OK") {
+      const dest = parts.slice(1).join("|");
+      resultEl.textContent = "✓ PDF kopieret til " + dest + " og åbnet i en ny Stifinder med filen markeret.";
+      resultEl.className = "popup-result ok";
+    } else {
+      throw new Error(output || "Ukendt fejl ved filvalg");
+    }
+  } catch (err) {
+    resultEl.textContent = "Fejl ved lokal PDF-test: " + err.message;
+    resultEl.className = "popup-result err";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
+  }
 }
 
 async function pdfDeleteTemp(btn) {
