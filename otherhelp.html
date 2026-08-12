@@ -306,13 +306,23 @@
       <div class="pdf-step">
         <div class="pdf-step-num">5</div>
         <div>
+          <div class="pdf-step-title">Sæt Microsoft Edge som PDF Preview Handler</div>
+          <p class="pdf-step-text">Adobe og andre PDF-programmer kan overtage Windows' PDF-preview efter en opdatering. Knappen finder den Edge Preview Handler, der allerede er registreret på pc'en, og sætter den som PDF Preview Handler for den indloggede bruger. <strong>Standardprogrammet til at åbne PDF-filer ændres ikke.</strong></p>
+          <div class="pdf-actions"><button class="btn-update" onclick="setEdgePdfPreviewHandler(this)">🌐 Sæt Edge som preview</button></div>
+          <div class="pdf-step-result">Brug denne hvis handler-tjekket viser Adobe, Sumatra eller en anden PDF-handler. Genstart Stifinder bagefter.</div>
+        </div>
+      </div>
+
+      <div class="pdf-step">
+        <div class="pdf-step-num">6</div>
+        <div>
           <div class="pdf-step-title">Tjek PowerToys File Explorer Add-ons</div>
           <p class="pdf-step-text">Hvis PowerToys er installeret: åbn <strong>PowerToys → File Management → File Explorer Add-ons</strong> og slå <strong>PDF preview</strong> fra. Genstart derefter Stifinder og test igen.</p>
         </div>
       </div>
 
       <div class="pdf-step">
-        <div class="pdf-step-num">6</div>
+        <div class="pdf-step-num">7</div>
         <div>
           <div class="pdf-step-title">Test UNC-stien i stedet for det mappede drev</div>
           <p class="pdf-step-text">Hvis filen fx ligger på <span class="pdf-code">S:\Mappe</span>, åbn samme mappe via <span class="pdf-code">\\server\share\Mappe</span>. Hvis UNC virker anderledes, er problemet sandsynligvis netværks-/zone-relateret.</p>
@@ -320,7 +330,7 @@
       </div>
 
       <div class="pdf-step">
-        <div class="pdf-step-num">7</div>
+        <div class="pdf-step-num">8</div>
         <div>
           <div class="pdf-step-title">Kontrollér sikkerhedszone for filserveren</div>
           <p class="pdf-step-text">Åbn Internetindstillinger → <strong>Sikkerhed → Lokalt intranet → Websteder → Avanceret</strong> og kontrollér at filserveren behandles som lokalt intranet.</p>
@@ -329,7 +339,7 @@
       </div>
 
       <div class="pdf-step">
-        <div class="pdf-step-num">8</div>
+        <div class="pdf-step-num">9</div>
         <div>
           <div class="pdf-step-title">Genstart Stifinder og test igen</div>
           <p class="pdf-step-text">Efter ændringer i Preview Handler eller PowerToys skal explorer.exe genstartes, så handleren indlæses på ny.</p>
@@ -1046,6 +1056,80 @@ $result | ConvertTo-Json -Compress
   } finally {
     btn.disabled = false;
     btn.textContent = "🔎 Kør automatisk tjek";
+  }
+}
+
+async function setEdgePdfPreviewHandler(btn) {
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Sætter Edge...';
+  document.getElementById("pdfHandlerResult").textContent = "";
+
+  const script = `
+$ErrorActionPreference = 'Stop'
+$previewShell = '{8895b1c6-b41f-4c1c-a562-0d564250836f}'
+
+$edgeExe = @(
+  "$env:ProgramFiles\\Microsoft\\Edge\\Application\\msedge.exe",
+  "\${env:ProgramFiles(x86)}\\Microsoft\\Edge\\Application\\msedge.exe"
+) | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $edgeExe) { throw 'Microsoft Edge blev ikke fundet på pc-en.' }
+
+$previewHandlers = Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\PreviewHandlers' -ErrorAction Stop
+$edgeProp = $previewHandlers.PSObject.Properties | Where-Object {
+  $_.Name -match '^\\{[0-9A-Fa-f-]+\\}$' -and
+  [string]$_.Value -match '(?i)Microsoft Edge.*PDF.*Preview|PDF.*Preview.*Microsoft Edge|Edge.*Preview'
+} | Select-Object -First 1
+
+if (-not $edgeProp) {
+  foreach ($p in $previewHandlers.PSObject.Properties | Where-Object { $_.Name -match '^\\{[0-9A-Fa-f-]+\\}$' }) {
+    $clsid = [string]$p.Name
+    $dll = (Get-ItemProperty -Path ('Registry::HKEY_CLASSES_ROOT\\CLSID\\' + $clsid + '\\InprocServer32') -ErrorAction SilentlyContinue).'(default)'
+    if (($dll -and [string]$dll -match '(?i)Edge') -or ([string]$p.Value -match '(?i)Edge')) {
+      $edgeProp = $p
+      break
+    }
+  }
+}
+if (-not $edgeProp) { throw 'Edge PDF Preview Handler er ikke registreret. Reparér/opdatér Edge og prøv igen.' }
+
+$edgeGuid = [string]$edgeProp.Name
+$edgeName = [string]$edgeProp.Value
+
+$user = (Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop).UserName
+if (-not $user) { throw 'Ingen interaktiv bruger fundet.' }
+$sid = (New-Object System.Security.Principal.NTAccount($user)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+if (-not (Get-PSDrive -Name HKU -ErrorAction SilentlyContinue)) {
+  New-PSDrive -PSProvider Registry -Name HKU -Root HKEY_USERS | Out-Null
+}
+
+$key = "HKU:\\$sid\\Software\\Classes\\.pdf\\shellex\\$previewShell"
+if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }
+Set-Item -Path $key -Value $edgeGuid -Force
+
+$verify = (Get-ItemProperty -Path $key -ErrorAction Stop).'(default)'
+if ([string]$verify -ne $edgeGuid) { throw 'Registreringsdatabasen kunne ikke verificeres efter ændringen.' }
+
+Write-Output ('OK|' + $edgeGuid + '|' + $edgeName)
+`.trim();
+
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    const parts = output.split("|");
+    if (parts[0] !== "OK") throw new Error(output || "Ukendt fejl");
+    const guid = parts[1] || "";
+    const name = parts.slice(2).join("|") || "Microsoft Edge PDF Preview Handler";
+    document.getElementById("pdfHandlerResult").textContent = "✓ Edge er sat som PDF Preview Handler: " + name + ". Genstart Stifinder og test igen.";
+    document.getElementById("pdfHandlerResult").className = "popup-result ok";
+    document.getElementById("pdfHandlerGuid").innerHTML = guid ? '<span class="pdf-code">' + escHtml(guid) + '</span>' : "—";
+    document.getElementById("pdfHandlerName").textContent = name;
+  } catch (err) {
+    document.getElementById("pdfHandlerResult").textContent = "Kunne ikke sætte Edge som PDF Preview Handler: " + err.message;
+    document.getElementById("pdfHandlerResult").className = "popup-result err";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
   }
 }
 
