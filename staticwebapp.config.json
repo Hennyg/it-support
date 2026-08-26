@@ -163,6 +163,12 @@
       ]
     },
     {
+      "route": "/printer.html",
+      "allowedRoles": [
+        "authenticated"
+      ]
+    },
+    {
       "route": "/teamsbaggrunde.html",
       "allowedRoles": [
         "authenticated"
