@@ -84,7 +84,7 @@
     .router-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 4px; }
     .router-card { display: block; border: 2px solid #e5e7eb; border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color .15s, box-shadow .15s; background: #fff; text-align: left; text-decoration: none; color: inherit; }
     .router-card:hover { border-color: #850c18; box-shadow: 0 4px 14px rgba(133,12,24,.12); }
-    .router-card img { width: 100%; height: 150px; object-fit: cover; display: block; background: #f3f4f6; }
+    .router-card img { width: 100%; height: 150px; object-fit: cover; object-position: top; display: block; background: #f3f4f6; }
     .router-card-body { padding: 12px 14px; }
     .router-card-name { font-weight: 700; font-size: .92rem; color: #111827; margin: 0 0 4px; }
     .router-card-desc { font-size: .78rem; color: #6b7280; margin: 0; line-height: 1.4; }
@@ -1993,7 +1993,7 @@ function renderWifiRouterGrid() {
     const meta = wifiRouterMeta(f.name);
     const card = document.createElement("a");
     card.className = "router-card";
-    card.href = f.downloadUrl || "#";
+    card.href = f.webUrl || f.downloadUrl || "#";
     card.target = "_blank";
     card.rel = "noopener";
     card.innerHTML = `
