@@ -79,6 +79,18 @@
     .pdf-code { font-family: Consolas, monospace; font-size: .78rem; word-break: break-all; }
     .pdf-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .pdf-note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 10px 12px; font-size: .8rem; line-height: 1.45; margin-top: 10px; }
+
+    /* Wifi routere */
+    .router-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 4px; }
+    .router-card { display: block; border: 2px solid #e5e7eb; border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color .15s, box-shadow .15s; background: #fff; text-align: left; text-decoration: none; color: inherit; }
+    .router-card:hover { border-color: #850c18; box-shadow: 0 4px 14px rgba(133,12,24,.12); }
+    .router-card img { width: 100%; height: 150px; object-fit: cover; display: block; background: #f3f4f6; }
+    .router-card-body { padding: 12px 14px; }
+    .router-card-name { font-weight: 700; font-size: .92rem; color: #111827; margin: 0 0 4px; }
+    .router-card-desc { font-size: .78rem; color: #6b7280; margin: 0; line-height: 1.4; }
+    .router-card-link { display: inline-block; margin-top: 8px; font-size: .78rem; font-weight: 600; color: #850c18; }
+    .loading { padding: 24px; text-align: center; color: #9ca3af; font-size: .88rem; }
+    .empty { padding: 24px; text-align: center; color: #9ca3af; font-size: .85rem; }
   </style>
 </head>
 <body>
@@ -130,6 +142,13 @@
         <h2>Diagnosticér printerproblem</h2>
         <p>Viser installerede printere og deres status, aktive print-job i køen og de seneste fejl/advarsler fra Windows' printlog — så du kan se hvorfor en udskrift hænger og fejler.</p>
         <button class="btn-run" id="printerBtn" onclick="openPrinterPopup()">▶ Kør</button>
+      </div>
+
+      <div class="action-card">
+        <div class="card-icon">📶</div>
+        <h2>Wifi routere</h2>
+        <p>Vejledninger til de små 4G/5G wifi-routere — placering, strøm, Wi-Fi, firmware og fejlsøgning.</p>
+        <button class="btn-run" id="wifiRouterBtn" onclick="openWifiRouterPopup()">📶 Se vejledninger</button>
       </div>
 
     </div>
@@ -483,6 +502,23 @@
   </div>
 </div>
 
+<!-- Popup: Wifi routere -->
+<div class="popup-overlay" id="wifiRouterOverlay">
+  <div class="popup-box" style="max-width:640px;">
+    <h2 class="popup-title">📶 Wifi routere</h2>
+    <p class="popup-desc">Vælg den router du har, for at åbne vejledningen til placering, strøm, Wi-Fi, firmware og fejlsøgning.</p>
+
+    <div class="router-grid" id="routerGrid">
+      <div class="loading"><span class="spinner"></span> Henter vejledninger...</div>
+    </div>
+
+    <div class="popup-footer">
+      <span class="popup-result" id="wifiRouterResult"></span>
+      <button class="btn-close" onclick="closeWifiRouterPopup()">Luk</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const AGENT = "http://localhost:5199";
 const REG_PATH = "HKCU:\\Software\\Microsoft\\Office\\16.0\\Excel\\Security\\ProtectedView";
@@ -556,6 +592,10 @@ document.getElementById("edgeOverlay").addEventListener("click", function(e) {
 
 document.getElementById("printerOverlay").addEventListener("click", function(e) {
   if (e.target === this) closePrinterPopup();
+});
+
+document.getElementById("wifiRouterOverlay").addEventListener("click", function(e) {
+  if (e.target === this) closeWifiRouterPopup();
 });
 
 async function checkRegValues() {
@@ -1897,9 +1937,76 @@ async function restartSpoolerService() {
     btn.textContent = "🧹 Ryd fastlåst printerkø";
   }
 }
+
+/* ---------- Wifi routere ---------- */
+
+let wifiRouterGuides = [];
+let wifiRouterLoaded = false;
+
+const WIFI_ROUTER_INFO = [
+  { match: /zte/i,           label: "ZTE U10",         desc: "Lille 4G/5G-router fra ZTE." },
+  { match: /d[-_]?link|dwr/i, label: "D-Link DWR-932",  desc: "Lille 4G-router fra D-Link." }
+];
+
+function wifiRouterMeta(name) {
+  const info = WIFI_ROUTER_INFO.find(i => i.match.test(name));
+  return info || { label: name.replace(/\.pdf$/i, ""), desc: "" };
+}
+
+function openWifiRouterPopup() {
+  document.getElementById("wifiRouterOverlay").classList.add("open");
+  document.getElementById("wifiRouterResult").textContent = "";
+  document.getElementById("wifiRouterResult").className = "popup-result";
+  loadWifiRouterGuides();
+}
+
+function closeWifiRouterPopup() {
+  document.getElementById("wifiRouterOverlay").classList.remove("open");
+}
+
+async function loadWifiRouterGuides() {
+  const grid = document.getElementById("routerGrid");
+  grid.innerHTML = '<div class="loading"><span class="spinner"></span> Henter vejledninger...</div>';
+
+  try {
+    const res = await fetch("/api/getWifiRouterGuides");
+    if (!res.ok) throw new Error("API fejlede: " + res.status);
+    const data = await res.json();
+    wifiRouterGuides = data.files || [];
+    wifiRouterLoaded = true;
+
+    if (wifiRouterGuides.length === 0) {
+      grid.innerHTML = '<div class="empty">Ingen vejledninger fundet i mappen.</div>';
+      return;
+    }
+    renderWifiRouterGrid();
+  } catch (err) {
+    grid.innerHTML = `<div class="empty">Kunne ikke hente vejledninger: ${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderWifiRouterGrid() {
+  const grid = document.getElementById("routerGrid");
+  grid.innerHTML = "";
+
+  wifiRouterGuides.forEach(f => {
+    const meta = wifiRouterMeta(f.name);
+    const card = document.createElement("a");
+    card.className = "router-card";
+    card.href = f.downloadUrl || "#";
+    card.target = "_blank";
+    card.rel = "noopener";
+    card.innerHTML = `
+      <img src="${escHtml(f.thumbnailUrl || f.downloadUrl || "")}" alt="${escHtml(meta.label)}" loading="lazy" onerror="this.style.background='#f3f4f6'" />
+      <div class="router-card-body">
+        <p class="router-card-name">${escHtml(meta.label)}</p>
+        <p class="router-card-desc">${escHtml(meta.desc)}</p>
+        <span class="router-card-link">📄 Åbn vejledning →</span>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
 </script>
 
 </body>
 </html>
-
-
