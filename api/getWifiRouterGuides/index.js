@@ -1,5 +1,4 @@
 // api/getWifiRouterGuides/index.js
-
 const { getGraphToken, graphGet, jsonResponse } = require("../shared/graph");
 
 module.exports = async function (context, req) {
@@ -45,6 +44,7 @@ module.exports = async function (context, req) {
         name:        item.name,
         size:        item.size,
         downloadUrl,
+        webUrl:      item.webUrl || null,
         thumbnailUrl
       };
     }));
