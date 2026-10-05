@@ -52,6 +52,27 @@ module.exports = async function (context, req) {
     const newUser = await graphPost(token, "/users", userPayload);
     const userId  = newUser.id;
 
+    // Nærmeste leder (manager) – fejl stopper ikke oprettelsen
+    let managerError = null;
+    if (body.managerId) {
+      try {
+        if (!/^[0-9a-f-]{36}$/i.test(body.managerId)) throw new Error("Ugyldigt leder-id");
+        const r = await fetch(`https://graph.microsoft.com/v1.0/users/${userId}/manager/$ref`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ "@odata.id": `https://graph.microsoft.com/v1.0/users/${body.managerId}` })
+        });
+        if (!r.ok) {
+          const txt = await r.text();
+          let msg = txt;
+          try { msg = JSON.parse(txt).error?.message || txt; } catch {}
+          throw new Error(`Graph fejl ${r.status}: ${msg}`);
+        }
+      } catch (err) {
+        managerError = err.message;
+      }
+    }
+
     // Tilføj til grupper
     const groupIds    = body.groupIds ?? [];
     const groupErrors = [];
@@ -72,7 +93,8 @@ module.exports = async function (context, req) {
       upn:         body.upn,
       displayName: body.displayName,
       groupsAdded: groupIds.length - groupErrors.length,
-      groupErrors
+      groupErrors,
+      managerError
     });
   } catch (err) {
     context.res = jsonResponse(500, { error: err.message });

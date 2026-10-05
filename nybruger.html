@@ -181,6 +181,13 @@
           <input type="text" id="department" placeholder="IT" autocomplete="off" />
         </div>
         <div class="form-group">
+          <label>Nærmeste leder</label>
+          <select id="manager">
+            <option value="">— Ingen —</option>
+          </select>
+          <div class="field-hint">Sættes som Manager i Entra ID</div>
+        </div>
+        <div class="form-group">
           <label>Virksomhed</label>
           <input type="text" id="companyName" placeholder="Lely Center Herrup" value="Lely Center Herrup" autocomplete="off" />
         </div>
@@ -324,6 +331,15 @@ async function init() {
     opt.value = u.id;
     opt.textContent = u.displayName + (u.mail ? ` (${u.mail})` : "");
     sel.appendChild(opt);
+  });
+
+  // Udfyld leder-dropdown (kun rigtige brugere – ikke delte postkasser/lokaler)
+  const mgr = document.getElementById("manager");
+  allUsers.filter(u => u.mailboxType === "user").forEach(u => {
+    const opt = document.createElement("option");
+    opt.value = u.id;
+    opt.textContent = u.displayName + (u.mail ? ` (${u.mail})` : "");
+    mgr.appendChild(opt);
   });
 
   renderAvail();
@@ -492,6 +508,7 @@ async function saveUser() {
     city:          document.getElementById("city").value.trim(),
     postalCode:    document.getElementById("postalCode").value.trim(),
     country:       document.getElementById("country").value.trim(),
+    managerId:     document.getElementById("manager").value,
     groupIds:      selectedGrps.map(g => g.id)
   };
 
@@ -508,6 +525,8 @@ async function saveUser() {
       <p><strong>Navn:</strong> ${esc(payload.displayName)}</p>
       <p><strong>Login:</strong> ${esc(payload.upn)}</p>
       <p><strong>Grupper tilføjet:</strong> ${payload.groupIds.length}</p>
+      ${payload.managerId && !data.managerError ? `<p><strong>Nærmeste leder:</strong> ${esc(document.getElementById("manager").selectedOptions[0]?.textContent || "")}</p>` : ""}
+      ${data.managerError ? `<p style="color:#92400e;"><strong>Leder kunne ikke sættes:</strong> ${esc(data.managerError)}</p>` : ""}
       ${data.groupErrors?.length ? `<p style="color:#92400e;"><strong>Gruppefejl:</strong> ${data.groupErrors.length} grupper kunne ikke tilføjes</p>` : ""}
     `;
     resultBox.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -533,6 +552,7 @@ function resetForm() {
     if (err) err.classList.remove("show");
   });
   document.getElementById("country").value = "Danmark";
+  document.getElementById("manager").value = "";
   document.getElementById("displayName").dataset.manual = "";
   document.getElementById("mailNickname").dataset.manual = "";
   clearSelectedGroups();
@@ -587,6 +607,7 @@ function parseBoardingData() {
   const stilling   = getVal("Stilling");
   const foedselsdag = getVal("Fødselsdato");
   const mailOenske = getVal("Mailadresse ønske");
+  const lederNavn  = getVal("Nærmeste leder");
 
   // Kaldenavn opdeles til fornavn/efternavn
   const vistnavn = kaldenavn || navn;
@@ -646,6 +667,14 @@ function parseBoardingData() {
   // Telefon blank
   document.getElementById("phone").value = "";
 
+  // Nærmeste leder: find brugeren ud fra navnet
+  let lederIkkeFundet = false;
+  if (lederNavn) {
+    const leder = findUserByName(lederNavn);
+    if (leder) document.getElementById("manager").value = leder.id;
+    else lederIkkeFundet = true;
+  }
+
   // Adresse: standard Herrup-adresse i de felter, der er tomme
   function setDefault(id, val) {
     const el = document.getElementById(id);
@@ -656,7 +685,24 @@ function parseBoardingData() {
   setDefault("postalCode", "7830");
 
   closeBoardingModal();
-  showToast("✓ Felter udfyldt fra Boarding app", "ok");
+  if (lederIkkeFundet) showToast(`Felter udfyldt – men lederen "${lederNavn}" blev ikke fundet. Vælg selv.`, "err");
+  else showToast("✓ Felter udfyldt fra Boarding app", "ok");
+}
+
+// Finder én bruger ud fra et navn. Først præcist vist navn, ellers en bruger
+// hvis vist navn indeholder alle ord i navnet (fx "Johan Sørensen" → "Johan Bach Sørensen").
+function findUserByName(name) {
+  const norm = s => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const n = norm(name);
+  const users = allUsers.filter(u => u.mailboxType === "user");
+  const exact = users.filter(u => norm(u.displayName) === n);
+  if (exact.length === 1) return exact[0];
+  const words = n.split(" ");
+  const partial = users.filter(u => {
+    const dn = norm(u.displayName).split(" ");
+    return words.every(w => dn.includes(w));
+  });
+  return partial.length === 1 ? partial[0] : null;
 }
 </script>
 </body>
