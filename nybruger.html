@@ -576,7 +576,8 @@ function parseBoardingData() {
 
   // Parser nøgle-værdi par
   function getVal(key) {
-    const re = new RegExp("^" + key + "\s*:\s*(.+)$", "im");
+    // [ \t]* i stedet for \s*, så en tom værdi ikke "låner" næste linje
+    const re = new RegExp("^" + key + "[ \\t]*:[ \\t]*(.*)$", "im");
     const m = text.match(re);
     return m ? m[1].trim() : "";
   }
@@ -585,6 +586,7 @@ function parseBoardingData() {
   const kaldenavn  = getVal("Kaldenavn");
   const stilling   = getVal("Stilling");
   const foedselsdag = getVal("Fødselsdato");
+  const mailOenske = getVal("Mailadresse ønske");
 
   // Kaldenavn opdeles til fornavn/efternavn
   const vistnavn = kaldenavn || navn;
@@ -601,8 +603,11 @@ function parseBoardingData() {
   }
   const fnNorm = normalize(firstName);
   const lnNorm = normalize(lastName);
-  const upnAlias = ((fnNorm[0] || "") + (lnNorm[0] || "") + (lnNorm[1] || "")).toUpperCase();
-  const upn = upnAlias ? upnAlias.toLowerCase() + "@lcherrup.dk" : "";
+  // "Mailadresse ønske" vinder; ellers genereres alias ud fra navnet
+  const oenskeAlias = mailOenske.split("@")[0].trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
+  const upnAlias = oenskeAlias
+    || ((fnNorm[0] || "") + (lnNorm[0] || "") + (lnNorm[1] || "")).toLowerCase();
+  const upn = upnAlias ? upnAlias + "@lcherrup.dk" : "";
 
   // Adgangskode: Lcherrup<ddmmåå> hvis fødselsdato, ellers Lcherrup112233
   let password = "";
@@ -632,7 +637,7 @@ function parseBoardingData() {
 
   if (upn) setField("upn", upn);
   setField("password", password);
-  setField("mailNickname", upnAlias.toLowerCase());
+  setField("mailNickname", upnAlias);
   setField("jobTitle", stilling);
 
   // Virksomhed altid Lely Center Herrup
