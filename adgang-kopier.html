@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kopier adgang — IT Support</title>
+  <link rel="stylesheet" href="/assets/navbar.css" />
+  <meta name="herrup-app" content="it-support">
+  <meta name="herrup-title" content="IT Support">
+  <meta name="herrup-subtitle" content="Kopier adgang">
+  <script src="/assets/navbar.js" defer></script>
+  <script src="/assets/auth.js" defer></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; color: #111827; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
+    h1 { font-size: 1.6rem; font-weight: 800; margin: 0 0 6px; }
+    .page-sub { color: #6b7280; font-size: .95rem; margin: 0 0 24px; }
+
+    .tile { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.05); margin-bottom: 16px; }
+    .tile-header { display: flex; align-items: center; gap: 12px; padding: 16px 24px; border-bottom: 1px solid #f3f4f6; }
+    .tile-icon { font-size: 1.2rem; }
+    .tile-title { font-size: 1rem; font-weight: 700; flex: 1; }
+    .tile-body { padding: 20px 24px; }
+
+    .pickers { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: start; }
+    .picker label { display: block; font-size: .82rem; font-weight: 700; color: #374151; margin-bottom: 6px; }
+    .arrow { align-self: center; font-size: 1.6rem; color: #850c18; padding-top: 22px; }
+    .person-search-wrap { position: relative; }
+    .person-search-wrap input { width: 100%; padding: 10px 16px; border: 1px solid #e5e7eb; border-radius: 12px; font-size: .95rem; outline: none; }
+    .person-search-wrap input:focus { border-color: #850c18; box-shadow: 0 0 0 3px rgba(133,12,24,.08); }
+    .person-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.12); z-index: 200; max-height: 320px; overflow-y: auto; display: none; }
+    .person-dropdown.open { display: block; }
+    .person-opt { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; border-bottom: 1px solid #f9fafb; }
+    .person-opt:hover { background: #fef3f2; }
+    .p-avatar { width: 30px; height: 30px; border-radius: 50%; background: #850c18; color: #fff; display: flex; align-items: center; justify-content: center; font-size: .75rem; font-weight: 700; flex-shrink: 0; }
+    .p-name { font-size: .88rem; font-weight: 600; }
+    .p-mail { font-size: .75rem; color: #6b7280; }
+    .chosen { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 12px; background: #f9fafb; }
+    .chosen .p-info { flex: 1; min-width: 0; }
+    .chosen .meta { font-size: .75rem; color: #6b7280; }
+    .chosen .x { border: none; background: none; cursor: pointer; color: #9ca3af; font-size: 1.1rem; }
+    .chosen .x:hover { color: #dc2626; }
+
+    .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .toolbar input[type=search] { flex: 1; min-width: 200px; padding: 7px 12px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: .85rem; outline: none; }
+    .toolbar input[type=search]:focus { border-color: #850c18; }
+    .link-btn { background: none; border: none; color: #850c18; font-size: .82rem; font-weight: 600; cursor: pointer; padding: 4px 6px; }
+    .link-btn:hover { text-decoration: underline; }
+
+    .group-list { border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; max-height: 480px; overflow-y: auto; }
+    .group-item { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid #f3f4f6; cursor: pointer; }
+    .group-item:last-child { border-bottom: none; }
+    .group-item:hover { background: #f9fafb; }
+    .group-item.disabled { cursor: default; opacity: .55; }
+    .group-item.disabled:hover { background: none; }
+    .group-item input { accent-color: #850c18; width: 16px; height: 16px; flex-shrink: 0; }
+    .group-icon { width: 28px; height: 28px; border-radius: 8px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: .8rem; flex-shrink: 0; }
+    .group-info { flex: 1; min-width: 0; }
+    .group-name { font-size: .85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .group-mail { font-size: .72rem; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .68rem; font-weight: 700; white-space: nowrap; background: #f3f4f6; color: #374151; }
+    .badge.exo { background: #eff6ff; color: #1d4ed8; }
+    .badge.have { background: #f0fdf4; color: #166534; }
+    .badge.dyn { background: #fffbeb; color: #92400e; }
+    .badge.ok { background: #dcfce7; color: #166534; }
+    .badge.err { background: #fee2e2; color: #991b1b; }
+    .badge.run { background: #e0e7ff; color: #3730a3; }
+
+    .footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+    .info { font-size: .85rem; color: #6b7280; }
+    .info strong { color: #111827; }
+    .btn-save { padding: 9px 22px; background: #850c18; color: #fff; border: none; border-radius: 10px; font-size: .9rem; font-weight: 600; cursor: pointer; }
+    .btn-save:hover { background: #6b0913; }
+    .btn-save:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-cancel { padding: 9px 16px; background: #fff; color: #374151; border: 1px solid #e5e7eb; border-radius: 10px; font-size: .9rem; cursor: pointer; }
+    .btn-cancel:hover { background: #f3f4f6; }
+    .err-text { font-size: .72rem; color: #991b1b; margin-top: 2px; white-space: normal; }
+
+    .empty { padding: 20px; text-align: center; color: #9ca3af; font-size: .85rem; }
+    .loading { padding: 24px; text-align: center; color: #9ca3af; font-size: .88rem; }
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e5e7eb; border-top-color: #850c18; border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast { position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 12px; font-size: .9rem; font-weight: 600; color: #fff; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 420px; }
+    .toast.show { opacity: 1; }
+    .toast.ok  { background: #16a34a; }
+    .toast.err { background: #dc2626; }
+
+    .cred-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 9999; align-items: center; justify-content: center; }
+    .cred-overlay.open { display: flex; }
+    .cred-box { background: #fff; border-radius: 20px; padding: 32px 28px; width: 380px; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+    .cred-title { margin: 0 0 6px; font-size: 1.1rem; font-weight: 700; }
+    .cred-desc { margin: 0 0 20px; font-size: .85rem; color: #6b7280; }
+    .cred-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .cred-field label { font-size: .8rem; font-weight: 700; color: #6b7280; text-transform: uppercase; }
+    .cred-field input { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: .9rem; outline: none; }
+    .cred-field input:focus { border-color: #850c18; }
+    .cred-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+    .cred-remember { display: flex; align-items: center; gap: 6px; font-size: .82rem; color: #374151; margin-bottom: 16px; cursor: pointer; }
+    .cred-remember input { accent-color: #850c18; }
+
+    #groupsTile { display: none; }
+    @media (max-width: 760px) { .pickers { grid-template-columns: 1fr; } .arrow { display: none; } }
+  </style>
+</head>
+<body>
+
+<div id="appContent" style="display:none;">
+  <div class="container">
+    <h1>Kopier adgang</h1>
+    <p class="page-sub">Kopiér gruppemedlemskaber fra én person til en anden — fx ved ny ansættelse. Personen mister ingen grupper, der kun tilføjes.</p>
+
+    <div class="tile">
+      <div class="tile-header"><div class="tile-icon">👥</div><div class="tile-title">Vælg personer</div></div>
+      <div class="tile-body">
+        <div class="pickers">
+          <div class="picker">
+            <label>Kopiér fra</label>
+            <div class="person-search-wrap">
+              <input type="search" id="fromSearch" placeholder="Søg efter navn eller e-mail..." autocomplete="off" />
+              <div class="person-dropdown" id="fromDropdown"></div>
+            </div>
+            <div id="fromChosen"></div>
+          </div>
+          <div class="arrow">➜</div>
+          <div class="picker">
+            <label>Kopiér til</label>
+            <div class="person-search-wrap">
+              <input type="search" id="toSearch" placeholder="Søg efter navn eller e-mail..." autocomplete="off" />
+              <div class="person-dropdown" id="toDropdown"></div>
+            </div>
+            <div id="toChosen"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tile" id="groupsTile">
+      <div class="tile-header"><div class="tile-icon">🔐</div><div class="tile-title" id="groupsTitle">Grupper</div></div>
+      <div class="tile-body">
+        <div class="toolbar">
+          <input type="search" id="groupSearch" placeholder="Søg i grupper..." oninput="renderGroups()" />
+          <button class="link-btn" onclick="selectAll(true)">Markér alle</button>
+          <button class="link-btn" onclick="selectAll(false)">Fjern markering</button>
+        </div>
+        <div class="group-list" id="groupList"></div>
+        <div class="footer">
+          <div class="info" id="info"></div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-cancel" onclick="reloadMemberships()">Genindlæs</button>
+            <button class="btn-save" id="copyBtn" onclick="copyGroups()" disabled>Kopiér grupper</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="cred-overlay" id="credOverlay">
+  <div class="cred-box">
+    <div class="cred-title">🔐 Exchange Online login</div>
+    <div class="cred-desc">Distributions- og mail-enabled grupper opdateres via Exchange. Indtast din admin-konto.</div>
+    <div class="cred-field">
+      <label>Brugernavn</label>
+      <input type="email" id="credUser" placeholder="admin@lcherrup.dk" autocomplete="username" />
+    </div>
+    <div class="cred-field">
+      <label>Password</label>
+      <input type="password" id="credPass" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <label class="cred-remember"><input type="checkbox" id="credRemember" checked /> Husk i denne session</label>
+    <div class="cred-footer">
+      <button class="btn-cancel" onclick="cancelCred()">Annuller</button>
+      <button class="btn-save" onclick="submitCred()">Fortsæt</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const AGENT = "http://localhost:5199";
+
+let allUsers = [];
+let fromUser = null, toUser = null;
+let fromGroups = [], toGroupIds = new Set();
+let checked = new Set();          // gruppe-id'er der skal kopieres
+let results = new Map();          // gruppe-id → { state: "run"|"ok"|"err", msg }
+let busy = false;
+
+document.addEventListener("DOMContentLoaded", () => {
+  ITAuth.requireAuth(() => {
+    document.getElementById("appContent").style.setProperty("display", "block", "important");
+    init();
+  });
+});
+
+async function init() {
+  const data = await fetch("/api/getUsers").then(r => r.json()).catch(() => ({ users: [] }));
+  allUsers = (data.users ?? []).filter(u => u.mailboxType === "user");
+
+  wirePicker("from", u => { fromUser = u; onPeopleChanged(); });
+  wirePicker("to",   u => { toUser = u;   onPeopleChanged(); });
+
+  // ?til=<id>&navn=..&mail=.. – fx fra Ny bruger (brugeren er måske ikke i listen endnu)
+  const p = new URLSearchParams(location.search);
+  const til = p.get("til");
+  if (til) {
+    const u = allUsers.find(x => x.id === til) || { id: til, displayName: p.get("navn") || "Ny bruger", mail: p.get("mail") || "" };
+    setChosen("to", u);
+    toUser = u;
+    onPeopleChanged();
+  }
+}
+
+// ── Personvælger ──────────────────────────────────────────────────────────────
+function wirePicker(key, onSelect) {
+  const input = document.getElementById(key + "Search");
+  const dd = document.getElementById(key + "Dropdown");
+
+  input.addEventListener("input", () => {
+    const q = input.value.toLowerCase().trim();
+    if (q.length < 2) { dd.classList.remove("open"); return; }
+    const matches = allUsers.filter(u =>
+      u.displayName?.toLowerCase().includes(q) || u.mail?.toLowerCase().includes(q)
+    ).slice(0, 25);
+    dd.innerHTML = matches.length ? "" : '<div class="empty">Ingen resultater</div>';
+    matches.forEach(u => {
+      const div = document.createElement("div");
+      div.className = "person-opt";
+      div.innerHTML = `<div class="p-avatar">${initials(u.displayName)}</div><div><div class="p-name">${esc(u.displayName)}</div><div class="p-mail">${esc(u.mail ?? "")}</div></div>`;
+      div.onclick = () => { dd.classList.remove("open"); input.value = ""; setChosen(key, u); onSelect(u); };
+      dd.appendChild(div);
+    });
+    dd.classList.add("open");
+  });
+  input.addEventListener("focus", () => { if (input.value.trim().length >= 2) dd.classList.add("open"); });
+  document.addEventListener("click", e => { if (!e.target.closest(`#${key}Search, #${key}Dropdown`)) dd.classList.remove("open"); });
+}
+
+function setChosen(key, u) {
+  const el = document.getElementById(key + "Chosen");
+  if (!u) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="chosen">
+    <div class="p-avatar">${initials(u.displayName)}</div>
+    <div class="p-info"><div class="p-name">${esc(u.displayName)}</div><div class="meta">${esc(u.mail ?? "")} · <span id="${key}Count">…</span></div></div>
+    <button class="x" title="Fjern" onclick="clearChosen('${key}')">✕</button>
+  </div>`;
+}
+
+function clearChosen(key) {
+  if (busy) return;
+  if (key === "from") fromUser = null; else toUser = null;
+  setChosen(key, null);
+  onPeopleChanged();
+}
+
+// ── Medlemskaber ──────────────────────────────────────────────────────────────
+async function fetchMemberships(userId) {
+  const res = await fetch(`/api/getUserMemberships?id=${encodeURIComponent(userId)}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data.groups ?? [];
+}
+
+async function onPeopleChanged() {
+  results.clear();
+  const tile = document.getElementById("groupsTile");
+  if (!fromUser || !toUser) { tile.style.display = "none"; return; }
+  if (fromUser.id === toUser.id) {
+    tile.style.display = "none";
+    showToast("Vælg to forskellige personer", "err");
+    return;
+  }
+  tile.style.display = "block";
+  document.getElementById("groupsTitle").textContent = `Grupper fra ${fromUser.displayName} → ${toUser.displayName}`;
+  await reloadMemberships(true);
+}
+
+async function reloadMemberships(resetChecks) {
+  if (!fromUser || !toUser || busy) return;
+  document.getElementById("groupList").innerHTML = '<div class="loading"><span class="spinner"></span>Henter gruppemedlemskaber...</div>';
+  document.getElementById("copyBtn").disabled = true;
+  try {
+    const [src, dst] = await Promise.all([fetchMemberships(fromUser.id), fetchMemberships(toUser.id)]);
+    fromGroups = src;
+    toGroupIds = new Set(dst.map(g => g.id));
+    setCount("from", src.length);
+    setCount("to", dst.length);
+    if (resetChecks !== false) {
+      checked = new Set(fromGroups.filter(g => canCopy(g)).map(g => g.id));
+    } else {
+      checked = new Set([...checked].filter(id => fromGroups.some(g => g.id === id && canCopy(g))));
+    }
+    renderGroups();
+  } catch (e) {
+    document.getElementById("groupList").innerHTML = `<div class="empty">Kunne ikke hente grupper: ${esc(e.message)}</div>`;
+  }
+}
+
+function setCount(key, n) {
+  const el = document.getElementById(key + "Count");
+  if (el) el.textContent = `${n} grupper`;
+}
+
+const isDynamic   = g => (g.groupTypes ?? []).includes("DynamicMembership");
+const isMailGroup = g => g.mailEnabled === true && !(g.groupTypes ?? []).includes("Unified");
+const canCopy     = g => !isDynamic(g) && !toGroupIds.has(g.id);
+
+// ── Visning ───────────────────────────────────────────────────────────────────
+function renderGroups() {
+  const q = document.getElementById("groupSearch").value.toLowerCase().trim();
+  const list = fromGroups.filter(g => !q || g.displayName?.toLowerCase().includes(q) || g.mail?.toLowerCase().includes(q) || g.type?.toLowerCase().includes(q));
+  const box = document.getElementById("groupList");
+
+  if (!fromGroups.length) box.innerHTML = '<div class="empty">Personen er ikke medlem af nogen grupper</div>';
+  else if (!list.length) box.innerHTML = '<div class="empty">Ingen grupper matcher</div>';
+  else {
+    box.innerHTML = list.map(g => {
+      const res = results.get(g.id);
+      const have = toGroupIds.has(g.id);
+      const dyn = isDynamic(g);
+      const disabled = have || dyn || busy;
+      let badge = "";
+      if (res?.state === "run") badge = '<span class="badge run">Kopierer…</span>';
+      else if (res?.state === "ok") badge = '<span class="badge ok">✓ Tilføjet</span>';
+      else if (res?.state === "err") badge = '<span class="badge err">✗ Fejl</span>';
+      else if (have) badge = '<span class="badge have">Har allerede</span>';
+      else if (dyn) badge = '<span class="badge dyn">Dynamisk – styres af regler</span>';
+      else if (isMailGroup(g)) badge = '<span class="badge exo">Via Exchange</span>';
+      return `<label class="group-item${have || dyn ? " disabled" : ""}">
+        <input type="checkbox" data-id="${esc(g.id)}" ${checked.has(g.id) ? "checked" : ""} ${disabled ? "disabled" : ""} />
+        <div class="group-icon">${esc(g.icon ?? "👥")}</div>
+        <div class="group-info">
+          <div class="group-name">${esc(g.displayName)}</div>
+          <div class="group-mail">${esc(g.type ?? "Gruppe")}${g.mail ? " · " + esc(g.mail) : ""}</div>
+          ${res?.state === "err" ? `<div class="err-text">${esc(res.msg)}</div>` : ""}
+        </div>
+        ${badge}
+      </label>`;
+    }).join("");
+    box.querySelectorAll("input[type=checkbox]").forEach(cb => cb.addEventListener("change", () => {
+      cb.checked ? checked.add(cb.dataset.id) : checked.delete(cb.dataset.id);
+      updateInfo();
+    }));
+  }
+  updateInfo();
+}
+
+function selectAll(on) {
+  if (busy) return;
+  const q = document.getElementById("groupSearch").value.toLowerCase().trim();
+  fromGroups
+    .filter(g => canCopy(g) && (!q || g.displayName?.toLowerCase().includes(q) || g.mail?.toLowerCase().includes(q)))
+    .forEach(g => on ? checked.add(g.id) : checked.delete(g.id));
+  renderGroups();
+}
+
+function updateInfo() {
+  const sel = fromGroups.filter(g => checked.has(g.id) && canCopy(g));
+  const exo = sel.filter(isMailGroup).length;
+  const have = fromGroups.filter(g => toGroupIds.has(g.id)).length;
+  const parts = [`<strong>${sel.length}</strong> grupper valgt`];
+  if (exo) parts.push(`${exo} via Exchange`);
+  if (have) parts.push(`${have} har personen allerede`);
+  document.getElementById("info").innerHTML = parts.join(" · ");
+  document.getElementById("copyBtn").disabled = busy || sel.length === 0;
+}
+
+// ── Kopiér ────────────────────────────────────────────────────────────────────
+async function copyGroups() {
+  const sel = fromGroups.filter(g => checked.has(g.id) && canCopy(g));
+  if (!sel.length || busy) return;
+
+  const graphGroups = sel.filter(g => !isMailGroup(g));
+  const exoGroups   = sel.filter(isMailGroup);
+
+  // Spørg om Exchange-login først, så man ikke venter på Graph-delen forgæves
+  let cred = null;
+  if (exoGroups.length) {
+    try { cred = await askForCred(); }
+    catch { showToast("Annulleret – intet er kopieret", "err"); return; }
+  }
+
+  busy = true;
+  const btn = document.getElementById("copyBtn");
+  btn.textContent = "Kopierer...";
+  sel.forEach(g => results.set(g.id, { state: "run" }));
+  renderGroups();
+
+  // Graph (sikkerhedsgrupper, M365, Teams)
+  for (const g of graphGroups) {
+    try {
+      const res = await fetch("/api/updateGroupMembers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ groupId: g.id, add: [toUser.id], remove: [] })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error || data.errors?.length) {
+        throw new Error(data.errors?.join(" | ") || data.error || `HTTP ${res.status}`);
+      }
+      results.set(g.id, { state: "ok" });
+    } catch (e) {
+      results.set(g.id, { state: "err", msg: e.message });
+    }
+    renderGroups();
+  }
+
+  // Exchange (distributions- og mail-enabled grupper) – ét login til alle
+  if (exoGroups.length) {
+    try {
+      const out = await addViaAgent(cred, toUser.mail, exoGroups.map(g => g.mail));
+      exoGroups.forEach(g => {
+        const err = out.errors.get(String(g.mail).toLowerCase());
+        results.set(g.id, err ? { state: "err", msg: err } : { state: "ok" });
+      });
+    } catch (e) {
+      exoGroups.forEach(g => results.set(g.id, { state: "err", msg: e.message }));
+    }
+  }
+
+  busy = false;
+  btn.textContent = "Kopiér grupper";
+
+  const ok = sel.filter(g => results.get(g.id)?.state === "ok");
+  const failed = sel.length - ok.length;
+  ok.forEach(g => { toGroupIds.add(g.id); checked.delete(g.id); });
+  setCount("to", toGroupIds.size);
+  renderGroups();
+
+  if (failed) showToast(`${ok.length} kopieret, ${failed} fejlede – se listen`, "err");
+  else showToast(`✓ ${ok.length} grupper kopieret til ${toUser.displayName}`, "ok");
+}
+
+// ── Exchange via lokal agent ─────────────────────────────────────────────────
+const psq = s => "'" + String(s ?? "").replace(/'/g, "''") + "'";   // PowerShell single-quote
+
+async function addViaAgent(cred, userEmail, groupEmails) {
+  if (!userEmail) throw new Error("Personen har ingen mailadresse");
+  const groupsPs = groupEmails.map(psq).join(",");
+
+  const script = `
+$resultFile = "C:\\Program Files\\ITSupportAgent\\exo-result.txt"
+$job = Start-Job -ScriptBlock {
+  param($username, $password, $member, $groups)
+  try {
+    Import-Module ExchangeOnlineManagement -ErrorAction Stop
+    $secpwd = ConvertTo-SecureString $password -AsPlainText -Force
+    $cred = New-Object System.Management.Automation.PSCredential($username, $secpwd)
+    Connect-ExchangeOnline -Credential $cred -ShowBanner:$false
+    $lines = @()
+    foreach ($g in $groups) {
+      try {
+        Add-DistributionGroupMember -Identity $g -Member $member -BypassSecurityGroupManagerCheck -ErrorAction Stop
+        $lines += "OK:$g"
+      } catch {
+        if ($_.Exception.Message -match "already a member") { $lines += "OK:$g" }
+        else { $lines += "ERR:$($g):$($_.Exception.Message -replace '\\r?\\n',' ')" }
+      }
+    }
+    Disconnect-ExchangeOnline -Confirm:$false
+    $lines | Out-File $using:resultFile -Encoding utf8
+  } catch {
+    "FATAL:$($_.Exception.Message)" | Out-File $using:resultFile -Encoding utf8
+  }
+} -ArgumentList ${psq(cred.user)}, ${psq(cred.pass)}, ${psq(userEmail)}, @(${groupsPs})
+Wait-Job $job -Timeout 180 | Out-Null
+if (!(Test-Path $resultFile)) { "FATAL:Timeout" | Out-File $resultFile -Encoding utf8 }
+Remove-Job $job -Force
+Get-Content $resultFile
+Remove-Item $resultFile -Force`.trim();
+
+  const res = await fetch(`${AGENT}/api/run-ps`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ script })
+  }).catch(() => { throw new Error("IT Support-agenten svarer ikke på denne pc"); });
+  if (!res.ok) throw new Error(`Agent svarede ${res.status}`);
+  const data = await res.json();
+  const output = String(data.output || "").trim();
+
+  if (output.includes("FATAL:")) {
+    sessionCred = null;   // så man kan prøve igen med et andet login
+    throw new Error(output.replace(/[\s\S]*FATAL:/, "").trim());
+  }
+
+  const errors = new Map();
+  let seen = 0;
+  output.split(/\r?\n/).map(l => l.trim()).forEach(l => {
+    if (l.startsWith("OK:")) seen++;
+    else if (l.startsWith("ERR:")) {
+      seen++;
+      const rest = l.slice(4);
+      const i = rest.indexOf(":");
+      errors.set(rest.slice(0, i).toLowerCase(), rest.slice(i + 1));
+    }
+  });
+  if (!seen) throw new Error("Intet resultat fra agent: " + output);
+  return { errors };
+}
+
+// ── Credentials (session) ────────────────────────────────────────────────────
+let sessionCred = null, credResolve = null, credReject = null;
+
+function askForCred() {
+  return new Promise((resolve, reject) => {
+    if (sessionCred) { resolve(sessionCred); return; }
+    credResolve = resolve; credReject = reject;
+    document.getElementById("credUser").value = "";
+    document.getElementById("credPass").value = "";
+    document.getElementById("credOverlay").classList.add("open");
+    setTimeout(() => document.getElementById("credUser").focus(), 50);
+  });
+}
+
+function submitCred() {
+  const user = document.getElementById("credUser").value.trim();
+  const pass = document.getElementById("credPass").value;
+  if (!user || !pass) { showToast("Udfyld brugernavn og password", "err"); return; }
+  document.getElementById("credOverlay").classList.remove("open");
+  const cred = { user, pass };
+  if (document.getElementById("credRemember").checked) sessionCred = cred;
+  if (credResolve) { credResolve(cred); credResolve = null; credReject = null; }
+}
+
+function cancelCred() {
+  document.getElementById("credOverlay").classList.remove("open");
+  if (credReject) { credReject(new Error("Login annulleret")); credReject = null; credResolve = null; }
+}
+
+document.getElementById("credPass").addEventListener("keydown", e => { if (e.key === "Enter") submitCred(); });
+
+// ── Hjælpere ──────────────────────────────────────────────────────────────────
+function initials(name) {
+  if (!name) return "?";
+  const p = name.trim().split(/\s+/);
+  return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : name[0].toUpperCase();
+}
+function esc(s) { return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function showToast(msg, type) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = `toast ${type} show`;
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.classList.remove("show"), 4500);
+}
+</script>
+</body>
+</html>

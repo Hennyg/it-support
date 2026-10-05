@@ -528,6 +528,7 @@ async function saveUser() {
       ${payload.managerId && !data.managerError ? `<p><strong>Nærmeste leder:</strong> ${esc(document.getElementById("manager").selectedOptions[0]?.textContent || "")}</p>` : ""}
       ${data.managerError ? `<p style="color:#92400e;"><strong>Leder kunne ikke sættes:</strong> ${esc(data.managerError)}</p>` : ""}
       ${data.groupErrors?.length ? `<p style="color:#92400e;"><strong>Gruppefejl:</strong> ${data.groupErrors.length} grupper kunne ikke tilføjes</p>` : ""}
+      <p style="margin-top:12px;"><a class="btn" style="text-decoration:none;display:inline-block;" href="/adgang-kopier.html?til=${encodeURIComponent(data.userId)}&navn=${encodeURIComponent(payload.displayName)}&mail=${encodeURIComponent(payload.upn)}">📋 Kopiér grupper til ${esc(payload.displayName)}</a></p>
     `;
     resultBox.scrollIntoView({ behavior: "smooth", block: "center" });
     showToast("✅ Bruger oprettet!", "ok");
