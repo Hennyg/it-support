@@ -604,7 +604,7 @@ function parseBoardingData() {
   const upnAlias = ((fnNorm[0] || "") + (lnNorm[0] || "") + (lnNorm[1] || "")).toUpperCase();
   const upn = upnAlias ? upnAlias.toLowerCase() + "@lcherrup.dk" : "";
 
-  // Adgangskode: Lcherrup<ddmmåå> hvis fødselsdato, ellers Lcherrupxxxxxx
+  // Adgangskode: Lcherrup<ddmmåå> hvis fødselsdato, ellers Lcherrup112233
   let password = "";
   if (foedselsdag) {
     // Format dd/mm/yyyy eller dd-mm-yyyy
@@ -616,10 +616,7 @@ function parseBoardingData() {
       password = "Lcherrup" + dd + mm + yy;
     }
   }
-  if (!password) {
-    const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
-    password = "Lcherrup" + rand;
-  }
+  if (!password) password = "Lcherrup112233";
 
   // Udfyld felter
   function setField(id, val) {
@@ -643,6 +640,15 @@ function parseBoardingData() {
 
   // Telefon blank
   document.getElementById("phone").value = "";
+
+  // Adresse: standard Herrup-adresse i de felter, der er tomme
+  function setDefault(id, val) {
+    const el = document.getElementById(id);
+    if (el && !el.value.trim()) el.value = val;
+  }
+  setDefault("streetAddress", "Nr Bjertvej 12");
+  setDefault("city", "Vinderup");
+  setDefault("postalCode", "7830");
 
   closeBoardingModal();
   showToast("✓ Felter udfyldt fra Boarding app", "ok");
