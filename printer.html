@@ -749,35 +749,45 @@ ${body}
 
   const script = `
 $ErrorActionPreference = 'Stop'
-$stage = Join-Path $env:ProgramData 'ITSupportAgent\\PrinterMigration\\Staging'
-New-Item -Path $stage -ItemType Directory -Force | Out-Null
-& icacls.exe $stage /grant '*S-1-5-32-545:(OI)(CI)M' /T /Q | Out-Null
-$user = (Get-CimInstance Win32_ComputerSystem).UserName
-if (-not $user) { throw 'Ingen bruger er logget på Windows.' }
-$id = [guid]::NewGuid().ToString('N')
-$jobPath = Join-Path $stage ('userjob_' + $id + '.ps1')
-$out = Join-Path $stage ('userjob_' + $id + '.out')
-$done = Join-Path $stage ('userjob_' + $id + '.done')
-$text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${utf8ToBase64(job)}'))
-[IO.File]::WriteAllText($jobPath, $text, (New-Object Text.UTF8Encoding $true))
-$taskName = 'ITSupport_PrinterMigration_' + $id
-$arg = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $jobPath + '" -Out "' + $out + '" -Done "' + $done + '"'
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arg
-$principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
 try {
-  Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Settings $settings -Force | Out-Null
-  Start-ScheduledTask -TaskName $taskName
-  $deadline = (Get-Date).AddSeconds(${timeoutSec})
-  while (-not (Test-Path -LiteralPath $done) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
-  $status = if (Test-Path -LiteralPath $done) { (Get-Content -LiteralPath $done -Raw).Trim() } else { 'TIMEOUT' }
-  $log = if (Test-Path -LiteralPath $out) { Get-Content -LiteralPath $out -Raw } else { '' }
-} finally {
-  Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
-  Remove-Item -LiteralPath $jobPath, $out, $done -Force -ErrorAction SilentlyContinue
+  $stage = Join-Path $env:ProgramData 'ITSupportAgent\\PrinterMigration\\Staging'
+  New-Item -Path $stage -ItemType Directory -Force | Out-Null
+  & icacls.exe $stage /grant '*S-1-5-32-545:(OI)(CI)M' /T /Q | Out-Null
+  if (-not (Get-CimInstance Win32_ComputerSystem).UserName) { throw 'Ingen bruger er logget på Windows.' }
+  $id = [guid]::NewGuid().ToString('N')
+  $jobPath = Join-Path $stage ('userjob_' + $id + '.ps1')
+  $out = Join-Path $stage ('userjob_' + $id + '.out')
+  $done = Join-Path $stage ('userjob_' + $id + '.done')
+  $text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${utf8ToBase64(job)}'))
+  [IO.File]::WriteAllText($jobPath, $text, (New-Object Text.UTF8Encoding $true))
+  $taskName = 'ITSupport_PrinterMigration_' + $id
+  $arg = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $jobPath + '" -Out "' + $out + '" -Done "' + $done + '"'
+  $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arg
+  # Gruppen "Users" (sprog-uafhængigt via SID) => opgaven kører i den logget-på brugers session
+  $usersGroup = (New-Object Security.Principal.SecurityIdentifier 'S-1-5-32-545').Translate([Security.Principal.NTAccount]).Value
+  $principal = New-ScheduledTaskPrincipal -GroupId $usersGroup -RunLevel Limited
+  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
+  try {
+    Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Settings $settings -Force | Out-Null
+    Start-ScheduledTask -TaskName $taskName
+    $deadline = (Get-Date).AddSeconds(${timeoutSec})
+    while (-not (Test-Path -LiteralPath $done) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
+    $status = if (Test-Path -LiteralPath $done) { (Get-Content -LiteralPath $done -Raw).Trim() } else { 'TIMEOUT' }
+    $log = if (Test-Path -LiteralPath $out) { Get-Content -LiteralPath $out -Raw } else { '' }
+    if ($status -eq 'TIMEOUT') {
+      $info = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
+      if ($info) { $log += "Opgavens sidste resultat: 0x{0:X}" -f $info.LastTaskResult }
+    }
+  } finally {
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $jobPath, $out, $done -Force -ErrorAction SilentlyContinue
+  }
+  'USERJOB:' + $status
+  $log
+} catch {
+  'USERJOB:FEJL'
+  'Fejl i SYSTEM-del: ' + $_.Exception.Message
 }
-'USERJOB:' + $status
-$log
 `.trim();
 
   const data = await runPs(script);
@@ -786,7 +796,7 @@ $log
   return {
     ok: !!m && m[1] === "OK",
     status: m ? m[1] : "UKENDT",
-    log: output.replace(/^\s*USERJOB:\w+\s*/m, "").trim()
+    log: m ? output.replace(/^\s*USERJOB:\w+\s*/m, "").trim() : "Uventet svar fra agent:\n" + JSON.stringify(data, null, 2)
   };
 }
 
