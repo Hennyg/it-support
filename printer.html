@@ -177,8 +177,8 @@
         <label class="lbl">Backup gemmes som</label>
         <div class="target" id="exportTarget">Finder logget-på bruger...</div>
 
-        <label class="lbl" for="exportZipPath">Anden placering (valgfri)</label>
-        <input type="text" id="exportZipPath" placeholder="fx C:\Temp\printer-backup.zip">
+        <label class="lbl" for="exportZipPath">Anden lokal placering (valgfri)</label>
+        <input type="text" id="exportZipPath" placeholder="Lokal sti, fx C:\Temp\printer-backup.zip">
 
         <div class="actions">
           <button class="btn-run" id="exportBtn" onclick="runMigrationExport()">▶ Start eksport</button>
@@ -196,7 +196,7 @@
         <label class="lbl" for="importUserName">Brugernavn (backup fra NAS)</label>
         <input type="text" id="importUserName" placeholder="fx HenrikNygaard" oninput="updateImportTarget()">
         <div class="or-sep">— eller —</div>
-        <label class="lbl" for="importZipPath">Sti til ZIP-fil</label>
+        <label class="lbl" for="importZipPath">Lokal sti til ZIP-fil</label>
         <input type="text" id="importZipPath" placeholder="fx C:\Temp\printer-HenrikNygaard.zip" oninput="updateImportTarget()">
 
         <div class="target" id="importTarget">—</div>
@@ -730,6 +730,68 @@ function showMigrationResult(resultEl, logEl, result, okText) {
   }
 }
 
+// Kører et PowerShell-script som den logget-på bruger (via midlertidig planlagt opgave).
+// Bruges til NAS-adgang, da agenten kører som SYSTEM og ikke har adgang til NAS'en.
+async function runAsUser(body, timeoutSec = 300) {
+  const job = `param([string]$Out, [string]$Done)
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+try {
+  $log = & {
+${body}
+  } *>&1 | Out-String -Width 300
+  Set-Content -LiteralPath $Out -Value $log -Encoding UTF8
+  Set-Content -LiteralPath $Done -Value 'OK'
+} catch {
+  Set-Content -LiteralPath $Out -Value ('FEJL: ' + $_.Exception.Message) -Encoding UTF8
+  Set-Content -LiteralPath $Done -Value 'FEJL'
+}`;
+
+  const script = `
+$ErrorActionPreference = 'Stop'
+$stage = Join-Path $env:ProgramData 'ITSupportAgent\\PrinterMigration\\Staging'
+New-Item -Path $stage -ItemType Directory -Force | Out-Null
+& icacls.exe $stage /grant '*S-1-5-32-545:(OI)(CI)M' /T /Q | Out-Null
+$user = (Get-CimInstance Win32_ComputerSystem).UserName
+if (-not $user) { throw 'Ingen bruger er logget på Windows.' }
+$id = [guid]::NewGuid().ToString('N')
+$jobPath = Join-Path $stage ('userjob_' + $id + '.ps1')
+$out = Join-Path $stage ('userjob_' + $id + '.out')
+$done = Join-Path $stage ('userjob_' + $id + '.done')
+$text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${utf8ToBase64(job)}'))
+[IO.File]::WriteAllText($jobPath, $text, (New-Object Text.UTF8Encoding $true))
+$taskName = 'ITSupport_PrinterMigration_' + $id
+$arg = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "' + $jobPath + '" -Out "' + $out + '" -Done "' + $done + '"'
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $arg
+$principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
+try {
+  Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Settings $settings -Force | Out-Null
+  Start-ScheduledTask -TaskName $taskName
+  $deadline = (Get-Date).AddSeconds(${timeoutSec})
+  while (-not (Test-Path -LiteralPath $done) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
+  $status = if (Test-Path -LiteralPath $done) { (Get-Content -LiteralPath $done -Raw).Trim() } else { 'TIMEOUT' }
+  $log = if (Test-Path -LiteralPath $out) { Get-Content -LiteralPath $out -Raw } else { '' }
+} finally {
+  Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $jobPath, $out, $done -Force -ErrorAction SilentlyContinue
+}
+'USERJOB:' + $status
+$log
+`.trim();
+
+  const data = await runPs(script);
+  const output = (data.output || "") + (data.error ? "\n" + data.error : "");
+  const m = output.match(/USERJOB:(\w+)/);
+  return {
+    ok: !!m && m[1] === "OK",
+    status: m ? m[1] : "UKENDT",
+    log: output.replace(/^\s*USERJOB:\w+\s*/m, "").trim()
+  };
+}
+
+const STAGE_PS = "(Join-Path $env:ProgramData 'ITSupportAgent\\PrinterMigration\\Staging')";
+
 async function runMigrationExport() {
   const btn = document.getElementById("exportBtn");
   const resultEl = document.getElementById("exportResult");
@@ -746,16 +808,62 @@ async function runMigrationExport() {
     resultEl.className = "result-line err";
     return;
   }
+  if (zip && zip.startsWith("\\\\")) {
+    resultEl.textContent = "Anden placering skal være en lokal sti (fx C:\\Temp\\...). NAS bruges automatisk, når feltet er tomt.";
+    resultEl.className = "result-line err";
+    return;
+  }
 
-  const args = "-Mode Export" + (zip ? " -ZipPath " + psQuote(zip) : "");
   setMigrationBusy(btn, true);
   resultEl.textContent = "Eksporterer — det kan tage et par minutter...";
   resultEl.className = "result-line";
   logEl.style.display = "none";
 
   try {
-    const result = await runMigration(args);
-    showMigrationResult(resultEl, logEl, result, "Eksport fuldført");
+    // Valgfri lokal placering: kør direkte
+    if (zip) {
+      const result = await runMigration("-Mode Export -ZipPath " + psQuote(zip));
+      showMigrationResult(resultEl, logEl, result, "Eksport fuldført");
+      return;
+    }
+
+    // NAS: eksportér lokalt som SYSTEM, kopiér derefter til NAS som brugeren
+    const user = consoleUser;
+    const stageZip = `(Join-Path ${STAGE_PS} ${psQuote("printer-" + user + ".zip")})`;
+
+    await runPs(`$s = ${STAGE_PS}; if (Test-Path -LiteralPath $s) { Get-ChildItem -LiteralPath $s -File | Where-Object { $_.Name -like 'printer-*' -or $_.Name -like 'PrinterMigration_*.log' } | Remove-Item -Force -ErrorAction SilentlyContinue }`);
+
+    const exp = await runMigration("-Mode Export -ZipPath " + stageZip);
+    if (exp.exitCode !== 0) {
+      showMigrationResult(resultEl, logEl, exp, "Eksport fuldført");
+      return;
+    }
+
+    resultEl.textContent = "Kopierer backup til NAS...";
+    const destDir = psQuote(MIGRATION_BACKUP_ROOT + "\\" + user);
+    const copy = await runAsUser(`
+$stage = ${STAGE_PS}
+$src = Join-Path $stage ${psQuote("printer-" + user + ".zip")}
+$destDir = ${destDir}
+$dest = Join-Path $destDir ${psQuote("printer-" + user + ".zip")}
+if (-not (Test-Path -LiteralPath $src)) { throw "Lokal backup findes ikke: $src" }
+if (-not (Test-Path -LiteralPath $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+if (Test-Path -LiteralPath $dest) {
+  $prev = Join-Path $destDir (${psQuote("printer-" + user + "_previous_")} + (Get-Date -Format 'yyyyMMdd_HHmmss') + '.zip')
+  Copy-Item -LiteralPath $dest -Destination $prev -Force
+  "Forrige backup gemt: $prev"
+}
+Copy-Item -LiteralPath $src -Destination $dest -Force
+Get-ChildItem -LiteralPath $stage -Filter 'PrinterMigration_Export_*.log' -File | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $destDir -Force; Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
+Remove-Item -LiteralPath $src -Force -ErrorAction SilentlyContinue
+"Backup kopieret til NAS: $dest"`);
+
+    const combined = {
+      exitCode: copy.ok ? 0 : 1,
+      log: exp.log + "\n\n--- Kopiering til NAS (som " + user + ") ---\n" + (copy.log || "(intet output)") + (copy.ok ? "" : "\nStatus: " + copy.status)
+    };
+    showMigrationResult(resultEl, logEl, combined, "Eksport fuldført og gemt på NAS");
+    if (!copy.ok) resultEl.textContent = "⚠ Eksport lykkedes, men kopiering til NAS fejlede — se loggen.";
   } catch (err) {
     resultEl.textContent = "Fejl: " + err.message;
     resultEl.className = "result-line err";
@@ -772,22 +880,23 @@ async function runMigrationImport() {
   const zip = document.getElementById("importZipPath").value.trim();
   const full = document.getElementById("importFullRestore").checked;
 
-  let args = "-Mode Import";
   if (zip) {
-    args += " -ZipPath " + psQuote(zip);
+    if (zip.startsWith("\\\\")) {
+      resultEl.textContent = "ZIP-sti skal være lokal. Brug brugernavn-feltet for backup på NAS.";
+      resultEl.className = "result-line err";
+      return;
+    }
   } else if (user) {
     if (!/^[a-zA-Z0-9._-]+$/.test(user)) {
       resultEl.textContent = "Ugyldigt brugernavn.";
       resultEl.className = "result-line err";
       return;
     }
-    args += " -UserName " + psQuote(user);
   } else {
     resultEl.textContent = "Angiv brugernavn eller sti til ZIP-fil.";
     resultEl.className = "result-line err";
     return;
   }
-  if (full) args += " -FullRestore";
 
   const source = zip || nasZipFor(user);
   const msg = full
@@ -801,7 +910,39 @@ async function runMigrationImport() {
   logEl.style.display = "none";
 
   try {
+    let zipArg;
+    let preLog = "";
+
+    if (zip) {
+      zipArg = psQuote(zip);
+    } else {
+      // Hent ZIP fra NAS som brugeren til lokal staging-mappe
+      resultEl.textContent = "Henter backup fra NAS...";
+      const localName = "import-" + user + ".zip";
+      const copy = await runAsUser(`
+$stage = ${STAGE_PS}
+$src = ${psQuote(nasZipFor(user))}
+$dest = Join-Path $stage ${psQuote(localName)}
+if (-not (Test-Path -LiteralPath $src)) { throw "Backup findes ikke på NAS: $src" }
+Copy-Item -LiteralPath $src -Destination $dest -Force
+"Backup hentet fra NAS: $src"`);
+      preLog = "--- Hentning fra NAS ---\n" + (copy.log || "(intet output)") + "\n\n";
+      if (!copy.ok) {
+        showMigrationResult(resultEl, logEl, { exitCode: 1, log: preLog + "Status: " + copy.status }, "");
+        return;
+      }
+      zipArg = `(Join-Path ${STAGE_PS} ${psQuote(localName)})`;
+    }
+
+    resultEl.textContent = "Importerer — det kan tage et par minutter...";
+    let args = "-Mode Import -ZipPath " + zipArg;
+    if (full) args += " -FullRestore";
+
     const result = await runMigration(args);
+    if (!zip) {
+      await runPs(`Remove-Item -LiteralPath (Join-Path ${STAGE_PS} ${psQuote("import-" + user + ".zip")}) -Force -ErrorAction SilentlyContinue`);
+    }
+    result.log = preLog + result.log;
     showMigrationResult(resultEl, logEl, result, "Import afsluttet");
     if (result.exitCode === 0) checkInstalled();
   } catch (err) {
