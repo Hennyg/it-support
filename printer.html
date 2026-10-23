@@ -63,6 +63,22 @@
 
     .note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 10px 12px; font-size: .8rem; line-height: 1.45; margin-top: 12px; }
     .select-inline { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: .88rem; min-width: 260px; }
+
+    /* Printer-migration tiles */
+    .section-title { font-size: 1.25rem; font-weight: 700; margin: 36px 0 6px; }
+    .section-desc { font-size: .88rem; color: #6b7280; margin: 0 0 16px; line-height: 1.55; }
+    .tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+    .tile { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.05); display: flex; flex-direction: column; }
+    .tile-icon { font-size: 1.8rem; margin-bottom: 8px; }
+    .tile h3 { margin: 0 0 6px; font-size: 1.05rem; }
+    .tile p { font-size: .85rem; color: #6b7280; margin: 0 0 14px; line-height: 1.5; }
+    .tile label.lbl { display: block; font-size: .78rem; font-weight: 600; color: #374151; margin: 0 0 4px; }
+    .tile input[type=text] { width: 100%; padding: 8px 11px; border: 1px solid #d1d5db; border-radius: 8px; font-size: .84rem; font-family: Consolas, monospace; margin-bottom: 10px; }
+    .tile .check { display: flex; align-items: flex-start; gap: 8px; font-size: .84rem; margin: 2px 0 12px; cursor: pointer; }
+    .tile .target { font-family: Consolas, monospace; font-size: .76rem; color: #374151; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px 10px; margin-bottom: 12px; word-break: break-all; }
+    .tile .actions { margin-top: auto; }
+    .or-sep { text-align: center; font-size: .75rem; color: #9ca3af; margin: -4px 0 6px; }
+    .log-box { background: #111827; color: #e5e7eb; font-family: Consolas, monospace; font-size: .75rem; line-height: 1.45; border-radius: 10px; padding: 10px 12px; margin-top: 12px; max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-word; display: none; }
   </style>
 </head>
 <body>
@@ -147,6 +163,58 @@
       <div class="note">Nogle egenskaber er skrivebeskyttede eller kræver en bestemt type (tal/boolean) — fejler en værdi, prøv med samme format som den oprindelige (fx <code>True</code>/<code>False</code> eller kun tal).</div>
     </div>
 
+    <!-- Printer-migration: eksport/import -->
+    <h2 class="section-title">🔁 Flyt printere til ny pc</h2>
+    <p class="section-desc">Tag backup af printeropsætningen på den gamle pc og gendan den på den nye. Backuppen gemmes som <code>printer-BRUGERNAVN.zip</code> på NAS'en. Kører via IT Support Agent (som administrator) — ingen manuel PowerShell nødvendig.</p>
+
+    <div class="tile-grid">
+      <!-- Eksport -->
+      <div class="tile">
+        <div class="tile-icon">📤</div>
+        <h3>Eksport — gammel pc</h3>
+        <p>Gemmer installerede printere, porte, drivere og standardindstillinger samt en komplet PrintBRM-backup. En eksisterende backup bevares som tidsstemplet kopi.</p>
+
+        <label class="lbl">Backup gemmes som</label>
+        <div class="target" id="exportTarget">Finder logget-på bruger...</div>
+
+        <label class="lbl" for="exportZipPath">Anden placering (valgfri)</label>
+        <input type="text" id="exportZipPath" placeholder="fx C:\Temp\printer-backup.zip">
+
+        <div class="actions">
+          <button class="btn-run" id="exportBtn" onclick="runMigrationExport()">▶ Start eksport</button>
+        </div>
+        <div class="result-line" id="exportResult"></div>
+        <pre class="log-box" id="exportLog"></pre>
+      </div>
+
+      <!-- Import -->
+      <div class="tile">
+        <div class="tile-icon">📥</div>
+        <h3>Import — ny pc</h3>
+        <p>Gendanner printerne fra backuppen. Printere der allerede findes på pc'en overskrives ikke ved almindelig import.</p>
+
+        <label class="lbl" for="importUserName">Brugernavn (backup fra NAS)</label>
+        <input type="text" id="importUserName" placeholder="fx HenrikNygaard" oninput="updateImportTarget()">
+        <div class="or-sep">— eller —</div>
+        <label class="lbl" for="importZipPath">Sti til ZIP-fil</label>
+        <input type="text" id="importZipPath" placeholder="fx C:\Temp\printer-HenrikNygaard.zip" oninput="updateImportTarget()">
+
+        <div class="target" id="importTarget">—</div>
+
+        <label class="check">
+          <input type="checkbox" id="importFullRestore">
+          <span><strong>Fuld gendannelse (PrintBRM)</strong> — bedst til særlige bakkevalg, men kan også importere ubrugte porte/drivere og ændre eksisterende printere.</span>
+        </label>
+
+        <div class="actions">
+          <button class="btn-run" id="importBtn" onclick="runMigrationImport()">▶ Start import</button>
+        </div>
+        <div class="result-line" id="importResult"></div>
+        <pre class="log-box" id="importLog"></pre>
+      </div>
+    </div>
+    <div class="note">Eksport/import kan tage et par minutter. Efter import: kontrollér advarsler i loggen, installér evt. manglende producentdrivere, og lav en testudskrift.</div>
+
   </div>
 </div>
 
@@ -191,6 +259,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderPrinterPickList();
   loadInstallerPath();
   checkAgentStatus();
+  loadConsoleUser();
 });
 
 function renderPrinterPickList() {
@@ -554,6 +623,192 @@ $result | ConvertTo-Json -Depth 5 -Compress
   } finally {
     btn.disabled = false;
     btn.textContent = "💾 Gem ændrede værdier";
+  }
+}
+
+/* ---------- Printer-migration (eksport/import) ---------- */
+
+const MIGRATION_SCRIPT_URL = "/scripts/PrinterMigration.ps1";
+const MIGRATION_BACKUP_ROOT = "\\\\192.168.10.5\\Deling\\IT\\Printere\\Brugerbackup";
+let consoleUser = "";
+
+function utf8ToBase64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+// UTF-16LE base64 til powershell.exe -EncodedCommand
+function toEncodedCommand(text) {
+  let bin = "";
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    bin += String.fromCharCode(c & 0xff, c >> 8);
+  }
+  return btoa(bin);
+}
+
+function nasZipFor(user) {
+  return `${MIGRATION_BACKUP_ROOT}\\${user}\\printer-${user}.zip`;
+}
+
+async function loadConsoleUser() {
+  const target = document.getElementById("exportTarget");
+  try {
+    const data = await runPs(`$u = (Get-CimInstance Win32_ComputerSystem).UserName; if ($u) { ($u -split '\\\\')[-1] }`);
+    consoleUser = (data.output || "").trim();
+  } catch { consoleUser = ""; }
+
+  if (consoleUser) {
+    target.textContent = nasZipFor(consoleUser);
+    const imp = document.getElementById("importUserName");
+    if (!imp.value) imp.value = consoleUser;
+  } else {
+    target.textContent = "Kunne ikke finde logget-på bruger — angiv anden placering.";
+  }
+  updateImportTarget();
+}
+
+function updateImportTarget() {
+  const user = document.getElementById("importUserName").value.trim();
+  const zip = document.getElementById("importZipPath").value.trim();
+  document.getElementById("importTarget").textContent =
+    zip ? zip : (user ? nasZipFor(user) : "Angiv brugernavn eller ZIP-sti");
+}
+
+// Henter PrinterMigration.ps1 fra sitet, lægger den på pc'en via agenten og kører den
+// i en separat Windows PowerShell 5.1-proces. Returnerer { exitCode, log }.
+async function runMigration(argString) {
+  const res = await fetch(MIGRATION_SCRIPT_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Kunne ikke hente ${MIGRATION_SCRIPT_URL} (${res.status})`);
+  const ps1 = await res.text();
+  if (!ps1.includes("PrinterMigration") ) throw new Error("Hentet script ser forkert ud.");
+
+  const inner = `$ProgressPreference='SilentlyContinue'; & (Join-Path $env:ProgramData 'ITSupportAgent\\PrinterMigration\\PrinterMigration.ps1') ${argString} -Confirm:$false`;
+
+  const script = `
+$ErrorActionPreference = 'Stop'
+$dir = Join-Path $env:ProgramData 'ITSupportAgent\\PrinterMigration'
+New-Item -Path $dir -ItemType Directory -Force | Out-Null
+$ps1 = Join-Path $dir 'PrinterMigration.ps1'
+$text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${utf8ToBase64(ps1)}'))
+[IO.File]::WriteAllText($ps1, $text, (New-Object Text.UTF8Encoding $true))
+$exe = Join-Path $env:windir 'Sysnative\\WindowsPowerShell\\v1.0\\powershell.exe'
+if (-not (Test-Path -LiteralPath $exe)) { $exe = Join-Path $env:windir 'System32\\WindowsPowerShell\\v1.0\\powershell.exe' }
+$ErrorActionPreference = 'Continue'
+$out = & $exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -OutputFormat Text -EncodedCommand '${toEncodedCommand(inner)}' 2>&1 | ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { $_ } } | Out-String -Width 300
+"EXITCODE:$LASTEXITCODE"
+$out
+`.trim();
+
+  const data = await runPs(script);
+  const output = (data.output || "") + (data.error ? "\n" + data.error : "");
+  const m = output.match(/EXITCODE:(-?\d+)/);
+  return {
+    exitCode: m ? Number(m[1]) : -1,
+    log: output.replace(/^\s*EXITCODE:-?\d+\s*/m, "").trim()
+  };
+}
+
+function setMigrationBusy(btn, busy, idleText) {
+  btn.disabled = busy;
+  btn.innerHTML = busy ? '<span class="spinner"></span> Kører...' : idleText;
+}
+
+function showMigrationResult(resultEl, logEl, result, okText) {
+  logEl.textContent = result.log || "(intet output)";
+  logEl.style.display = "block";
+  logEl.scrollTop = logEl.scrollHeight;
+  const hasWarnings = /WARNING:|ADVARSEL:/i.test(result.log);
+  if (result.exitCode === 0) {
+    resultEl.textContent = hasWarnings ? `✓ ${okText} — med advarsler, se loggen.` : `✓ ${okText}.`;
+    resultEl.className = "result-line ok";
+  } else {
+    resultEl.textContent = `⚠ Fejlede (kode ${result.exitCode}) — se loggen.`;
+    resultEl.className = "result-line err";
+  }
+}
+
+async function runMigrationExport() {
+  const btn = document.getElementById("exportBtn");
+  const resultEl = document.getElementById("exportResult");
+  const logEl = document.getElementById("exportLog");
+  const zip = document.getElementById("exportZipPath").value.trim();
+
+  if (!zip && !consoleUser) {
+    resultEl.textContent = "Ingen logget-på bruger fundet — angiv en anden placering.";
+    resultEl.className = "result-line err";
+    return;
+  }
+  if (zip && !/\.zip$/i.test(zip)) {
+    resultEl.textContent = "Stien skal ende på .zip.";
+    resultEl.className = "result-line err";
+    return;
+  }
+
+  const args = "-Mode Export" + (zip ? " -ZipPath " + psQuote(zip) : "");
+  setMigrationBusy(btn, true);
+  resultEl.textContent = "Eksporterer — det kan tage et par minutter...";
+  resultEl.className = "result-line";
+  logEl.style.display = "none";
+
+  try {
+    const result = await runMigration(args);
+    showMigrationResult(resultEl, logEl, result, "Eksport fuldført");
+  } catch (err) {
+    resultEl.textContent = "Fejl: " + err.message;
+    resultEl.className = "result-line err";
+  } finally {
+    setMigrationBusy(btn, false, "▶ Start eksport");
+  }
+}
+
+async function runMigrationImport() {
+  const btn = document.getElementById("importBtn");
+  const resultEl = document.getElementById("importResult");
+  const logEl = document.getElementById("importLog");
+  const user = document.getElementById("importUserName").value.trim();
+  const zip = document.getElementById("importZipPath").value.trim();
+  const full = document.getElementById("importFullRestore").checked;
+
+  let args = "-Mode Import";
+  if (zip) {
+    args += " -ZipPath " + psQuote(zip);
+  } else if (user) {
+    if (!/^[a-zA-Z0-9._-]+$/.test(user)) {
+      resultEl.textContent = "Ugyldigt brugernavn.";
+      resultEl.className = "result-line err";
+      return;
+    }
+    args += " -UserName " + psQuote(user);
+  } else {
+    resultEl.textContent = "Angiv brugernavn eller sti til ZIP-fil.";
+    resultEl.className = "result-line err";
+    return;
+  }
+  if (full) args += " -FullRestore";
+
+  const source = zip || nasZipFor(user);
+  const msg = full
+    ? `FULD gendannelse fra:\n${source}\n\nDette kan importere ubrugte porte/drivere og ændre eksisterende printere på denne pc. Fortsæt?`
+    : `Importér printere fra:\n${source}\n\nEksisterende printere overskrives ikke. Fortsæt?`;
+  if (!confirm(msg)) return;
+
+  setMigrationBusy(btn, true);
+  resultEl.textContent = "Importerer — det kan tage et par minutter...";
+  resultEl.className = "result-line";
+  logEl.style.display = "none";
+
+  try {
+    const result = await runMigration(args);
+    showMigrationResult(resultEl, logEl, result, "Import afsluttet");
+    if (result.exitCode === 0) checkInstalled();
+  } catch (err) {
+    resultEl.textContent = "Fejl: " + err.message;
+    resultEl.className = "result-line err";
+  } finally {
+    setMigrationBusy(btn, false, "▶ Start import");
   }
 }
 </script>
