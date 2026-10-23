@@ -3,8 +3,9 @@
 .SYNOPSIS
   Backup Windows printers to a per-user ZIP on NAS; restore selectively or fully.
 .DESCRIPTION
-  Export includes a complete PrintBRM safety backup plus an inventory of active
-  printer queues and their referenced ports/drivers. Import defaults to selective
+  Export includes a complete PrintBRM safety backup, an inventory of active
+  printer queues and their referenced ports/drivers, and the driver packages
+  (from the Windows DriverStore) for all non-Microsoft drivers in use. Import defaults to selective
   restoration (only inventoried printer queues). -FullRestore invokes PrintBRM
   and can restore unused drivers/ports too, but best preserves vendor settings.
 .EXAMPLE
@@ -39,11 +40,90 @@ function Get-PrintBRM {
     }
     throw 'PrintBrm.exe findes ikke.'
 }
+function Get-DriverPackageFolder([string]$infPath) {
+    if ([string]::IsNullOrWhiteSpace($infPath)) { return $null }
+    if ($infPath -like '*\FileRepository\*') {
+        $folder = Split-Path -Parent $infPath
+        if (Test-Path -LiteralPath $folder) { return $folder }
+    }
+    # InfPath kan pege på C:\Windows\INF\oemNN.inf - find den originale pakke i DriverStore
+    $leaf = Split-Path -Leaf $infPath
+    try {
+        $wd = Get-WindowsDriver -Online -ErrorAction Stop | Where-Object { $_.Driver -ieq $leaf } | Select-Object -First 1
+        if ($wd -and $wd.OriginalFileName) {
+            $folder = Split-Path -Parent $wd.OriginalFileName
+            if (Test-Path -LiteralPath $folder) { return $folder }
+        }
+    } catch { Write-Warning "Kunne ikke slå driverpakke op for $infPath : $_" }
+    return $null
+}
+function Export-DriverPackages($drivers, [string]$destRoot) {
+    New-Item -Path $destRoot -ItemType Directory -Force | Out-Null
+    $copied = @{}
+    foreach ($d in @($drivers)) {
+        $infLeaf = if ($d.InfPath) { Split-Path -Leaf $d.InfPath } else { '' }
+        if ($d.Manufacturer -eq 'Microsoft' -or $infLeaf -match '^(ntprint|prnms)') {
+            Write-Host "Driver springes over (indbygget i Windows): $($d.Name)"
+            continue
+        }
+        $folder = Get-DriverPackageFolder $d.InfPath
+        if (-not $folder) { Write-Warning "Driverpakke ikke fundet for $($d.Name) - skal installeres manuelt på ny pc."; continue }
+        $pkg = Split-Path -Leaf $folder
+        $infName = if ($d.InfPath -like '*\FileRepository\*') { $infLeaf } else { (Get-ChildItem -LiteralPath $folder -Filter '*.inf' -File | Select-Object -First 1).Name }
+        $d | Add-Member -NotePropertyName Package -NotePropertyValue $pkg -Force
+        $d | Add-Member -NotePropertyName PackageInf -NotePropertyValue $infName -Force
+        if ($copied.ContainsKey($pkg)) { continue }
+        try {
+            Copy-Item -LiteralPath $folder -Destination (Join-Path $destRoot $pkg) -Recurse -Force -ErrorAction Stop
+            $copied[$pkg] = $true
+            Write-Host "Driverpakke gemt: $($d.Name) ($pkg)" -ForegroundColor Green
+        } catch { Write-Warning "Kunne ikke kopiere driverpakke for $($d.Name): $_" }
+    }
+}
+function Install-DriverPackages($inv, [string]$work, [string]$backup) {
+    $ErrorActionPreference = 'Continue'   # pnputil skriver til stderr; må ikke stoppe scriptet
+    $driversDir = Join-Path $work 'Drivers'
+    $infs = @()
+    if (Test-Path -LiteralPath $driversDir) {
+        foreach ($d in @($inv.Drivers)) {
+            if (-not $d.Package -or -not $d.PackageInf) { continue }
+            $inf = Join-Path (Join-Path $driversDir $d.Package) $d.PackageInf
+            if ((Test-Path -LiteralPath $inf) -and ($infs -notcontains $inf)) { $infs += $inf }
+        }
+        # Pakker uden match i inventory (fx ældre format): tag første .inf i hver mappe
+        Get-ChildItem -LiteralPath $driversDir -Directory | ForEach-Object {
+            $pkgDir = $_.FullName
+            if (-not ($infs | Where-Object { $_ -like "$pkgDir\*" })) {
+                $first = Get-ChildItem -LiteralPath $pkgDir -Filter '*.inf' -File | Select-Object -First 1
+                if ($first) { $infs += $first.FullName }
+            }
+        }
+    }
+    if ($infs.Count -gt 0) {
+        foreach ($inf in $infs) {
+            $out = & pnputil.exe /add-driver $inf /install 2>&1 | Out-String
+            if (@(0, 259, 3010) -contains $LASTEXITCODE) { Write-Host "Driverpakke installeret: $(Split-Path -Leaf (Split-Path -Parent $inf))" -ForegroundColor Green }
+            else { Write-Warning "pnputil fejlede ($LASTEXITCODE) for $inf : $($out.Trim())" }
+        }
+        return
+    }
+    # Fallback for backups uden Drivers-mappe: forsøg at udpakke fra PrintBRM-arkivet
+    Write-Warning 'Backup indeholder ingen driverpakker - forsøger udpakning fra PrintBRM-arkivet.'
+    $driverFolder = Join-Path $work 'DriverExtract'
+    New-Item -Path $driverFolder -ItemType Directory -Force | Out-Null
+    $expandExe = Join-Path $env:windir 'System32\expand.exe'
+    & $expandExe -F:* $backup $driverFolder 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Get-ChildItem -Path $driverFolder -Filter '*.inf' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+            & pnputil.exe /add-driver $_.FullName /install 2>&1 | Out-Null
+        }
+    } else { Write-Warning 'Kunne ikke udpakke driverarkivet. Drivere skal muligvis installeres manuelt.' }
+}
 function Get-ActiveInventory {
     $printers = @(Get-Printer | Select-Object Name,DriverName,PortName,Shared,ShareName,Comment,Location,Type)
     $driverNames = @($printers | ForEach-Object { $_.DriverName } | Where-Object { $_ } | Select-Object -Unique)
     $portNames = @($printers | ForEach-Object { $_.PortName -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Select-Object -Unique)
-    $drivers = @(Get-PrinterDriver | Where-Object { $driverNames -contains $_.Name } | Select-Object Name,Manufacturer,MajorVersion,InfPath)
+    $drivers = @(Get-PrinterDriver | Where-Object { $driverNames -contains $_.Name -and $_.PrinterEnvironment -eq 'Windows x64' } | Select-Object Name,Manufacturer,MajorVersion,InfPath)
     $ports = @(Get-PrinterPort | Where-Object { $portNames -contains $_.Name } | Select-Object Name,PrinterHostAddress,PortNumber,Protocol,SNMPEnabled,SNMPCommunity,Description)
     $configurations = @()
     foreach ($printer in $printers) {
@@ -56,7 +136,7 @@ function Get-ActiveInventory {
         } catch { Write-Warning "Kan ikke læse standardindstillinger for $($printer.Name): $_" }
     }
     return [ordered]@{
-        FormatVersion=2; Created=(Get-Date).ToString('o'); SourceComputer=$env:COMPUTERNAME
+        FormatVersion=3; Created=(Get-Date).ToString('o'); SourceComputer=$env:COMPUTERNAME
         Printers=$printers; Ports=$ports; Drivers=$drivers; Configurations=$configurations
     }
 }
@@ -84,6 +164,7 @@ try {
     if ($Mode -eq 'Export') {
         Write-Host "Backup for: $UserName" -ForegroundColor Cyan
         $inventory = Get-ActiveInventory
+        Export-DriverPackages $inventory.Drivers (Join-Path $work 'Drivers')
         $inventory | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $work 'inventory.json') -Encoding UTF8
         $backup = Join-Path $work 'printers.printerExport'
         & $brm -b -f $backup -o force
@@ -92,13 +173,16 @@ try {
 PRINTER MIGRATION
 - inventory.json lists only installed printer queues and their referenced drivers/ports.
 - printers.printerExport is a FULL PrintBRM safety backup, including unused components.
+- Drivers\ contains the driver packages for the printers in use; import installs them automatically.
 - Default import is selective and will not restore unused printer queues/ports.
 - Vendor-specific paper tray settings may require FullRestore or manual configuration.
 - FullRestore can change existing printer configuration and import unused components.
 '@ | Set-Content -LiteralPath (Join-Path $work 'README.txt') -Encoding UTF8
         $package = Join-Path $env:TEMP ("PrinterMigrationPackage_" + [guid]::NewGuid().ToString('N') + '.zip')
         try {
-            Compress-Archive -LiteralPath @((Join-Path $work 'inventory.json'),$backup,(Join-Path $work 'README.txt')) -DestinationPath $package -CompressionLevel Optimal -Force
+            $items = @((Join-Path $work 'inventory.json'),$backup,(Join-Path $work 'README.txt'))
+            if (@(Get-ChildItem -LiteralPath (Join-Path $work 'Drivers') -ErrorAction SilentlyContinue).Count -gt 0) { $items += (Join-Path $work 'Drivers') }
+            Compress-Archive -LiteralPath $items -DestinationPath $package -CompressionLevel Optimal -Force
             $dest = Split-Path -Parent $zipFull
             if (-not (Test-Path -LiteralPath $dest)) { New-Item -Path $dest -ItemType Directory -Force | Out-Null }
             if (Test-Path -LiteralPath $zipFull) {
@@ -108,7 +192,7 @@ PRINTER MIGRATION
             }
             Copy-Item -LiteralPath $package -Destination $zipFull -Force -ErrorAction Stop
             Write-Host "Eksport fuldført: $zipFull" -ForegroundColor Green
-            Write-Host "Aktive printere: $(@($inventory.Printers).Count); porte: $(@($inventory.Ports).Count); drivere: $(@($inventory.Drivers).Count)"
+            Write-Host "Aktive printere: $(@($inventory.Printers).Count); porte: $(@($inventory.Ports).Count); drivere: $(@($inventory.Drivers).Count); driverpakker: $(@(Get-ChildItem -LiteralPath (Join-Path $work 'Drivers') -Directory -ErrorAction SilentlyContinue).Count)"
             $success = $true
         } finally { Remove-Item -LiteralPath $package -Force -ErrorAction SilentlyContinue }
     } else {
@@ -117,13 +201,14 @@ PRINTER MIGRATION
         $inventoryPath = Join-Path $work 'inventory.json'
         if (-not (Test-Path -LiteralPath $inventoryPath)) { throw 'inventory.json mangler i ZIP.' }
         $inv = Get-Content -LiteralPath $inventoryPath -Raw | ConvertFrom-Json
-        if ($inv.FormatVersion -ne 2) { throw 'Backup er fra en ældre version. Brug den tidligere import eller lav en ny eksport.' }
+        if (@(2,3) -notcontains [int]$inv.FormatVersion) { throw 'Backup er fra en ældre version. Brug den tidligere import eller lav en ny eksport.' }
         $backup = Join-Path $work 'printers.printerExport'
         if (-not (Test-Path -LiteralPath $backup)) { throw 'PrintBRM-backup mangler.' }
         Write-Host "Kilde: $($inv.SourceComputer)" -ForegroundColor Cyan
         @($inv.Printers) | Format-Table Name,DriverName,PortName -AutoSize
         if ($FullRestore) {
             if ($PSCmdlet.ShouldProcess($env:COMPUTERNAME,'FULD PrintBRM-gendannelse (inklusive ubrugte porte/drivere)')) {
+                Install-DriverPackages $inv $work $backup
                 & $brm -r -f $backup -o force
                 if ($LASTEXITCODE -ne 0) { throw "PrintBRM-gendannelse fejlede: $LASTEXITCODE" }
                 $success = $true
@@ -131,23 +216,14 @@ PRINTER MIGRATION
         } else {
             Write-Warning 'Selektiv import gendanner almindelige printerindstillinger. Producent-specifikke bakkevalg kan kræve manuel opsætning eller -FullRestore.'
             if ($PSCmdlet.ShouldProcess($env:COMPUTERNAME,'Selektiv gendannelse af aktive printere')) {
-                # Stage drivers from PrintBRM archive when possible; some OEM packages may require their original installer.
-                $driverFolder = Join-Path $work 'DriverExtract'
-                New-Item -Path $driverFolder -ItemType Directory -Force | Out-Null
-                $expandExe = Join-Path $env:windir 'System32\expand.exe'
-                & $expandExe -F:* $backup $driverFolder 2>&1 | Out-Null
-                if ($LASTEXITCODE -eq 0) {
-                    Get-ChildItem -Path $driverFolder -Filter '*.inf' -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-                        & pnputil.exe /add-driver $_.FullName /install 2>&1 | Out-Null
-                    }
-                } else { Write-Warning 'Kunne ikke udpakke driverarkivet. Drivere skal muligvis installeres manuelt.' }
+                Install-DriverPackages $inv $work $backup
                 foreach ($port in @($inv.Ports)) {
                     if (Get-PrinterPort -Name $port.Name -ErrorAction SilentlyContinue) { continue }
                     if (-not [string]::IsNullOrWhiteSpace($port.PrinterHostAddress)) {
                         try {
-                            $args = @{Name=$port.Name;PrinterHostAddress=$port.PrinterHostAddress;ErrorAction='Stop'}
-                            if ($port.PortNumber -gt 0) { $args.PortNumber=[uint32]$port.PortNumber }
-                            Add-PrinterPort @args
+                            $portArgs = @{Name=$port.Name;PrinterHostAddress=$port.PrinterHostAddress;ErrorAction='Stop'}
+                            if ($port.PortNumber -gt 0) { $portArgs.PortNumber=[uint32]$port.PortNumber }
+                            Add-PrinterPort @portArgs
                         } catch { Write-Warning "Port $($port.Name) kunne ikke oprettes: $_" }
                     } else { Write-Warning "Port $($port.Name) er ikke en almindelig TCP/IP-port og skal muligvis oprettes manuelt." }
                 }
@@ -187,7 +263,8 @@ PRINTER MIGRATION
 } finally {
     if ($transcriptStarted) { Stop-Transcript | Out-Null }
     try {
-        $logDir = if ($Mode -eq 'Export' -and $success) { Split-Path -Parent $zipFull } else { $env:TEMP }
+        $zipDir = Split-Path -Parent $zipFull
+        $logDir = if (($Mode -eq 'Import' -or $success) -and (Test-Path -LiteralPath $zipDir)) { $zipDir } else { $env:TEMP }
         $logTarget = Join-Path $logDir (Split-Path -Leaf $localLog)
         Copy-Item -LiteralPath $localLog -Destination $logTarget -Force -ErrorAction Stop
         Write-Host "Log: $logTarget"
