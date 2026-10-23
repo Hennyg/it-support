@@ -182,7 +182,7 @@
 
         <div class="actions field-row" style="margin-bottom:0;">
           <button class="btn-run" id="exportBtn" onclick="runMigrationExport()">▶ Start eksport</button>
-          <button class="btn-secondary" onclick="openExportFolder()">📂 Åbn mappen</button>
+          <button class="btn-secondary" onclick="copyExportFolder()">📋 Kopiér mappesti</button>
         </div>
         <div class="result-line" id="exportResult"></div>
         <div class="note" id="exportNext" style="display:none;"></div>
@@ -193,13 +193,13 @@
       <div class="tile">
         <div class="tile-icon">📥</div>
         <h3>Import — ny pc</h3>
-        <p>Kopiér først ZIP-filen fra NAS'en ind i mappen (brug knapperne), og start derefter importen. Printere der allerede findes overskrives ikke ved almindelig import.</p>
+        <p>Kopiér først ZIP-filen fra NAS'en ind i mappen (brug knapperne og indsæt stien i Stifinder), og start derefter importen. Printere der allerede findes overskrives ikke ved almindelig import.</p>
 
         <label class="lbl" for="importZipPath">ZIP-fil</label>
         <input type="text" id="importZipPath" placeholder="C:\ProgramData\ITSupportAgent\PrinterMigration\Staging\printer-BRUGERNAVN.zip">
 
         <div class="field-row" style="margin-bottom:12px;">
-          <button class="btn-secondary" onclick="openImportFolder()">📂 Åbn mappen</button>
+          <button class="btn-secondary" onclick="copyImportFolder()">📋 Kopiér mappesti</button>
           <button class="btn-secondary" onclick="copyNasPath()">📋 Kopiér NAS-sti</button>
         </div>
 
@@ -679,27 +679,14 @@ async function loadConsoleUser() {
   } else {
     target.textContent = "Kunne ikke finde logget-på bruger — angiv anden placering.";
   }
+  ensureStageFolder();
 }
 
-// Opretter mappen (med skriveadgang for Users) og åbner den i Stifinder.
-// Findes filen, markeres den.
-async function openFolder(dir, file) {
-  const script = `
-try {
-  $d = ${psQuote(dir)}
-  New-Item -Path $d -ItemType Directory -Force | Out-Null
-  & icacls.exe $d /grant '*S-1-5-32-545:(OI)(CI)M' /T /Q | Out-Null
-  $f = ${psQuote(file || "")}
-  if ($f -and (Test-Path -LiteralPath $f)) {
-    Start-Process -FilePath "explorer.exe" -ArgumentList ('/select,"' + $f + '"')
-  } else {
-    Start-Process -FilePath "explorer.exe" -ArgumentList ('"' + $d + '"')
-  }
-  Write-Output "OK"
-} catch { Write-Output ("ERROR: " + $_.Exception.Message) }`.trim();
-  const data = await runPs(script);
-  const out = (data.output || "").trim();
-  if (out !== "OK") throw new Error(out || "Ukendt fejl");
+// Sikrer at staging-mappen findes, og at brugere kan lægge filer i den.
+async function ensureStageFolder() {
+  try {
+    await runPs(`$d = ${psQuote(STAGE_DIR)}; New-Item -Path $d -ItemType Directory -Force | Out-Null; & icacls.exe $d /grant '*S-1-5-32-545:(OI)(CI)M' /T /Q | Out-Null; 'OK'`);
+  } catch { /* ikke kritisk */ }
 }
 
 async function copyText(text) {
@@ -714,31 +701,24 @@ function currentExportZip() {
   return zip || (consoleUser ? stageZipFor(consoleUser) : "");
 }
 
-async function openExportFolder() {
-  const resultEl = document.getElementById("exportResult");
-  const zip = currentExportZip();
-  try {
-    await openFolder(zip ? parentDir(zip) : STAGE_DIR, zip);
-    resultEl.textContent = "✓ Stifinder åbnet.";
-    resultEl.className = "result-line ok";
-  } catch (err) {
-    resultEl.textContent = "Kunne ikke åbne mappen: " + err.message + " — åbn manuelt: " + (zip ? parentDir(zip) : STAGE_DIR);
-    resultEl.className = "result-line err";
-  }
+// Agenten kører som SYSTEM og kan ikke åbne vinduer på brugerens skrivebord,
+// så stien kopieres i stedet og indsættes i Stifinder.
+async function copyFolderPath(dir, resultEl) {
+  const ok = await copyText(dir);
+  resultEl.textContent = ok
+    ? `✓ Kopieret: ${dir} — tryk Win+R, Ctrl+V og Enter.`
+    : `Mappe: ${dir} — kopiér stien og indsæt i Stifinder.`;
+  resultEl.className = ok ? "result-line ok" : "result-line";
 }
 
-async function openImportFolder() {
-  const resultEl = document.getElementById("importResult");
+async function copyExportFolder() {
+  const zip = currentExportZip();
+  await copyFolderPath(zip ? parentDir(zip) : STAGE_DIR, document.getElementById("exportResult"));
+}
+
+async function copyImportFolder() {
   const zip = document.getElementById("importZipPath").value.trim();
-  const dir = zip ? parentDir(zip) : STAGE_DIR;
-  try {
-    await openFolder(dir, zip);
-    resultEl.textContent = "✓ Stifinder åbnet — læg ZIP-filen her.";
-    resultEl.className = "result-line ok";
-  } catch (err) {
-    resultEl.textContent = "Kunne ikke åbne mappen: " + err.message + " — åbn manuelt: " + dir;
-    resultEl.className = "result-line err";
-  }
+  await copyFolderPath(zip ? parentDir(zip) : STAGE_DIR, document.getElementById("importResult"));
 }
 
 async function copyNasPath() {
@@ -841,9 +821,9 @@ async function runMigrationExport() {
 
     if (result.exitCode === 0) {
       const nasDir = consoleUser ? nasDirFor(consoleUser) : MIGRATION_BACKUP_ROOT + "\\BRUGERNAVN";
-      nextEl.innerHTML = `<strong>Næste skridt:</strong> Kopiér <code>${escHtml(zip.split("\\").pop())}</code> til <code>${escHtml(nasDir)}</code>. Klik “📂 Åbn mappen” for at finde filen.`;
+      const copied = await copyText(parentDir(zip));
+      nextEl.innerHTML = `<strong>Næste skridt:</strong> ${copied ? "Mappestien er kopieret — tryk <strong>Win+R</strong>, <strong>Ctrl+V</strong> og <strong>Enter</strong>." : `Åbn <code>${escHtml(parentDir(zip))}</code> i Stifinder.`} Kopiér derefter <code>${escHtml(zip.split("\\").pop())}</code> til <code>${escHtml(nasDir)}</code>.`;
       nextEl.style.display = "block";
-      try { await openFolder(parentDir(zip), zip); } catch { /* knappen kan bruges manuelt */ }
     }
   } catch (err) {
     resultEl.textContent = "Fejl: " + err.message;
