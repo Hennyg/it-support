@@ -662,4 +662,156 @@ async function loadConsoleUser() {
 
   if (consoleUser) {
     target.textContent = nasZipFor(consoleUser);
-    const imp =
+    const imp = document.getElementById("importUserName");
+    if (!imp.value) imp.value = consoleUser;
+  } else {
+    target.textContent = "Kunne ikke finde logget-på bruger — angiv anden placering.";
+  }
+  updateImportTarget();
+}
+
+function updateImportTarget() {
+  const user = document.getElementById("importUserName").value.trim();
+  const zip = document.getElementById("importZipPath").value.trim();
+  document.getElementById("importTarget").textContent =
+    zip ? zip : (user ? nasZipFor(user) : "Angiv brugernavn eller ZIP-sti");
+}
+
+// Henter PrinterMigration.ps1 fra sitet, lægger den på pc'en via agenten og kører den
+// i en separat Windows PowerShell 5.1-proces. Returnerer { exitCode, log }.
+async function runMigration(argString) {
+  const res = await fetch(MIGRATION_SCRIPT_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Kunne ikke hente ${MIGRATION_SCRIPT_URL} (${res.status})`);
+  const ps1 = await res.text();
+  if (!ps1.includes("PrinterMigration") ) throw new Error("Hentet script ser forkert ud.");
+
+  const inner = `$ProgressPreference='SilentlyContinue'; & (Join-Path $env:ProgramData 'ITSupportAgent\\PrinterMigration\\PrinterMigration.ps1') ${argString} -Confirm:$false`;
+
+  const script = `
+$ErrorActionPreference = 'Stop'
+$dir = Join-Path $env:ProgramData 'ITSupportAgent\\PrinterMigration'
+New-Item -Path $dir -ItemType Directory -Force | Out-Null
+$ps1 = Join-Path $dir 'PrinterMigration.ps1'
+$text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${utf8ToBase64(ps1)}'))
+[IO.File]::WriteAllText($ps1, $text, (New-Object Text.UTF8Encoding $true))
+$exe = Join-Path $env:windir 'Sysnative\\WindowsPowerShell\\v1.0\\powershell.exe'
+if (-not (Test-Path -LiteralPath $exe)) { $exe = Join-Path $env:windir 'System32\\WindowsPowerShell\\v1.0\\powershell.exe' }
+$ErrorActionPreference = 'Continue'
+$out = & $exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -OutputFormat Text -EncodedCommand '${toEncodedCommand(inner)}' 2>&1 | ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { $_ } } | Out-String -Width 300
+"EXITCODE:$LASTEXITCODE"
+$out
+`.trim();
+
+  const data = await runPs(script);
+  const output = (data.output || "") + (data.error ? "\n" + data.error : "");
+  const m = output.match(/EXITCODE:(-?\d+)/);
+  return {
+    exitCode: m ? Number(m[1]) : -1,
+    log: output.replace(/^\s*EXITCODE:-?\d+\s*/m, "").trim()
+  };
+}
+
+function setMigrationBusy(btn, busy, idleText) {
+  btn.disabled = busy;
+  btn.innerHTML = busy ? '<span class="spinner"></span> Kører...' : idleText;
+}
+
+function showMigrationResult(resultEl, logEl, result, okText) {
+  logEl.textContent = result.log || "(intet output)";
+  logEl.style.display = "block";
+  logEl.scrollTop = logEl.scrollHeight;
+  const hasWarnings = /WARNING:|ADVARSEL:/i.test(result.log);
+  if (result.exitCode === 0) {
+    resultEl.textContent = hasWarnings ? `✓ ${okText} — med advarsler, se loggen.` : `✓ ${okText}.`;
+    resultEl.className = "result-line ok";
+  } else {
+    resultEl.textContent = `⚠ Fejlede (kode ${result.exitCode}) — se loggen.`;
+    resultEl.className = "result-line err";
+  }
+}
+
+async function runMigrationExport() {
+  const btn = document.getElementById("exportBtn");
+  const resultEl = document.getElementById("exportResult");
+  const logEl = document.getElementById("exportLog");
+  const zip = document.getElementById("exportZipPath").value.trim();
+
+  if (!zip && !consoleUser) {
+    resultEl.textContent = "Ingen logget-på bruger fundet — angiv en anden placering.";
+    resultEl.className = "result-line err";
+    return;
+  }
+  if (zip && !/\.zip$/i.test(zip)) {
+    resultEl.textContent = "Stien skal ende på .zip.";
+    resultEl.className = "result-line err";
+    return;
+  }
+
+  const args = "-Mode Export" + (zip ? " -ZipPath " + psQuote(zip) : "");
+  setMigrationBusy(btn, true);
+  resultEl.textContent = "Eksporterer — det kan tage et par minutter...";
+  resultEl.className = "result-line";
+  logEl.style.display = "none";
+
+  try {
+    const result = await runMigration(args);
+    showMigrationResult(resultEl, logEl, result, "Eksport fuldført");
+  } catch (err) {
+    resultEl.textContent = "Fejl: " + err.message;
+    resultEl.className = "result-line err";
+  } finally {
+    setMigrationBusy(btn, false, "▶ Start eksport");
+  }
+}
+
+async function runMigrationImport() {
+  const btn = document.getElementById("importBtn");
+  const resultEl = document.getElementById("importResult");
+  const logEl = document.getElementById("importLog");
+  const user = document.getElementById("importUserName").value.trim();
+  const zip = document.getElementById("importZipPath").value.trim();
+  const full = document.getElementById("importFullRestore").checked;
+
+  let args = "-Mode Import";
+  if (zip) {
+    args += " -ZipPath " + psQuote(zip);
+  } else if (user) {
+    if (!/^[a-zA-Z0-9._-]+$/.test(user)) {
+      resultEl.textContent = "Ugyldigt brugernavn.";
+      resultEl.className = "result-line err";
+      return;
+    }
+    args += " -UserName " + psQuote(user);
+  } else {
+    resultEl.textContent = "Angiv brugernavn eller sti til ZIP-fil.";
+    resultEl.className = "result-line err";
+    return;
+  }
+  if (full) args += " -FullRestore";
+
+  const source = zip || nasZipFor(user);
+  const msg = full
+    ? `FULD gendannelse fra:\n${source}\n\nDette kan importere ubrugte porte/drivere og ændre eksisterende printere på denne pc. Fortsæt?`
+    : `Importér printere fra:\n${source}\n\nEksisterende printere overskrives ikke. Fortsæt?`;
+  if (!confirm(msg)) return;
+
+  setMigrationBusy(btn, true);
+  resultEl.textContent = "Importerer — det kan tage et par minutter...";
+  resultEl.className = "result-line";
+  logEl.style.display = "none";
+
+  try {
+    const result = await runMigration(args);
+    showMigrationResult(resultEl, logEl, result, "Import afsluttet");
+    if (result.exitCode === 0) checkInstalled();
+  } catch (err) {
+    resultEl.textContent = "Fejl: " + err.message;
+    resultEl.className = "result-line err";
+  } finally {
+    setMigrationBusy(btn, false, "▶ Start import");
+  }
+}
+</script>
+
+</body>
+</html>
