@@ -2090,6 +2090,34 @@ function kbdProgress(label) {
   return () => { clearInterval(t); wrap.style.display = "none"; };
 }
 
+/* Agenten håndterer ikke flerlinjede scripts pålideligt — send scriptet som én linje (base64 → ScriptBlock) */
+function utf8ToB64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+function runPsKbd(script) {
+  const b = utf8ToB64(script);
+  return runPs("$s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('" + b + "'));& ([ScriptBlock]::Create($s))");
+}
+
+/* Sender en DLL (base64) til agenten i bidder og gemmer den i en midlertidig fil */
+async function kbdUploadB64(b64, fileName) {
+  const path = "C:\\ProgramData\\" + fileName;
+  const CHUNK = 8000;
+  for (let i = 0; i < b64.length; i += CHUNK) {
+    const part = b64.slice(i, i + CHUNK);
+    const cmd = i === 0
+      ? `Set-Content -Path '${path}' -Value '${part}' -NoNewline -Encoding ASCII; Write-Output 'OK'`
+      : `Add-Content -Path '${path}' -Value '${part}' -NoNewline -Encoding ASCII; Write-Output 'OK'`;
+    const data = await runPsKbd(cmd);
+    if ((data.output || "").trim() !== "OK") throw new Error("Upload af " + fileName + " fejlede: " + JSON.stringify(data));
+  }
+  return path;
+}
+
 /* Fælles PowerShell: find layoutets KLID ud fra DLL-navnet */
 const KBD_PS_FIND = String.raw`
 $name='${KBD_DLL}'
@@ -2166,7 +2194,7 @@ Write-Output ("DLL=$dll|KLID=$klid|USER=$user|WHO=$who")
 `.trim();
 
   try {
-    const data = await runPs(script);
+    const data = await runPsKbd(script);
     const output = (data.output || "").trim();
     if (!output.startsWith("DLL=")) throw new Error(output || data.error || data.stderr || ("Uventet svar: " + JSON.stringify(data)));
 
@@ -2216,14 +2244,19 @@ async function installKbdLayout() {
 
   try {
     const [b64, b32] = await Promise.all([fetchDllBase64(KBD_URL_64), fetchDllBase64(KBD_URL_32)]);
+    const p64 = await kbdUploadB64(b64, "ITSupport-kbd-amd64.b64");
+    const p32 = await kbdUploadB64(b32, "ITSupport-kbd-wow64.b64");
 
     const script = String.raw`
 try {
 $ErrorActionPreference='Stop'
 ${KBD_PS_FIND}
 $text='${KBD_TEXT}'
-$b64='${b64}'
-$b32='${b32}'
+$f64='${p64}'
+$f32='${p32}'
+$b64=(Get-Content $f64 -Raw).Trim()
+$b32=(Get-Content $f32 -Raw).Trim()
+Remove-Item $f64,$f32 -Force -ErrorAction SilentlyContinue
 
 function Put-Dll($b, $dir){
   $p=Join-Path $dir $name
@@ -2265,7 +2298,7 @@ Write-Output ('OK|'+$klid)
 } catch { Write-Output ('ERROR: '+$_.Exception.Message) }
 `.trim();
 
-    const data = await runPs(script);
+    const data = await runPsKbd(script);
     const output = (data.output || "").trim();
     if (!output.startsWith("OK|")) throw new Error(output || data.error || data.stderr || ("Uventet svar: " + JSON.stringify(data)));
     setKbdResult("✓ Installeret. Skift med Windows-tast + Mellemrum.", "ok");
@@ -2315,7 +2348,7 @@ Write-Output 'OK'
 
   let msg = "", cls = "";
   try {
-    const data = await runPs(script);
+    const data = await runPsKbd(script);
     const output = (data.output || "").trim();
     if (output !== "OK") throw new Error(output || data.error || data.stderr || ("Uventet svar: " + JSON.stringify(data)));
     msg = "✓ Fjernet fra brugerens tastaturer."; cls = "ok";
