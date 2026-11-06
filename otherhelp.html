@@ -2168,7 +2168,7 @@ Write-Output ("DLL=$dll|KLID=$klid|USER=$user|WHO=$who")
   try {
     const data = await runPs(script);
     const output = (data.output || "").trim();
-    if (!output.startsWith("DLL=")) throw new Error(output || "Tomt svar fra agenten");
+    if (!output.startsWith("DLL=")) throw new Error(output || data.error || data.stderr || ("Uventet svar: " + JSON.stringify(data)));
 
     const map = {};
     output.split("|").forEach(p => { const i = p.indexOf("="); if (i > 0) map[p.slice(0, i)] = p.slice(i + 1); });
@@ -2187,7 +2187,8 @@ Write-Output ("DLL=$dll|KLID=$klid|USER=$user|WHO=$who")
     if (allOk) setKbdResult("Layoutet er klar. Skift med Windows-tast + Mellemrum.", "ok");
   } catch (err) {
     [dllEl, regEl, userEl].forEach(el => el.innerHTML = kbdBadge("error", "Fejl"));
-    setKbdResult(err.message.startsWith("ERROR") ? err.message : "Kunne ikke forbinde til IT Support Agent.", "err");
+    console.error("Punktum på numpad – status fejl:", err);
+    setKbdResult(err instanceof TypeError ? "Kunne ikke forbinde til IT Support Agent." : "Fejl: " + err.message, "err");
   }
 }
 
@@ -2266,7 +2267,7 @@ Write-Output ('OK|'+$klid)
 
     const data = await runPs(script);
     const output = (data.output || "").trim();
-    if (!output.startsWith("OK|")) throw new Error(output || "Ukendt fejl fra PowerShell");
+    if (!output.startsWith("OK|")) throw new Error(output || data.error || data.stderr || ("Uventet svar: " + JSON.stringify(data)));
     setKbdResult("✓ Installeret. Skift med Windows-tast + Mellemrum.", "ok");
   } catch (err) {
     setKbdResult("Fejl: " + err.message, "err");
@@ -2316,7 +2317,7 @@ Write-Output 'OK'
   try {
     const data = await runPs(script);
     const output = (data.output || "").trim();
-    if (output !== "OK") throw new Error(output || "Ukendt fejl fra PowerShell");
+    if (output !== "OK") throw new Error(output || data.error || data.stderr || ("Uventet svar: " + JSON.stringify(data)));
     msg = "✓ Fjernet fra brugerens tastaturer."; cls = "ok";
   } catch (err) {
     msg = "Fejl: " + err.message; cls = "err";
