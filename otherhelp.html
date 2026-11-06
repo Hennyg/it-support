@@ -151,6 +151,13 @@
         <button class="btn-run" id="wifiRouterBtn" onclick="openWifiRouterPopup()">📶 Se vejledninger</button>
       </div>
 
+      <div class="action-card">
+        <div class="card-icon">⌨️</div>
+        <h2>Punktum på numpad</h2>
+        <p>Giver dig et ekstra tastaturlayout, hvor numpad-tasten skriver punktum i stedet for komma. Du skifter mellem de to med Windows-tast + Mellemrum.</p>
+        <button class="btn-run" id="kbdBtn" onclick="openKbdPopup()">▶ Kør</button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -515,6 +522,39 @@
     <div class="popup-footer">
       <span class="popup-result" id="wifiRouterResult"></span>
       <button class="btn-close" onclick="closeWifiRouterPopup()">Luk</button>
+    </div>
+  </div>
+</div>
+
+<!-- Popup: Punktum på numpad -->
+<div class="popup-overlay" id="kbdOverlay">
+  <div class="popup-box" style="max-width:560px;">
+    <h2 class="popup-title">⌨️ Punktum på numpad</h2>
+    <p class="popup-desc">Installerer tastaturlayoutet "Dansk (punktum på numpad)" ved siden af det almindelige danske layout. Det almindelige layout bliver ikke ændret.</p>
+
+    <table class="reg-table">
+      <tbody>
+        <tr><td>Layout-fil på pc'en</td><td id="kbdDllStatus"><span class="status-badge loading"><span class="spinner"></span> Tjekker...</span></td></tr>
+        <tr><td>Layout registreret i Windows</td><td id="kbdRegStatus"><span class="status-badge loading"><span class="spinner"></span> Tjekker...</span></td></tr>
+        <tr><td>Aktiveret for brugeren</td><td id="kbdUserStatus"><span class="status-badge loading"><span class="spinner"></span> Tjekker...</span></td></tr>
+      </tbody>
+    </table>
+    <p id="kbdUserInfo" style="font-size:.78rem;color:#9ca3af;margin:-12px 0 14px;"></p>
+
+    <div class="pdf-note" style="margin:0 0 16px;">
+      <strong>Sådan skifter du:</strong> Tryk <strong>Windows-tast + Mellemrum</strong> og vælg "Dansk (punktum på numpad)" for punktum eller "Dansk" for komma. Du kan også klikke på <strong>DAN</strong> nederst til højre i proceslinjen.
+    </div>
+
+    <div id="kbdProgressWrap" style="display:none;">
+      <div class="progressTrack"><div class="progressBarIndeterminate"></div></div>
+      <p class="progressText" id="kbdProgressText"></p>
+    </div>
+
+    <div class="popup-footer">
+      <span class="popup-result" id="kbdResult"></span>
+      <button class="btn-close" onclick="closeKbdPopup()">Luk</button>
+      <button class="btn-close" id="kbdRemoveBtn" onclick="removeKbdLayout()" disabled>Fjern for brugeren</button>
+      <button class="btn-update" id="kbdInstallBtn" onclick="installKbdLayout()" disabled>Installér</button>
     </div>
   </div>
 </div>
@@ -2005,6 +2045,286 @@ function renderWifiRouterGrid() {
       </div>`;
     grid.appendChild(card);
   });
+}
+
+/* ---------- Punktum på numpad (eget tastaturlayout) ---------- */
+
+const KBD_DLL    = "kbddapkt.dll";
+const KBD_TEXT   = "Dansk (punktum på numpad)";
+const KBD_URL_64 = "/tools/kbd/amd64/" + KBD_DLL;
+const KBD_URL_32 = "/tools/kbd/wow64/" + KBD_DLL;
+let kbdState = { dll: false, klid: "", user: "" };
+
+document.getElementById("kbdOverlay").addEventListener("click", function(e) {
+  if (e.target === this) closeKbdPopup();
+});
+
+function openKbdPopup() {
+  document.getElementById("kbdOverlay").classList.add("open");
+  setKbdResult("", "");
+  checkKbdStatus();
+}
+
+function closeKbdPopup() {
+  document.getElementById("kbdOverlay").classList.remove("open");
+}
+
+function setKbdResult(text, cls) {
+  const el = document.getElementById("kbdResult");
+  el.textContent = text;
+  el.className = "popup-result" + (cls ? " " + cls : "");
+}
+
+function kbdBadge(cls, text) {
+  const spin = cls === "loading" ? '<span class="spinner"></span> ' : "";
+  return `<span class="status-badge ${cls}">${spin}${escHtml(text)}</span>`;
+}
+
+function kbdProgress(label) {
+  const wrap = document.getElementById("kbdProgressWrap");
+  const text = document.getElementById("kbdProgressText");
+  wrap.style.display = "block";
+  let s = 0;
+  text.textContent = `${label} (0 sekunder)`;
+  const t = setInterval(() => { s++; text.textContent = `${label} (${s} sekund${s === 1 ? "" : "er"})`; }, 1000);
+  return () => { clearInterval(t); wrap.style.display = "none"; };
+}
+
+/* Fælles PowerShell: find layoutets KLID ud fra DLL-navnet */
+const KBD_PS_FIND = String.raw`
+$name='${KBD_DLL}'
+$root='HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layouts'
+$klid=''
+foreach($k in Get-ChildItem $root){ $f=(Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue).'Layout File'; if($f -and ($f -ieq $name)){ $klid=$k.PSChildName; break } }
+$sys = if([Environment]::Is64BitProcess){ "$env:windir\System32" } else { "$env:windir\Sysnative" }
+$wow = "$env:windir\SysWOW64"
+`;
+
+/* Fælles PowerShell: kør $userScript som den indloggede bruger via scheduled task */
+const KBD_PS_RUN_AS_USER = String.raw`
+$who=(Get-CimInstance Win32_ComputerSystem).UserName
+if(-not $who){ throw 'Ingen indlogget bruger fundet' }
+$out=Join-Path $env:ProgramData ('ITSupport-kbd-'+[guid]::NewGuid().ToString('N')+'.txt')
+$userScript=$userScript.Replace('__TIP__',$tip).Replace('__OUT__',$out)
+$enc=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($userScript))
+$task='ITSupport-Kbd-'+[guid]::NewGuid().ToString('N')
+$action=New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand '+$enc)
+$principal=New-ScheduledTaskPrincipal -UserId $who -LogonType Interactive -RunLevel Limited
+Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Force | Out-Null
+$res=$null
+try {
+  Start-ScheduledTask -TaskName $task
+  for($i=0; $i -lt 40 -and -not $res; $i++){
+    Start-Sleep -Milliseconds 500
+    if(Test-Path $out){ $c=Get-Content $out -Raw -Encoding UTF8; if($c){ $res=$c.Trim() } }
+  }
+} finally {
+  Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+  Remove-Item $out -Force -ErrorAction SilentlyContinue
+}
+if(-not $res){ throw 'Brugerdelen svarede ikke inden for 20 sekunder' }
+if($res -ne 'OK'){ throw $res }
+`;
+
+async function checkKbdStatus() {
+  const dllEl  = document.getElementById("kbdDllStatus");
+  const regEl  = document.getElementById("kbdRegStatus");
+  const userEl = document.getElementById("kbdUserStatus");
+  const info   = document.getElementById("kbdUserInfo");
+  const instBtn = document.getElementById("kbdInstallBtn");
+  const remBtn  = document.getElementById("kbdRemoveBtn");
+
+  [dllEl, regEl, userEl].forEach(el => el.innerHTML = kbdBadge("loading", "Tjekker..."));
+  info.textContent = "";
+  instBtn.disabled = true;
+  remBtn.disabled = true;
+
+  const script = String.raw`
+try {
+$ErrorActionPreference='Stop'
+${KBD_PS_FIND}
+$dll=[int](Test-Path (Join-Path $sys $name))
+$user='NOUSER'; $who=''
+$who=(Get-CimInstance Win32_ComputerSystem).UserName
+if($who){
+  $sid=(New-Object System.Security.Principal.NTAccount($who)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+  if(-not (Get-PSDrive HKU -ErrorAction SilentlyContinue)){ New-PSDrive -PSProvider Registry -Name HKU -Root HKEY_USERS | Out-Null }
+  $user='0'
+  if($klid){
+    $tip=('0406:'+$klid).ToUpper()
+    $prof="HKU:\$sid\Control Panel\International\User Profile"
+    if(Test-Path $prof){
+      foreach($lang in Get-ChildItem $prof){
+        $names=(Get-ItemProperty $lang.PSPath).PSObject.Properties.Name
+        if($names -contains $tip){ $user='1' }
+      }
+    }
+  }
+}
+Write-Output ("DLL=$dll|KLID=$klid|USER=$user|WHO=$who")
+} catch { Write-Output ('ERROR: '+$_.Exception.Message) }
+`.trim();
+
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    if (!output.startsWith("DLL=")) throw new Error(output || "Tomt svar fra agenten");
+
+    const map = {};
+    output.split("|").forEach(p => { const i = p.indexOf("="); if (i > 0) map[p.slice(0, i)] = p.slice(i + 1); });
+    kbdState = { dll: map.DLL === "1", klid: map.KLID || "", user: map.USER || "" };
+
+    dllEl.innerHTML = kbdState.dll ? kbdBadge("ok", "✓ Installeret") : kbdBadge("missing", "⚠ Mangler");
+    regEl.innerHTML = kbdState.klid ? kbdBadge("ok", "✓ " + kbdState.klid) : kbdBadge("missing", "⚠ Mangler");
+    if (kbdState.user === "NOUSER")      userEl.innerHTML = kbdBadge("error", "Ingen bruger logget ind");
+    else if (kbdState.user === "1")      userEl.innerHTML = kbdBadge("ok", "✓ Aktiveret");
+    else                                 userEl.innerHTML = kbdBadge("missing", "⚠ Ikke aktiveret");
+    if (map.WHO) info.textContent = "Bruger: " + map.WHO;
+
+    const allOk = kbdState.dll && kbdState.klid && kbdState.user === "1";
+    instBtn.disabled = allOk || kbdState.user === "NOUSER";
+    remBtn.disabled = kbdState.user !== "1";
+    if (allOk) setKbdResult("Layoutet er klar. Skift med Windows-tast + Mellemrum.", "ok");
+  } catch (err) {
+    [dllEl, regEl, userEl].forEach(el => el.innerHTML = kbdBadge("error", "Fejl"));
+    setKbdResult(err.message.startsWith("ERROR") ? err.message : "Kunne ikke forbinde til IT Support Agent.", "err");
+  }
+}
+
+async function fetchDllBase64(url) {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Kunne ikke hente ${url} (HTTP ${res.status})`);
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (buf.length < 2 || buf[0] !== 0x4D || buf[1] !== 0x5A) {
+    throw new Error(`${url} er ikke en gyldig DLL (serveren sendte sandsynligvis en HTML-side)`);
+  }
+  let bin = "";
+  for (let i = 0; i < buf.length; i += 0x8000) {
+    bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  }
+  return btoa(bin);
+}
+
+async function installKbdLayout() {
+  const instBtn = document.getElementById("kbdInstallBtn");
+  const remBtn  = document.getElementById("kbdRemoveBtn");
+  instBtn.disabled = true;
+  remBtn.disabled = true;
+  setKbdResult("", "");
+  const stop = kbdProgress("Installerer tastaturlayout");
+
+  try {
+    const [b64, b32] = await Promise.all([fetchDllBase64(KBD_URL_64), fetchDllBase64(KBD_URL_32)]);
+
+    const script = String.raw`
+try {
+$ErrorActionPreference='Stop'
+${KBD_PS_FIND}
+$text='${KBD_TEXT}'
+$b64='${b64}'
+$b32='${b32}'
+
+function Put-Dll($b, $dir){
+  $p=Join-Path $dir $name
+  if(Test-Path $p){ if([Convert]::ToBase64String([IO.File]::ReadAllBytes($p)) -eq $b){ return } }
+  [IO.File]::WriteAllBytes($p, [Convert]::FromBase64String($b))
+}
+Put-Dll $b64 $sys
+if(Test-Path $wow){ Put-Dll $b32 $wow }
+
+if(-not $klid){
+  $keys=Get-ChildItem $root
+  $used=@($keys | ForEach-Object { $_.PSChildName.ToLower() })
+  for($i=0; $i -lt 0x1000; $i++){ $c=('a{0:x3}0406' -f $i); if($used -notcontains $c){ $klid=$c; break } }
+  $ids=@($keys | ForEach-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).'Layout Id' } | Where-Object { $_ } | ForEach-Object { [Convert]::ToInt32($_,16) })
+  $max=0xbf; foreach($x in $ids){ if($x -gt $max){ $max=$x } }
+  $newId=('{0:x4}' -f ($max+1))
+  $k="$root\$klid"
+  New-Item -Path $k -Force | Out-Null
+  New-ItemProperty -Path $k -Name 'Layout File' -Value $name -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $k -Name 'Layout Text' -Value $text -PropertyType String -Force | Out-Null
+  New-ItemProperty -Path $k -Name 'Layout Display Name' -Value ('@%SystemRoot%\system32\'+$name+',-1000') -PropertyType ExpandString -Force | Out-Null
+  New-ItemProperty -Path $k -Name 'Layout Id' -Value $newId -PropertyType String -Force | Out-Null
+}
+
+$tip=('0406:'+$klid).ToUpper()
+$userScript=@'
+try {
+  $tip='__TIP__'
+  $l=Get-WinUserLanguageList
+  $da=$l | Where-Object { $_.LanguageTag -like 'da*' } | Select-Object -First 1
+  if(-not $da){ $l.Add('da-DK'); $da=$l | Where-Object { $_.LanguageTag -like 'da*' } | Select-Object -First 1 }
+  if(-not ($da.InputMethodTips -contains $tip)){ $da.InputMethodTips.Add($tip) }
+  Set-WinUserLanguageList $l -Force
+  Set-Content -Path '__OUT__' -Value 'OK' -Encoding UTF8
+} catch { Set-Content -Path '__OUT__' -Value ('ERROR: '+$_.Exception.Message) -Encoding UTF8 }
+'@
+${KBD_PS_RUN_AS_USER}
+Write-Output ('OK|'+$klid)
+} catch { Write-Output ('ERROR: '+$_.Exception.Message) }
+`.trim();
+
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    if (!output.startsWith("OK|")) throw new Error(output || "Ukendt fejl fra PowerShell");
+    setKbdResult("✓ Installeret. Skift med Windows-tast + Mellemrum.", "ok");
+  } catch (err) {
+    setKbdResult("Fejl: " + err.message, "err");
+  } finally {
+    stop();
+  }
+  const msg = document.getElementById("kbdResult").textContent;
+  const cls = document.getElementById("kbdResult").className;
+  await checkKbdStatus();
+  document.getElementById("kbdResult").textContent = msg;
+  document.getElementById("kbdResult").className = cls;
+}
+
+async function removeKbdLayout() {
+  if (!confirm(`Fjern "${KBD_TEXT}" fra brugerens tastaturer?`)) return;
+  const instBtn = document.getElementById("kbdInstallBtn");
+  const remBtn  = document.getElementById("kbdRemoveBtn");
+  instBtn.disabled = true;
+  remBtn.disabled = true;
+  setKbdResult("", "");
+  const stop = kbdProgress("Fjerner tastaturlayout");
+
+  const script = String.raw`
+try {
+$ErrorActionPreference='Stop'
+${KBD_PS_FIND}
+if(-not $klid){ throw 'Layoutet er ikke registreret på pc''en' }
+$tip=('0406:'+$klid).ToUpper()
+$userScript=@'
+try {
+  $tip='__TIP__'
+  $l=Get-WinUserLanguageList
+  foreach($x in $l){
+    $m=@($x.InputMethodTips | Where-Object { $_ -ieq $tip })
+    foreach($t in $m){ [void]$x.InputMethodTips.Remove($t) }
+  }
+  Set-WinUserLanguageList $l -Force
+  Set-Content -Path '__OUT__' -Value 'OK' -Encoding UTF8
+} catch { Set-Content -Path '__OUT__' -Value ('ERROR: '+$_.Exception.Message) -Encoding UTF8 }
+'@
+${KBD_PS_RUN_AS_USER}
+Write-Output 'OK'
+} catch { Write-Output ('ERROR: '+$_.Exception.Message) }
+`.trim();
+
+  let msg = "", cls = "";
+  try {
+    const data = await runPs(script);
+    const output = (data.output || "").trim();
+    if (output !== "OK") throw new Error(output || "Ukendt fejl fra PowerShell");
+    msg = "✓ Fjernet fra brugerens tastaturer."; cls = "ok";
+  } catch (err) {
+    msg = "Fejl: " + err.message; cls = "err";
+  } finally {
+    stop();
+  }
+  await checkKbdStatus();
+  setKbdResult(msg, cls);
 }
 </script>
 
