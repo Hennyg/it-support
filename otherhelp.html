@@ -260,7 +260,12 @@
       <div class="sig-img-grid" id="sigImgGrid"><div class="loading"><span class="spinner"></span> Henter billeder...</div></div>
     </div>
 
-    <label class="sig-check"><input type="checkbox" id="sigDefault" checked> Sæt "Ny mail" og "Svar" som standard på begge konti</label>
+    <div class="sig-tile">
+      <h4 class="sig-tile-title">Standardsignatur i Outlook</h4>
+      <label class="sig-check"><input type="radio" name="sigDefaultMode" value="both" checked> Sæt "Ny mail" til nye mails og "Svar" til svar/videresend på begge konti</label>
+      <label class="sig-check"><input type="radio" name="sigDefaultMode" value="newOnly"> Sæt "Ny mail" til både nye mails og svar/videresend på begge konti</label>
+      <label class="sig-check"><input type="radio" name="sigDefaultMode" value="none"> Sæt ikke som standard — vælg selv i Outlook</label>
+    </div>
 
     <div id="sigProgressWrap" style="display:none;">
       <div class="progressTrack"><div class="progressBarIndeterminate"></div></div>
@@ -2480,7 +2485,7 @@ const SIG_DEFAULT_IMG  = "outlookstandardsignaturbillede.png";
 const SIG_DEFAULT_TEL  = "+45 30 50 61 80";
 const SIG_WEB_TEXT     = "www.lely.com/dk/centers/herrup/";
 const SIG_ADDRESS_LINE = "Lely Center Herrup  |  Nr. Bjertvej 12  |  7830   |   Vinderup   |   Danmark";
-const SIG_MAX_IMG_W    = 600;
+const SIG_MAX_IMG_W    = 320;   // bredde i signaturen — billedet skaleres ned til dette før det gemmes
 const SIG_COLS = {
   local: { domain: "lcherrup.dk" },
   lely:  { domain: "lelycenter.com" }
@@ -2810,13 +2815,27 @@ function closeSigPopup() {
   sigEl("sigOverlay").classList.remove("open");
 }
 
-async function sigFetchB64(url) {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Kunne ikke hente billedet ${url} (HTTP ${res.status})`);
-  const buf = new Uint8Array(await res.arrayBuffer());
-  let bin = "";
-  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-  return btoa(bin);
+/* Henter billedet og skalerer det ned til SIG_MAX_IMG_W, så mailen ikke bliver tung */
+function sigResizedImageB64(url, ext) {
+  return new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => {
+      let w = im.naturalWidth, h = im.naturalHeight;
+      if (w > SIG_MAX_IMG_W) { h = Math.round(h * SIG_MAX_IMG_W / w); w = SIG_MAX_IMG_W; }
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      const ctx = c.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      const jpg = ext === ".jpg" || ext === ".jpeg";
+      if (jpg) { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h); }
+      ctx.drawImage(im, 0, 0, w, h);
+      const dataUrl = jpg ? c.toDataURL("image/jpeg", 0.9) : c.toDataURL("image/png");
+      resolve(dataUrl.split(",")[1]);
+    };
+    im.onerror = () => reject(new Error("Kunne ikke hente billedet " + url));
+    im.src = url;
+  });
 }
 
 async function saveSig() {
@@ -2832,10 +2851,12 @@ async function saveSig() {
   setSigResult("", "");
   const prog = sigProgress("Forbereder...");
   const id = Date.now().toString(36);
+  const mode = document.querySelector('input[name="sigDefaultMode"]:checked')?.value || "both";
 
   try {
     const imgName = sigState.selectedImg;
-    const ext = (imgName.match(/\.[a-z0-9]+$/i)?.[0] || ".png").toLowerCase();
+    const srcExt = (imgName.match(/\.[a-z0-9]+$/i)?.[0] || ".png").toLowerCase();
+    const ext = srcExt === ".jpg" || srcExt === ".jpeg" ? ".jpg" : ".png";
     const txtB64 = t => utf8ToB64("\uFEFF" + String(t).replace(/\r/g, "").replace(/\s+$/, "").replace(/\n/g, "\r\n") + "\r\n");
 
     const payload = { sigs: [], accounts: [] };
@@ -2844,16 +2865,16 @@ async function saveSig() {
       const imgRel = imgName ? encodeURI(newName) + "_files/image001" + ext : "";
       payload.sigs.push({ name: newName,   image: !!imgName, htm: utf8ToB64(sigWrapHtm(sigTextToHtml(c.newText, imgRel))), txt: txtB64(c.newText) });
       payload.sigs.push({ name: replyName, image: false,     htm: utf8ToB64(sigWrapHtm(sigTextToHtml(c.replyText, ""))),   txt: txtB64(c.replyText) });
-      payload.accounts.push({ mail: c.mail, newSig: newName, replySig: replyName });
+      payload.accounts.push({ mail: c.mail, newSig: newName, replySig: mode === "newOnly" ? newName : replyName });
     });
 
     prog.set("Overfører billede...");
-    const imgTmp = imgName ? await kbdUploadB64(await sigFetchB64(SIG_IMG_DIR + encodeURIComponent(imgName)), `ITSupport-sig-${id}.img`) : "";
+    const imgTmp = imgName ? await kbdUploadB64(await sigResizedImageB64(SIG_IMG_DIR + encodeURIComponent(imgName), srcExt), `ITSupport-sig-${id}.img`) : "";
     prog.set("Overfører signaturer...");
     const dataTmp = await kbdUploadB64(utf8ToB64(JSON.stringify(payload)), `ITSupport-sig-${id}.json`);
 
     prog.set("Gemmer i Outlook...");
-    const setDef = sigEl("sigDefault").checked ? "$true" : "$false";
+    const setDef = mode !== "none" ? "$true" : "$false";
     const script = String.raw`
 try {
 $ErrorActionPreference='Stop'
@@ -2901,11 +2922,11 @@ Write-Output ('OK|'+($hits -join ','))
     const hits = output.slice(3).split(",").filter(Boolean).map(x => x.toLowerCase());
 
     let msg = `✓ Signaturerne er gemt for ${cols.map(c => c.mail).join(" og ")}.`;
-    if (sigEl("sigDefault").checked) {
+    if (mode !== "none") {
       const missing = cols.filter(c => !hits.includes(c.mail)).map(c => c.mail);
       msg += missing.length
         ? ` Standard kunne ikke sættes for ${missing.join(", ")} (konto ikke fundet i Outlook).`
-        : " Sat som standard på begge konti.";
+        : (mode === "newOnly" ? ' "Ny mail" er sat som standard til både nye mails og svar på begge konti.' : " Sat som standard på begge konti.");
     }
     setSigResult(msg + " Genstart Outlook.", "ok");
     await loadSigExisting();
