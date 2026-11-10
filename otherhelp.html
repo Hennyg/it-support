@@ -219,6 +219,7 @@
         <label>Tel<input id="sigTel" oninput="sigFillTemplates()"></label>
         <label>Mob<input id="sigMob" oninput="sigFillTemplates()"></label>
       </div>
+      <label class="sig-check" style="margin-top:12px;"><input type="checkbox" id="sigIncludeMail" checked onchange="sigFillTemplates()"> Medtag mailadresse i "Ny mail"</label>
       <p class="sig-info" style="margin:10px 0 0;">Ændrer du stamdata, bliver teksten i alle fire signaturer lavet forfra ud fra skabelonen.</p>
     </div>
 
@@ -2551,7 +2552,8 @@ function sigStam() {
     last:  sigEl("sigLast").value.trim(),
     dept:  sigEl("sigDept").value.trim(),
     tel:   sigEl("sigTel").value.trim(),
-    mob:   sigEl("sigMob").value.trim()
+    mob:   sigEl("sigMob").value.trim(),
+    includeMail: sigEl("sigIncludeMail").checked
   };
 }
 
@@ -2609,7 +2611,7 @@ function sigTplNew(mail) {
     sigNameLine(),
     SIG_ADDRESS_LINE,
     phone,
-    [mail, SIG_WEB_TEXT].filter(Boolean).join("   |  ")
+    [f.includeMail ? mail : "", SIG_WEB_TEXT].filter(Boolean).join("   |  ")
   ].join("\n");
 }
 
@@ -2630,6 +2632,12 @@ function sigFillTemplates(onlyCol) {
 
 /* Udfyld fra eksisterende "Ny mail (...)"/"Svar (...)" hvis de findes, ellers skabelon */
 function sigFillFromExisting() {
+  // Har brugeren allerede en "Ny mail" uden mailadresse, fjernes fluebenet
+  const exNews = Object.keys(SIG_COLS).map(col => sigColMail(col))
+    .map(m => m && sigState.existing.find(s => s.name.toLowerCase() === sigNewName(m).toLowerCase()))
+    .filter(x => x && x.txt.trim());
+  if (exNews.length) sigEl("sigIncludeMail").checked = exNews.some(x => /@/.test(x.txt));
+
   Object.keys(SIG_COLS).forEach(col => {
     const mail = sigColMail(col);
     const find = n => sigState.existing.find(s => s.name.toLowerCase() === n.toLowerCase());
