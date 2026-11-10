@@ -91,6 +91,25 @@
     .router-card-link { display: inline-block; margin-top: 8px; font-size: .78rem; font-weight: 600; color: #850c18; }
     .loading { padding: 24px; text-align: center; color: #9ca3af; font-size: .88rem; }
     .empty { padding: 24px; text-align: center; color: #9ca3af; font-size: .85rem; }
+
+    /* Outlook signatur */
+    .sig-box { max-width: 780px; }
+    .sig-info { font-size: .78rem; color: #9ca3af; margin: -12px 0 14px; }
+    .sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-bottom: 10px; }
+    .sig-grid label { display: flex; flex-direction: column; gap: 4px; font-size: .78rem; font-weight: 600; color: #374151; }
+    .sig-grid input, .sig-grid select { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: .88rem; font-family: inherit; }
+    .sig-grid input:focus, .sig-grid select:focus { outline: none; border-color: #850c18; }
+    .sig-small { padding: 6px 12px; font-size: .8rem; }
+    .sig-section-title { font-size: .9rem; font-weight: 700; margin: 18px 0 8px; }
+    .sig-img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+    .sig-img { border: 2px solid #e5e7eb; border-radius: 10px; padding: 6px; cursor: pointer; background: #fff; text-align: center; transition: border-color .15s; }
+    .sig-img:hover { border-color: #fca5a5; }
+    .sig-img.active { border-color: #850c18; box-shadow: 0 2px 10px rgba(133,12,24,.18); }
+    .sig-img img { max-width: 100%; max-height: 70px; display: block; margin: 0 auto 4px; }
+    .sig-img span { font-size: .72rem; color: #6b7280; word-break: break-all; }
+    .sig-preview { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; background: #fff; overflow-x: auto; }
+    .sig-check { display: flex; align-items: center; gap: 8px; font-size: .85rem; margin: 14px 0 6px; }
+    @media (max-width: 600px) { .sig-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -158,6 +177,61 @@
         <button class="btn-run" id="kbdBtn" onclick="openKbdPopup()">▶ Kør</button>
       </div>
 
+      <div class="action-card">
+        <div class="card-icon">✉️</div>
+        <h2>Outlook signatur</h2>
+        <p>Opret eller ret din Outlook signatur. Navn, mail og telefon hentes fra Entra ID, og du vælger selv billedet under signaturen.</p>
+        <button class="btn-run" id="sigBtn" onclick="openSigPopup()">✉️ Lav signatur</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Popup: Outlook signatur -->
+<div class="popup-overlay" id="sigOverlay">
+  <div class="popup-box sig-box">
+    <h3 class="popup-title">✉️ Outlook signatur</h3>
+    <p class="popup-desc">Oplysningerne hentes fra Entra ID og fra din nuværende signatur. Ret det til, vælg billede og gem.</p>
+    <p class="sig-info" id="sigUserInfo"></p>
+
+    <div class="sig-grid">
+      <label>Hent oplysninger fra eksisterende signatur
+        <select id="sigExisting" onchange="onSigExistingChange()"><option value="">— Kun Entra ID —</option></select>
+      </label>
+      <label>Gemmes som
+        <input value="&quot;Nye mail&quot; og &quot;Svar&quot;" disabled>
+      </label>
+      <label>Fornavn<input id="sigFirst" oninput="renderSigPreview()"></label>
+      <label>Efternavn<input id="sigLast" oninput="renderSigPreview()"></label>
+      <label>Afdeling / titel<input id="sigDept" oninput="renderSigPreview()"></label>
+      <label>Mail<input id="sigMail" oninput="renderSigPreview()"></label>
+      <label>Tel<input id="sigTel" oninput="renderSigPreview()"></label>
+      <label>Mob<input id="sigMob" oninput="renderSigPreview()"></label>
+    </div>
+    <button class="btn-close sig-small" onclick="sigFillFromEntra()">↺ Hent navn, mail og mobil fra Entra ID</button>
+
+    <div class="sig-section-title">Billede under signaturen</div>
+    <div class="sig-img-grid" id="sigImgGrid"><div class="loading"><span class="spinner"></span> Henter billeder...</div></div>
+
+    <div class="sig-section-title">Forhåndsvisning — "Nye mail"</div>
+    <div class="sig-preview" id="sigPreview"></div>
+
+    <div class="sig-section-title">Forhåndsvisning — "Svar"</div>
+    <div class="sig-preview" id="sigPreviewReply"></div>
+
+    <label class="sig-check"><input type="checkbox" id="sigDefault" checked> Sæt "Nye mail" og "Svar" som standard på alle mailkonti</label>
+
+    <div id="sigProgressWrap" style="display:none;">
+      <div class="progressTrack"><div class="progressBarIndeterminate"></div></div>
+      <p class="progressText" id="sigProgressText"></p>
+    </div>
+
+    <div class="popup-footer">
+      <span class="popup-result" id="sigResult"></span>
+      <button class="btn-close" onclick="closeSigPopup()">Luk</button>
+      <button class="btn-close" onclick="copySig()" title="Til ny Outlook / Outlook på nettet">📋 Kopiér</button>
+      <button class="btn-update" id="sigSaveBtn" onclick="saveSig()" disabled>Gem i Outlook</button>
     </div>
   </div>
 </div>
@@ -2359,6 +2433,486 @@ Write-Output 'OK'
   }
   await checkKbdStatus();
   setKbdResult(msg, cls);
+}
+
+/* ---------- Outlook signatur ---------- */
+const SIG_IMG_DIR     = "/images/outlooksignatur/";
+const SIG_DEFAULT_IMG = "outlookstandardsignaturbillede.png";
+const SIG_DEFAULT_TEL = "+45 30 50 61 80";
+const SIG_WEB_TEXT    = "www.lely.com/dk/centers/herrup/";
+const SIG_WEB_URL     = "https://www.lely.com/dk/centers/herrup/";
+const SIG_ADDRESS     = ["Lely Center Herrup", "Nr. Bjertvej 12", "7830", "Vinderup", "Danmark"];
+const SIG_MAX_IMG_W   = 600;
+const SIG_MAIL_DOMAIN = "lelycenter.com";
+const SIG_NAME_NEW    = "Nye mail";
+const SIG_NAME_REPLY  = "Svar";
+
+let sigState = { images: [], selectedImg: "", existing: [], defaultSig: "", entra: null, agentOk: false, imgSize: null };
+
+function sigEl(id) { return document.getElementById(id); }
+
+function setSigResult(text, cls) {
+  const el = sigEl("sigResult");
+  el.textContent = text;
+  el.className = "popup-result" + (cls ? " " + cls : "");
+}
+
+function sigProgress(label) {
+  const wrap = sigEl("sigProgressWrap");
+  const text = sigEl("sigProgressText");
+  wrap.style.display = "block";
+  text.textContent = label;
+  return {
+    set: t => { text.textContent = t; },
+    stop: () => { wrap.style.display = "none"; }
+  };
+}
+
+/* Fælles PowerShell: find den indloggede brugers SID, profil og Outlook signatur-mappe (agenten kører som SYSTEM) */
+const SIG_PS_USER = String.raw`
+$who=(Get-CimInstance Win32_ComputerSystem).UserName
+if(-not $who){ throw 'Ingen indlogget bruger fundet' }
+$sid=(New-Object System.Security.Principal.NTAccount($who)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+if(-not (Get-PSDrive HKU -ErrorAction SilentlyContinue)){ New-PSDrive -PSProvider Registry -Name HKU -Root HKEY_USERS | Out-Null }
+$appData=(Get-ItemProperty ("HKU:\"+$sid+"\Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders") -ErrorAction SilentlyContinue).AppData
+if(-not $appData){
+  $prof=(Get-ItemProperty ("HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\"+$sid)).ProfileImagePath
+  $appData=Join-Path $prof 'AppData\Roaming'
+}
+$folder='Signatures'
+$gen=Get-ItemProperty ("HKU:\"+$sid+"\Software\Microsoft\Office\16.0\Common\General") -ErrorAction SilentlyContinue
+if($gen -and $gen.Signatures){ $folder=$gen.Signatures }
+$sigDir=Join-Path $appData ('Microsoft\'+$folder)
+function RegStr($v){ if($v -is [byte[]]){ return [Text.Encoding]::Unicode.GetString($v).Trim([char]0) }; return [string]$v }
+function Get-MailAccounts(){
+  $root="HKU:\"+$sid+"\Software\Microsoft\Office\16.0\Outlook\Profiles"
+  $res=@()
+  if(Test-Path $root){
+    foreach($k in (Get-ChildItem $root -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.PSParentPath -like '*9375CFF0413111d3B88A00104B2A6676' })){
+      $p=Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue
+      if($p -and $p.'Account Name'){ $res+=[pscustomobject]@{ path=$k.PSPath; account=(RegStr $p.'Account Name'); newSig=(RegStr $p.'New Signature') } }
+    }
+  }
+  return $res
+}
+`;
+
+function sigFormatPhone(p) {
+  if (!p) return "";
+  let d = String(p).replace(/[^\d+]/g, "");
+  if (d.startsWith("0045")) d = "+45" + d.slice(4);
+  if (/^\d{8}$/.test(d)) d = "+45" + d;
+  const m = d.match(/^\+45(\d{8})$/);
+  if (m) return "+45 " + m[1].replace(/(\d{2})(?=\d)/g, "$1 ");
+  return String(p).trim();
+}
+
+/* Signaturens mail er altid fornavn.efternavn@lelycenter.com med små bogstaver (lokaldelen tages fra xx.yy@lcherrup.dk) */
+function sigBuildMail(e) {
+  const src = String(e.mail || e.userPrincipalName || "").toLowerCase();
+  let local = src.split("@")[0];
+  if (!local.includes(".") && e.givenName && e.surname) {
+    local = (e.givenName + "." + e.surname).toLowerCase().replace(/\s+/g, ".");
+  }
+  return local ? local + "@" + SIG_MAIL_DOMAIN : "";
+}
+
+function sigEntraValues() {
+  const e = sigState.entra || {};
+  return {
+    first: e.givenName || "",
+    last:  e.surname || "",
+    dept:  e.department || e.jobTitle || "",
+    mail:  sigBuildMail(e),
+    tel:   SIG_DEFAULT_TEL,
+    mob:   sigFormatPhone(e.mobilePhone)
+  };
+}
+
+/* Læser værdier ud af en eksisterende signaturs .txt-version */
+function parseSigTxt(txt) {
+  const r = {};
+  if (!txt) return r;
+  const lines = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const nameLine = lines.find(l => l.includes("|") && !/lely center/i.test(l) && !/tel:|mob:|@|www\./i.test(l));
+  if (nameLine) {
+    const [name, dept] = nameLine.split("|").map(s => s.trim());
+    const parts = name.split(/\s+/);
+    r.last  = parts.length > 1 ? parts.pop() : "";
+    r.first = parts.join(" ");
+    if (dept) r.dept = dept;
+  }
+  const tel  = txt.match(/Tel:\s*(\+?[\d ]{6,})/i);
+  const mob  = txt.match(/Mob:\s*(\+?[\d ]{6,})/i);
+  const mail = txt.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
+  if (tel)  r.tel  = tel[1].trim();
+  if (mob)  r.mob  = sigFormatPhone(mob[1]);
+  if (mail) r.mail = mail[0].toLowerCase();
+  return r;
+}
+
+function sigSetFields(v) {
+  sigEl("sigFirst").value = v.first || "";
+  sigEl("sigLast").value  = v.last  || "";
+  sigEl("sigDept").value  = v.dept  || "";
+  sigEl("sigMail").value  = v.mail  || "";
+  sigEl("sigTel").value   = v.tel   || "";
+  sigEl("sigMob").value   = v.mob   || "";
+  renderSigPreview();
+}
+
+function sigFillFromEntra() {
+  if (!sigState.entra) { setSigResult("Ingen data fra Entra ID.", "err"); return; }
+  const e = sigEntraValues();
+  sigSetFields({ ...sigGetFields(), first: e.first, last: e.last, mail: e.mail, mob: e.mob || sigEl("sigMob").value });
+}
+
+function sigGetFields() {
+  return {
+    first: sigEl("sigFirst").value.trim(),
+    last:  sigEl("sigLast").value.trim(),
+    dept:  sigEl("sigDept").value.trim(),
+    mail:  sigEl("sigMail").value.trim().toLowerCase(),
+    tel:   sigEl("sigTel").value.trim(),
+    mob:   sigEl("sigMob").value.trim()
+  };
+}
+
+function sigCleanName(n) {
+  return String(n || "").replace(/[\\/:*?"<>|]/g, "").trim();
+}
+
+function onSigExistingChange() {
+  const name = sigEl("sigExisting").value;
+  const base = sigEntraValues();
+  if (!name) {
+    sigSetFields(base);
+    return;
+  }
+  const s = sigState.existing.find(x => x.name === name);
+  const parsed = parseSigTxt(s?.txt || "");
+  const merged = { ...base };
+  Object.keys(parsed).forEach(k => { if (parsed[k]) merged[k] = parsed[k]; });
+  sigSetFields(merged);
+}
+
+/* ---- Byg signaturen ---- */
+function sigSep(n) { return "&nbsp;".repeat(n) + "|" + "&nbsp;".repeat(n) + " "; }
+
+function buildSigHtml(imgSrc) {
+  const f = sigGetFields();
+  const name = [f.first, f.last].filter(Boolean).join(" ");
+  const p = 'style="margin:0;font-family:Arial,sans-serif;font-size:10pt;color:#000000;"';
+  const a = 'style="color:#000000;text-decoration:underline;"';
+  const nameLine = escHtml(name) + (f.dept ? " | " + escHtml(f.dept) : "");
+  const phoneParts = [];
+  if (f.tel) phoneParts.push("Tel: " + escHtml(f.tel));
+  if (f.mob) phoneParts.push("Mob: " + escHtml(f.mob));
+  const contact = [];
+  if (f.mail) contact.push(`<a href="mailto:${escHtml(f.mail)}" ${a}>${escHtml(f.mail)}</a>`);
+  contact.push(`<a href="${SIG_WEB_URL}" ${a}>${SIG_WEB_TEXT}</a>`);
+
+  let img = "";
+  if (imgSrc) {
+    let w = sigState.imgSize?.w, h = sigState.imgSize?.h;
+    if (w && w > SIG_MAX_IMG_W) { h = Math.round(h * SIG_MAX_IMG_W / w); w = SIG_MAX_IMG_W; }
+    const size = w && h ? ` width="${w}" height="${h}"` : "";
+    img = `<p ${p}>&nbsp;</p><p ${p}><img${size} src="${imgSrc}" alt="Lely Center Herrup" style="border:0;"></p>`;
+  }
+
+  return `<p ${p}>Venlig hilsen,</p>
+<p ${p}>&nbsp;</p>
+<p ${p}>${nameLine}</p>
+<p ${p}>${SIG_ADDRESS.map(escHtml).join(sigSep(2))}</p>
+<p ${p}>${phoneParts.join(sigSep(2))}</p>
+<p ${p}>${contact.join(sigSep(3))}</p>
+${img}`;
+}
+
+function buildSigTxt() {
+  const f = sigGetFields();
+  const name = [f.first, f.last].filter(Boolean).join(" ");
+  const phone = [f.tel ? "Tel: " + f.tel : "", f.mob ? "Mob: " + f.mob : ""].filter(Boolean).join("  |  ");
+  return [
+    "Venlig hilsen,",
+    "",
+    name + (f.dept ? " | " + f.dept : ""),
+    SIG_ADDRESS.join("  |  "),
+    phone,
+    [f.mail, SIG_WEB_TEXT].filter(Boolean).join("   |  ")
+  ].join("\r\n") + "\r\n";
+}
+
+/* "Svar": kun hilsen + navn | afdeling */
+function buildSigReplyHtml() {
+  const f = sigGetFields();
+  const name = [f.first, f.last].filter(Boolean).join(" ");
+  const p = 'style="margin:0;font-family:Arial,sans-serif;font-size:10pt;color:#000000;"';
+  return `<p ${p}>Venlig hilsen,</p>
+<p ${p}>${escHtml(name)}${f.dept ? " | " + escHtml(f.dept) : ""}</p>`;
+}
+
+function buildSigReplyTxt() {
+  const f = sigGetFields();
+  const name = [f.first, f.last].filter(Boolean).join(" ");
+  return "Venlig hilsen,\r\n" + name + (f.dept ? " | " + f.dept : "") + "\r\n";
+}
+
+function sigWrapHtm(body) {
+  return `<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="Generator" content="IT Support - Lely Center Herrup">
+</head>
+<body lang="DA">
+${body}
+</body>
+</html>`;
+}
+
+function renderSigPreview() {
+  const img = sigState.selectedImg ? SIG_IMG_DIR + encodeURIComponent(sigState.selectedImg) : "";
+  sigEl("sigPreview").innerHTML = buildSigHtml(img);
+  sigEl("sigPreviewReply").innerHTML = buildSigReplyHtml();
+}
+
+/* ---- Billeder ---- */
+async function loadSigImages() {
+  let list = [];
+  try {
+    const r = await fetch(SIG_IMG_DIR + "index.json", { cache: "no-store" });
+    if (r.ok) list = await r.json();
+  } catch {}
+  if (!Array.isArray(list) || !list.length) list = [SIG_DEFAULT_IMG];
+  sigState.images = list;
+  if (!list.includes(sigState.selectedImg)) {
+    sigState.selectedImg = list.includes(SIG_DEFAULT_IMG) ? SIG_DEFAULT_IMG : list[0];
+  }
+  renderSigImages();
+  await selectSigImage(sigState.selectedImg);
+}
+
+function renderSigImages() {
+  sigEl("sigImgGrid").innerHTML = sigState.images.map(n => `
+    <div class="sig-img${n === sigState.selectedImg ? " active" : ""}" onclick="selectSigImage(this.dataset.name)" data-name="${escHtml(n)}">
+      <img src="${SIG_IMG_DIR + encodeURIComponent(n)}" alt="">
+      <span>${escHtml(n)}</span>
+    </div>`).join("");
+}
+
+function selectSigImage(name) {
+  sigState.selectedImg = name;
+  sigState.imgSize = null;
+  renderSigImages();
+  return new Promise(resolve => {
+    const im = new Image();
+    im.onload  = () => { sigState.imgSize = { w: im.naturalWidth, h: im.naturalHeight }; renderSigPreview(); resolve(); };
+    im.onerror = () => { renderSigPreview(); resolve(); };
+    im.src = SIG_IMG_DIR + encodeURIComponent(name);
+  });
+}
+
+/* ---- Entra ID ---- */
+async function loadSigEntra() {
+  try {
+    const r = await fetch("/api/getSignatureInfo", { cache: "no-store" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    sigState.entra = d;
+  } catch (err) {
+    console.error("Outlook signatur – Entra fejl:", err);
+    sigState.entra = null;
+    setSigResult("Kunne ikke hente oplysninger fra Entra ID: " + err.message, "err");
+  }
+}
+
+/* ---- Eksisterende signaturer via agenten ---- */
+async function loadSigExisting() {
+  const script = String.raw`
+try {
+$ErrorActionPreference='Stop'
+${SIG_PS_USER}
+$list=@()
+if(Test-Path $sigDir){
+  foreach($f in (Get-ChildItem $sigDir -Filter *.htm -File)){
+    $n=[IO.Path]::GetFileNameWithoutExtension($f.Name)
+    $t=Join-Path $sigDir ($n+'.txt')
+    $txt=''
+    if(Test-Path $t){ $txt=[string](Get-Content $t -Raw) }
+    $list+=[pscustomobject]@{ name=$n; txt=$txt }
+  }
+}
+$def=''
+foreach($a in (Get-MailAccounts)){ if($a.newSig){ $def=$a.newSig; break } }
+$json=ConvertTo-Json @{ who=$who; dir=$sigDir; def=$def; sigs=@($list) } -Depth 4 -Compress
+Write-Output ('JSON:'+[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json)))
+} catch { Write-Output ('ERROR: '+$_.Exception.Message) }
+`.trim();
+
+  try {
+    const data = await runPsKbd(script);
+    const output = (data.output || "").trim();
+    if (!output.startsWith("JSON:")) throw new Error(output || data.error || data.stderr || ("Uventet svar: " + JSON.stringify(data)));
+    const bytes = Uint8Array.from(atob(output.slice(5)), c => c.charCodeAt(0));
+    const j = JSON.parse(new TextDecoder().decode(bytes));
+    sigState.existing   = Array.isArray(j.sigs) ? j.sigs : (j.sigs ? [j.sigs] : []);
+    sigState.defaultSig = j.def || "";
+    sigState.agentOk    = true;
+    sigEl("sigUserInfo").textContent = "Bruger: " + j.who + "  ·  " + j.dir;
+  } catch (err) {
+    console.error("Outlook signatur – agent fejl:", err);
+    sigState.existing = [];
+    sigState.agentOk = false;
+    setSigResult(err instanceof TypeError
+      ? "Kunne ikke forbinde til IT Support Agent. Du kan stadig kopiere signaturen."
+      : "Fejl: " + err.message, "err");
+  }
+
+  const sel = sigEl("sigExisting");
+  sel.innerHTML = '<option value="">➕ Ny signatur</option>' +
+    sigState.existing.map(s => `<option value="${escHtml(s.name)}">${escHtml(s.name)}${s.name === sigState.defaultSig ? " (standard)" : ""}</option>`).join("");
+}
+
+async function openSigPopup() {
+  sigEl("sigOverlay").classList.add("open");
+  setSigResult("", "");
+  sigEl("sigSaveBtn").disabled = true;
+  sigEl("sigUserInfo").textContent = "";
+  const prog = sigProgress("Henter oplysninger...");
+  try {
+    await Promise.all([loadSigEntra(), loadSigExisting(), loadSigImages()]);
+  } finally {
+    prog.stop();
+  }
+
+  // Forvælg "Nye mail", ellers nuværende standardsignatur, ellers den første, ellers kun Entra ID
+  const sel = sigEl("sigExisting");
+  const pick = sigState.existing.find(s => s.name === SIG_NAME_NEW)
+            || sigState.existing.find(s => s.name === sigState.defaultSig)
+            || sigState.existing[0];
+  sel.value = pick ? pick.name : "";
+  onSigExistingChange();
+  sigEl("sigSaveBtn").disabled = !sigState.agentOk;
+}
+
+function closeSigPopup() {
+  sigEl("sigOverlay").classList.remove("open");
+}
+
+async function sigFetchB64(url) {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Kunne ikke hente ${url} (HTTP ${res.status})`);
+  const buf = new Uint8Array(await res.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+async function saveSig() {
+  const f = sigGetFields();
+  if (!f.first || !f.mail) { setSigResult("Fornavn og mail skal udfyldes.", "err"); return; }
+
+  const btn = sigEl("sigSaveBtn");
+  btn.disabled = true;
+  setSigResult("", "");
+  const prog = sigProgress("Forbereder...");
+  const id = Date.now().toString(36);
+
+  try {
+    const imgName = sigState.selectedImg;
+    const ext = (imgName.match(/\.[a-z0-9]+$/i)?.[0] || ".png").toLowerCase();
+    const imgRel = encodeURIComponent(SIG_NAME_NEW) + "_files/image001" + ext;
+
+    prog.set("Overfører billede...");
+    const imgTmp = imgName ? await kbdUploadB64(await sigFetchB64(SIG_IMG_DIR + encodeURIComponent(imgName)), `ITSupport-sig-${id}.img`) : "";
+    prog.set("Overfører signaturer...");
+    const newHtmTmp   = await kbdUploadB64(utf8ToB64(sigWrapHtm(buildSigHtml(imgName ? imgRel : ""))), `ITSupport-sig-${id}-new.htm`);
+    const newTxtTmp   = await kbdUploadB64(utf8ToB64("\uFEFF" + buildSigTxt()),                       `ITSupport-sig-${id}-new.txt`);
+    const replyHtmTmp = await kbdUploadB64(utf8ToB64(sigWrapHtm(buildSigReplyHtml())),                 `ITSupport-sig-${id}-reply.htm`);
+    const replyTxtTmp = await kbdUploadB64(utf8ToB64("\uFEFF" + buildSigReplyTxt()),                   `ITSupport-sig-${id}-reply.txt`);
+
+    prog.set("Gemmer i Outlook...");
+    const setDef = sigEl("sigDefault").checked ? "$true" : "$false";
+    const script = String.raw`
+try {
+$ErrorActionPreference='Stop'
+${SIG_PS_USER}
+$newName=${psQuote(SIG_NAME_NEW)}
+$replyName=${psQuote(SIG_NAME_REPLY)}
+$imgTmp=${psQuote(imgTmp)}
+$ext=${psQuote(ext)}
+function Dec($tmp,$dest){ $b=[Convert]::FromBase64String((Get-Content $tmp -Raw).Trim()); [IO.File]::WriteAllBytes($dest,$b); Remove-Item $tmp -Force }
+function Reset-Sig($n){
+  $fd=Join-Path $sigDir ($n+'_files')
+  if(Test-Path $fd){ Remove-Item $fd -Recurse -Force }
+  Remove-Item (Join-Path $sigDir ($n+'.rtf')) -Force -ErrorAction SilentlyContinue
+}
+New-Item -ItemType Directory -Force -Path $sigDir | Out-Null
+
+# Nye mail — fuld signatur med billede
+Reset-Sig $newName
+if($imgTmp){
+  $filesDir=Join-Path $sigDir ($newName+'_files')
+  New-Item -ItemType Directory -Force -Path $filesDir | Out-Null
+  Dec $imgTmp (Join-Path $filesDir ('image001'+$ext))
+}
+Dec ${psQuote(newHtmTmp)} (Join-Path $sigDir ($newName+'.htm'))
+Dec ${psQuote(newTxtTmp)} (Join-Path $sigDir ($newName+'.txt'))
+
+# Svar — kun hilsen og navn | afdeling
+Reset-Sig $replyName
+Dec ${psQuote(replyHtmTmp)} (Join-Path $sigDir ($replyName+'.htm'))
+Dec ${psQuote(replyTxtTmp)} (Join-Path $sigDir ($replyName+'.txt'))
+
+$hits=0
+if(${setDef}){
+  # Samme opsætning på alle mailkonti i Outlook (xx.yy@lcherrup.dk og zzz@lcherrup.dk)
+  foreach($a in @(Get-MailAccounts | Where-Object { $_.account -like '*@*' })){
+    New-ItemProperty -Path $a.path -Name 'New Signature' -Value $newName -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $a.path -Name 'Reply-Forward Signature' -Value $replyName -PropertyType String -Force | Out-Null
+    $hits++
+  }
+}
+Write-Output ('OK|'+$hits)
+} catch { Write-Output ('ERROR: '+$_.Exception.Message) }
+`.trim();
+
+    const data = await runPsKbd(script);
+    const output = (data.output || "").trim();
+    if (!output.startsWith("OK|")) throw new Error(output || data.error || data.stderr || ("Uventet svar: " + JSON.stringify(data)));
+    const hits = parseInt(output.split("|")[1], 10) || 0;
+
+    let msg = `✓ "${SIG_NAME_NEW}" og "${SIG_NAME_REPLY}" er gemt.`;
+    if (sigEl("sigDefault").checked) {
+      msg += hits ? ` Sat som standard på ${hits} mailkonto${hits === 1 ? "" : "er"} — genstart Outlook.` : " Kunne ikke finde en Outlook-konto at sætte dem som standard på — vælg dem i Outlook.";
+    } else {
+      msg += " Genstart Outlook for at se dem.";
+    }
+    setSigResult(msg, "ok");
+    await loadSigExisting();
+    sigEl("sigExisting").value = SIG_NAME_NEW;
+  } catch (err) {
+    console.error("Outlook signatur – gem fejl:", err);
+    setSigResult(err instanceof TypeError ? "Kunne ikke forbinde til IT Support Agent." : "Fejl: " + err.message, "err");
+  } finally {
+    prog.stop();
+    btn.disabled = !sigState.agentOk;
+  }
+}
+
+/* Kopiér til udklipsholder — til ny Outlook / Outlook på nettet */
+async function copySig() {
+  const img = sigState.selectedImg ? location.origin + SIG_IMG_DIR + encodeURIComponent(sigState.selectedImg) : "";
+  const html = buildSigHtml(img);
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html":  new Blob([html], { type: "text/html" }),
+      "text/plain": new Blob([buildSigTxt()], { type: "text/plain" })
+    })]);
+    setSigResult("✓ Kopieret. Indsæt i Outlook → Indstillinger → Signaturer.", "ok");
+  } catch (err) {
+    setSigResult("Kunne ikke kopiere: " + err.message, "err");
+  }
 }
 </script>
 
