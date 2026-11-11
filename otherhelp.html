@@ -709,8 +709,21 @@ function stopProgress(wrapId, timerId) {
 document.addEventListener("DOMContentLoaded", () => {
   ITAuth.requireAuth(({ user }) => {
     document.getElementById("appContent").style.setProperty("display", "block", "important");
+    openFromLink();
   });
 });
+
+/* Direkte links: otherhelp.html#outlook-signatur eller otherhelp.html?vis=outlook-signatur */
+const DIRECT_LINKS = {
+  "outlook-signatur": () => openSigPopup()
+};
+
+function openFromLink() {
+  const key = (location.hash.replace(/^#/, "") || new URLSearchParams(location.search).get("vis") || "").toLowerCase();
+  if (DIRECT_LINKS[key]) DIRECT_LINKS[key]();
+}
+
+window.addEventListener("hashchange", openFromLink);
 
 async function runPs(script) {
   const res = await fetch(AGENT + "/api/run-ps", {
